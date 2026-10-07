@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开盘啦榜单速评 · 连板晋级概率</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#f6f7f9; --panel:#ffffff; --fg:#1f2328; --muted:#6b7280;
+    --border:#e4e7eb; --head:#1f3864; --chip:#eef3fb; --ok:#1f7a3d; --bad:#b3261e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#15171c; --panel:#1d2026; --fg:#e9ebee; --muted:#9aa0a6; --border:#2c313a; --head:#9ec1f0; --chip:#232a35; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:22px 16px 40px;background:var(--bg);color:var(--fg);
+       font:14px/1.65 "Microsoft YaHei","PingFang SC",system-ui,-apple-system,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 6px;font-weight:600}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 18px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .card h2{font-size:14px;margin:0 0 10px;font-weight:600;color:var(--head)}
+  label.field{display:block;font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  textarea{width:100%;min-height:132px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;
+           background:var(--bg);color:var(--fg);font:13px/1.7 Consolas,"Courier New",monospace;resize:vertical}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  button{font:13px inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--border);
+         background:var(--chip);color:var(--fg);cursor:pointer}
+  button:hover{border-color:var(--head)}
+  button.primary{background:var(--head);color:#fff;border-color:var(--head)}
+  button.primary:hover{opacity:.9}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12px}
+  .tablewrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border:1px solid var(--border);padding:7px 9px;text-align:center;white-space:nowrap}
+  th{background:var(--chip);font-weight:600;color:var(--head)}
+  th.hd{background:var(--head);color:#fff;border-color:var(--head)}
+  td.name{text-align:left}
+  td.left{text-align:left}
+  .tag{font-size:11.5px;color:var(--muted);display:block}
+  .big{font-size:15px;font-weight:600}
+  .legend{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:8px 0 2px;flex-wrap:wrap}
+  .sw{width:24px;height:12px;display:inline-block;border-radius:2px}
+  .kpi{display:flex;flex-wrap:wrap;gap:18px;margin:2px 0 10px}
+  .kpi div{font-size:12.5px;color:var(--muted)}
+  .kpi b{display:block;font-size:19px;color:var(--fg);font-weight:600}
+  .note{font-size:12.5px;color:var(--muted);margin-top:10px}
+  .hzhi{color:#b3261e;font-weight:700}
+  .hzmid{color:#e07a1f;font-weight:700}
+  .hzseat{font-size:11.5px;color:var(--muted);display:block}
+  .rbadge{display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#b3261e;color:#fff;font-size:10.5px;font-weight:700}
+  .obadge{display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#e07a1f;color:#fff;font-size:10.5px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>开盘啦榜单速评 · 连板晋级概率</h1>
+  <p class="sub">把 9:25 实时龙虎榜
+  里你要看的几只粘进来，立刻看到它们在历史上的晋级概率。底层统计：2026-03-25 ~ 2026-09-10，117 个交易日、10244 只昨日涨停股。</p>
+
+  <div class="card">
+    <h2>① 输入今天的榜单</h2>
+    <label class="field" for="inp">每行一只，格式：<code>代码 名称 板数 实际换手 竞价涨幅</code>（名称可省；板数可写数字或「首板」）</label>
+    <textarea id="inp" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="primary" id="btnGo">计算晋级概率</button>
+      <button id="btnDemo">填入示例</button>
+      <button id="btnSave">存进本地复盘库</button>
+      <button id="btnExport">导出复盘库 CSV</button>
+      <button id="btnClear">清空复盘库</button>
+    </div>
+    <p class="hint">板数填昨天收盘时的连板数；实际换手、竞价涨幅照着榜单抄（带不带 % 都行）。开盘档位按主板 10%、创业板/科创板 20%、ST 5%、北交所 30% 折算。</p>
+  </div>
+
+  <div class="card" id="hzCard">
+    <h2>高危席位 · 砸盘榜（数据版）</h2>
+    <div class="row" style="margin-top:0">
+      <span style="font-size:12.5px;color:var(--muted)">龙虎榜日期</span>
+      <input type="date" id="hzDate" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg)">
+      <button class="primary" id="hzGo">抓这天的龙虎榜</button>
+      <span id="hzMsg" class="hint"></span>
+    </div>
+    <div id="hzKpi" class="kpi"></div>
+    <div class="tablewrap"><table id="hzTab"><tbody><tr><td style="color:var(--muted);text-align:left">点上面按钮：列出当天上榜股的买卖席位，命中高风险名单的标红（红＝次日下跌概率≥70%，橙＝62~70%）。</td></tr></tbody></table></div>
+    <p class="note" id="hzNote"></p>
+  </div>
+
+  <div class="card" id="resCard" hidden>
+    <h2>② 逐只评估</h2>
+    <div id="kpi" class="kpi"></div>
+    <div class="tablewrap"><table id="resTab"></table></div>
+    <p class="note" id="resNote"></p>
+  </div>
+
+  <div class="card">
+    <h2>③ 历史概率参照（当前口径：<span id="modeName">实际换手前5</span>）</h2>
+    <div class="row" style="margin-top:0">
+      <button id="btnMode">切换口径：实际换手前5 / 全部昨日涨停股</button>
+    </div>
+    <div class="legend"><span>晋级概率</span><span id="sws"></span><span>低 → 高</span><span id="legendNote"></span></div>
+    <div class="tablewrap"><table id="heat"></table></div>
+    <p class="note" id="heatNote"></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var GK = ["低开","高开0~20%","高开20~50%","高开50~80%","高开80~99%","开盘即涨停"];
+  var BROW = ["首板","2板","3板","4板","≥5板"];
+  var TAB = {
+    at: [
+      [[5,19],[15,20],[29,21],[46,26],[64,25],[56,52]],
+      [[13,16],[24,17],[20,20],[44,39],[52,23],[86,43]],
+      [[12,17],[33,12],[54,13],[46,13],[56,16],[82,28]],
+      [[5,19],[63,8],[44,9],[70,10],[56,9],[79,14]],
+      [[0,22],[13,15],[50,10],[50,18],[45,11],[70,20]]
+    ],
+    all: [
+      [[3,2244],[8,2622],[20,1657],[38,538],[56,153],[67,361]],
+      [[6,385],[11,317],[23,266],[43,170],[51,77],[81,192]],
+      [[7,137],[15,101],[24,96],[41,61],[54,37],[77,103]],
+      [[6,62],[29,42],[21,53],[57,30],[47,17],[81,48]],
+      [[6,120],[20,76],[25,77],[38,53],[66,29],[76,85]]
+    ]
+  };
+  var MODE = "at";
+  var NAMES = { at:"实际换手前5", all:"全部昨日涨停股" };
+
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function lim(code, name){
+    var st = /ST/i.test(name||"");
+    if (code.indexOf("30")===0 || code.indexOf("68")===0) return 20;
+    if (code.indexOf("8")===0 || code.indexOf("4")===0 || code.indexOf("92")===0) return 30;
+    return st ? 5 : 10;
+  }
+  function boardOf(t){
+    if (!t) return null;
+    if (/^首板$/.test(t) || /^1$/.test(t)) return 1;
+    var m = t.match(/^(\d+)$/); if (m) return +m[1];
+    m = t.match(/^(\d+)\s*板$/); if (m) return +m[1];
+    m = t.match(/^(\d+)\s*天\s*(\d+)\s*板$/); if (m) return +m[2];
+    if (/连板$/.test(t)) { m = t.match(/^(\d+)/); if (m) return +m[1]; }
+    return null;
+  }
+  function rowOf(b){ return b>=5 ? 4 : Math.max(0, b-1); }
+  function colOf(chg, limPct){
+    var f = chg / limPct;
+    if (f < 0) return 0;
+    if (f < 0.2) return 1;
+    if (f < 0.5) return 2;
+    if (f < 0.8) return 3;
+    if (f < 0.99) return 4;
+    return 5;
+  }
+  function num(t){ var m = String(t).replace(/[%％,，]/g,"").match(/^-?\d+(\.\d+)?$/); return m ? +m[0] : null; }
+
+  function parse(text){
+    var out = [], bad = [];
+    text.split(/\r?\n/).forEach(function(raw){
+      var line = raw.trim();
+      if (!line || line.charAt(0) === "#") return;
+      var t = line.split(/[\s,，;；\t]+/).filter(function(x){ return x !== ""; });
+      if (t.length < 3) { bad.push(line); return; }
+      var code = "", i = 0;
+      for (var k = 0; k < t.length; k++) { if (/^\d{6}$/.test(t[k])) { code = t[k]; i = k; break; } }
+      var rest = code ? t.slice(i+1) : t.slice();
+      var name = "";
+      if (rest.length && num(rest[0]) === null && boardOf(rest[0]) === null) { name = rest.shift(); }
+      var b = boardOf(rest[0]) !== null ? boardOf(rest.shift()) : null;
+      var nums = rest.map(num).filter(function(x){ return x !== null; });
+      if (b === null || nums.length < 2) { bad.push(line); return; }
+      out.push({ code: code, name: name, board: b, at: nums[0], chg: nums[1] });
+    });
+    return { rows: out, bad: bad };
+  }
+
+  function shade(p){
+    var steps = [[10,"#eff4fb","#1f3864"],[20,"#dee8f5","#1f3864"],[30,"#cbdaef","#1f3864"],[40,"#b5cbe8","#1f3864"],
+                 [50,"#9db9df","#1f3864"],[60,"#84a7d6","#123257"],[70,"#6c95cc","#ffffff"],[80,"#5783c2","#ffffff"],[101,"#2f5fa6","#ffffff"]];
+    for (var i=0;i<steps.length;i++) if (p < steps[i][0]) return { bg:steps[i][1], fg:steps[i][2] };
+    return { bg:"#2f5fa6", fg:"#ffffff" };
+  }
+
+  function render(){
+    var r = parse(document.getElementById("inp").value);
+    var card = document.getElementById("resCard"), tab = document.getElementById("resTab");
+    if (!r.rows.length){
+      card.hidden = false;
+      tab.innerHTML = "";
+      document.getElementById("kpi").innerHTML = "";
+      document.getElementById("resNote").textContent = "没识别到有效行" +
+        (r.bad.length ? "（有 " + r.bad.length + " 行格式看不懂：" + r.bad.slice(0,2).join(" / ") + "）" : "") +
+        "。格式示例：002790 瑞尔特 2 2.79 10.01";
+      return;
+    }
+    var html = '<tr><th class="hd">股票</th><th class="hd">板数</th><th class="hd">实际换手</th><th class="hd">竞价涨幅</th><th class="hd">开盘档位</th><th class="hd">历史晋级概率</th><th class="hd">样本</th><th class="hd">同期基线</th></tr>';
+    r.rows.forEach(function(x){
+      var L = lim(x.code, x.name), c = colOf(x.chg, L), rw = rowOf(x.board);
+      var cell = TAB.at[rw][c], base = TAB.all[rw][c];
+      var weak = cell[1] < 8;
+      var s = shade(cell[0]);
+      html += '<tr>'
+        + '<td class="name">' + (x.name ? esc(x.name) : "—") + (x.code ? '<span class="tag">' + esc(x.code) + '</span>' : '') + '</td>'
+        + '<td>' + (x.board >= 5 ? "≥5板" : (x.board === 1 ? "首板" : x.board + "板")) + '</td>'
+        + '<td>' + x.at + '%</td>'
+        + '<td>' + (x.chg > 0 ? "+" : "") + x.chg + '%<span class="tag">涨停幅 ' + L + '%</span></td>'
+        + '<td class="left">' + GK[c] + '</td>'
+        + '<td style="background:' + s.bg + ';color:' + s.fg + '"><span class="big">' + cell[0] + '%</span></td>'
+        + '<td>' + cell[1] + (weak ? '<span class="tag">样本少</span>' : '') + '</td>'
+        + '<td>' + base[0] + '%<span class="tag">n=' + base[1] + '</span></td>'
+        + '</tr>';
+    });
+    tab.innerHTML = html;
+    var ranked = r.rows.slice().sort(function(a,b){
+      return TAB.at[rowOf(b.board)][colOf(b.chg, lim(b.code,b.name))][0] - TAB.at[rowOf(a.board)][colOf(a.chg, lim(a.code,a.name))][0];
+    });
+    var top = ranked[0], topP = TAB.at[rowOf(top.board)][colOf(top.chg, lim(top.code, top.name))];
+    document.getElementById("kpi").innerHTML =
+      '<div>本次最高<b>' + topP[0] + '%</b>' + esc(top.name || top.code || "—") + '</div>'
+      + '<div>输入只数<b>' + r.rows.length + '</b>本次</div>'
+      + '<div>该组合历史样本<b>' + topP[1] + '</b>只</div>';
+    var note = "概率来自历史统计，不等于当天结果，也不构成投资建议。";
+    if (topP[1] < 8) note += "该组合历史样本不足 8 只，参考意义有限。";
+    if (r.bad.length) note += "（另有 " + r.bad.length + " 行没解析出来，已跳过）";
+    document.getElementById("resNote").textContent = note;
+    card.hidden = false;
+  }
+
+  function renderHeat(){
+    var T = TAB[MODE];
+    var h = '<tr><th class="hd">板数</th>' + GK.map(function(g){ return '<th class="hd">' + g + '</th>'; }).join("") + '</tr>';
+    for (var i=0;i<BROW.length;i++){
+      h += '<tr><th>' + BROW[i] + '</th>';
+      for (var j=0;j<GK.length;j++){
+        var c = T[i][j], s = shade(c[0]);
+        h += '<td style="background:' + s.bg + ';color:' + s.fg + '">' + c[0] + '%<span class="tag" style="color:' + s.fg + ';opacity:.75">n=' + c[1] + '</span></td>';
+      }
+      h += '</tr>';
+    }
+    document.getElementById("heat").innerHTML = h;
+    document.getElementById("modeName").textContent = NAMES[MODE];
+    document.getElementById("heatNote").textContent = MODE === "at"
+      ? "口径：9:25 实时龙虎榜按实际换手排序取前 5（只统计昨日涨停股）。"
+      : "口径：同期全部昨日涨停股，不按换手率筛选。";
+  }
+
+// ===== 高危席位（数据版砸盘榜）：东财营业部交易明细 2025-09-15 ~ 2026-09-14，净卖出 63,366 笔
+// p=上榜后「次日下跌概率」%，d1=次日平均涨跌%，d3=后3日平均%，c=样本数。基准：次日 -0.10%、下跌概率 52.9%
+var RISK_HI = [
+  {n:"华鑫证券有限责任公司上海源深路证券营业部",p:89.1,d1:-6.16,d3:-10.50,c:46},
+  {n:"中国中金财富证券有限公司深圳中金大厦证券营业部",p:84.1,d1:-3.00,d3:-4.74,c:44},
+  {n:"国泰海通证券股份有限公司洛阳长兴街证券营业部",p:83.7,d1:-5.47,d3:-8.33,c:49},
+  {n:"东北证券股份有限公司北京三里河东路证券营业部",p:76.7,d1:-2.32,d3:0.54,c:30},
+  {n:"华鑫证券有限责任公司上海光复路证券营业部",p:75.7,d1:-2.70,d3:-5.12,c:37},
+  {n:"华鑫证券有限责任公司深圳益田路证券营业部",p:74.5,d1:-2.83,d3:-7.39,c:55},
+  {n:"国信证券股份有限公司深圳泰然九路证券营业部",p:74.0,d1:-3.83,d3:-5.67,c:150},
+  {n:"光大证券股份有限公司北京总部基地证券营业部",p:73.1,d1:-3.36,d3:-5.64,c:67},
+  {n:"招商证券股份有限公司上海牡丹江路证券营业部",p:73.0,d1:-6.05,d3:-7.48,c:37},
+  {n:"东方证券股份有限公司无锡梁清路证券营业部",p:71.1,d1:-3.52,d3:-8.16,c:45},
+  {n:"招商证券股份有限公司北京建国路证券营业部",p:71.1,d1:-2.91,d3:-8.37,c:38},
+  {n:"湘财证券股份有限公司上海陆家嘴证券营业部",p:71.0,d1:-1.75,d3:-3.77,c:31},
+  {n:"广发证券股份有限公司杭州富春路证券营业部",p:70.8,d1:-1.66,d3:-2.60,c:65},
+  {n:"东方证券股份有限公司杭州龙井路证券营业部",p:70.6,d1:-2.13,d3:-1.57,c:34},
+  {n:"广发证券股份有限公司深圳东滨路证券营业部",p:70.0,d1:-4.67,d3:-4.38,c:30},
+  {n:"中银国际证券股份有限公司深圳中心四路证券营业部",p:70.0,d1:-1.19,d3:0.56,c:40}
+];
+
+var RISK_MID = [
+  {n:"中泰证券股份有限公司湖北分公司",p:69.4,d1:-1.57,d3:-2.84,c:49},
+  {n:"华鑫证券有限责任公司上海徐汇区瑞平路证券营业部",p:69.3,d1:-1.97,d3:-4.92,c:101},
+  {n:"国泰海通证券股份有限公司深圳海岸城海德三道证券营业部",p:68.6,d1:-2.14,d3:-2.79,c:51},
+  {n:"华泰证券股份有限公司苏州吴中大道证券营业部",p:68.6,d1:-1.87,d3:-1.49,c:70},
+  {n:"中泰证券股份有限公司常州惠国路证券营业部",p:68.4,d1:-2.08,d3:-3.96,c:95},
+  {n:"国盛证券股份有限公司杭州建设三路证券营业部",p:68.4,d1:-1.66,d3:-2.32,c:76},
+  {n:"中国中金财富证券有限公司广州分公司",p:66.7,d1:-2.32,d3:-6.05,c:33},
+  {n:"国泰海通证券股份有限公司深圳福田中心区华融大厦证券营业部",p:66.7,d1:-1.22,d3:-4.66,c:30},
+  {n:"国泰海通证券股份有限公司长沙五一大道第二证券营业部",p:66.7,d1:-1.96,d3:0.13,c:48},
+  {n:"中信证券股份有限公司北京紫竹院路证券营业部",p:66.7,d1:-0.19,d3:-4.33,c:30},
+  {n:"国泰海通证券股份有限公司揭阳黄岐山大道证券营业部",p:66.7,d1:-3.03,d3:-5.07,c:36},
+  {n:"中国银河证券股份有限公司南京王府大街证券营业部",p:66.7,d1:-3.31,d3:-8.13,c:30},
+  {n:"上海证券有限责任公司崇明区堡镇中路证券营业部",p:66.7,d1:-1.02,d3:-1.63,c:33},
+  {n:"国信证券股份有限公司深圳红岭中路证券营业部",p:66.6,d1:-1.70,d3:-3.15,c:371},
+  {n:"国信证券股份有限公司上海分公司",p:65.1,d1:-3.34,d3:-3.81,c:43},
+  {n:"华鑫证券有限责任公司上海东大名路证券营业部",p:64.9,d1:-1.85,d3:-5.90,c:37},
+  {n:"爱建证券有限责任公司上海浦东新区前滩大道证券营业部",p:64.3,d1:-1.65,d3:-2.76,c:70},
+  {n:"中信建投证券股份有限公司杭州庆春路证券营业部",p:64.1,d1:-1.87,d3:-1.07,c:64},
+  {n:"东亚前海证券有限责任公司浙江分公司",p:63.9,d1:-1.53,d3:-3.64,c:83},
+  {n:"中国银河证券股份有限公司北京学院南路证券营业部",p:63.6,d1:-0.85,d3:0.34,c:88},
+  {n:"中信建投证券股份有限公司天津解放南路证券营业部",p:63.6,d1:0.39,d3:-3.91,c:33},
+  {n:"招商证券股份有限公司上海世纪大道证券营业部",p:63.5,d1:-2.45,d3:-4.83,c:52},
+  {n:"甬兴证券有限公司宁波和源路证券营业部",p:62.9,d1:-0.70,d3:-1.62,c:70},
+  {n:"长江证券股份有限公司上海分公司",p:62.8,d1:-0.82,d3:-0.40,c:43},
+  {n:"国联民生证券股份有限公司宁波财神殿南路证券营业部",p:62.5,d1:-1.48,d3:-6.55,c:32},
+  {n:"江海证券有限公司深圳分公司",p:62.5,d1:-0.59,d3:4.16,c:32},
+  {n:"中国银河证券股份有限公司北京安贞门证券营业部",p:62.5,d1:-2.33,d3:-3.91,c:40},
+  {n:"华泰证券股份有限公司深圳前海证券营业部",p:62.3,d1:-0.93,d3:-2.15,c:183},
+  {n:"国信证券股份有限公司上海浦东分公司",p:62.2,d1:0.53,d3:-3.29,c:37}
+];
+
+var RISKMAP = {};
+RISK_HI.forEach(function(x){ RISKMAP[x.n] = { lv: 2, p: x.p, d1: x.d1, d3: x.d3, c: x.c }; });
+RISK_MID.forEach(function(x){ if (!RISKMAP[x.n]) RISKMAP[x.n] = { lv: 1, p: x.p, d1: x.d1, d3: x.d3, c: x.c }; });
+var HZC = 0;
+function hzFetch(report, date){
+  return new Promise(function(res){
+    var name = "HZCB" + (++HZC) + "_" + Math.floor(Math.random() * 1e5);
+    var s = document.createElement("script"), done = false;
+    var t = setTimeout(function(){ if (!done){ done = true; fin(null); } }, 15000);
+    function fin(v){ try { delete window[name]; } catch(e){ window[name] = undefined; } if (s.parentNode) s.parentNode.removeChild(s); clearTimeout(t); res(v); }
+    window[name] = function(j){ if (done) return; done = true; fin(j); };
+    s.onerror = function(){ if (!done){ done = true; fin(null); } };
+    var f = "(TRADE_DATE=" + String.fromCharCode(39) + date + String.fromCharCode(39) + ")";
+    s.src = "https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=" + report +
+      "&columns=ALL&pageSize=500&pageNumber=1&source=WEB&client=WEB&callback=" + name + "&filter=" + encodeURIComponent(f);
+    document.body.appendChild(s);
+  });
+}
+function hzY(v){ if (v === null || v === undefined) return "—"; var a = Math.abs(v);
+  if (a >= 1e8) return (v / 1e8).toFixed(2) + " 亿"; if (a >= 1e4) return (v / 1e4).toFixed(0) + " 万"; return Math.round(v).toLocaleString("zh-CN"); }
+function hzGo(){
+  var d = document.getElementById("hzDate").value;
+  if (!d){ alert("先选日期"); return; }
+  var box = document.getElementById("hzMsg");
+  box.textContent = "正在抓 " + d + " 的龙虎榜买卖席位…";
+  document.getElementById("hzKpi").innerHTML = "";
+  Promise.all([hzFetch("RPT_BILLBOARD_DAILYDETAILSBUY", d), hzFetch("RPT_BILLBOARD_DAILYDETAILSSELL", d), hzFetch("RPT_DAILYBILLBOARD_DETAILSNEW", d)]).then(function(a){
+    var buy = (a[0] && a[0].result && a[0].result.data) || [];
+    var sell = (a[1] && a[1].result && a[1].result.data) || [];
+    var nameMap = {};
+    ((a[2] && a[2].result && a[2].result.data) || []).forEach(function(r){ if (r.SECURITY_CODE) nameMap[r.SECURITY_CODE] = r.SECURITY_NAME_ABBR || r.SECURITY_CODE; });
+    if (!buy.length && !sell.length){ box.textContent = d + " 没取到数据（可能不是交易日，或接口暂时不通）"; return; }
+    box.textContent = "已取到买入席位 " + buy.length + " 行 / 卖出席位 " + sell.length + " 行";
+    var byStock = {};
+    function add(list, side){
+      list.forEach(function(r){
+        var c = r.SECURITY_CODE; if (!c) return;
+        var o = byStock[c] = byStock[c] || { code: c, name: nameMap[c] || r.SECURITY_NAME_ABBR || c, chg: r.CHANGE_RATE, expl: r.EXPLANATION, seats: [], risky: [], riskyKey: {}, netSell: 0 };
+        var rk = RISKMAP[r.OPERATEDEPT_NAME] || null;
+        var key = side + "|" + r.OPERATEDEPT_NAME;
+        if (o.riskyKey[key]) return;
+        o.riskyKey[key] = 1;
+        o.seats.push({ n: r.OPERATEDEPT_NAME, side: side, net: r.NET_AMT });
+        if (side === "卖" && r.NET_AMT) o.netSell += Math.abs(r.NET_AMT);
+        if (rk) o.risky.push({ n: r.OPERATEDEPT_NAME, side: side, lv: rk.lv, p: rk.p, d1: rk.d1, d3: rk.d3, c: rk.c });
+      });
+    }
+    add(buy, "买"); add(sell, "卖");
+    var arr = Object.keys(byStock).map(function(k){ return byStock[k]; });
+    arr.forEach(function(o){
+      o.hiSell = o.risky.filter(function(x){ return x.lv === 2 && x.side === "卖"; }).length;
+      o.hiBuy  = o.risky.filter(function(x){ return x.lv === 2 && x.side === "买"; }).length;
+      o.midSell = o.risky.filter(function(x){ return x.lv === 1 && x.side === "卖"; }).length;
+      o.score = o.hiSell * 3 + o.hiBuy * 2 + o.midSell;
+    });
+    arr.sort(function(a, b){ return b.score - a.score || b.netSell - a.netSell; });
+    var hi = arr.filter(function(o){ return o.score > 0; });
+    var h = '<thead><tr><th>股票</th><th>当日涨跌</th><th>上榜原因</th><th>高危席位（红＝卖出 / 橙＝注意）</th><th>卖出净额</th><th>风险</th></tr></thead><tbody>';
+    arr.forEach(function(o){
+      if (o.score <= 0) return;
+      var cls = o.chg > 0 ? "up" : "down";
+      var badge = "";
+      o.risky.sort(function(a, b){ return b.lv - a.lv || b.p - a.p; }).forEach(function(x){
+        var c2 = x.lv === 2 ? "hzhi" : "hzmid";
+        badge += '<span class="' + c2 + '">' + (x.side === "买" ? "买" : "卖") + '·' + x.n + '</span><span class="hzseat">次日跌概率 ' + x.p + '%、次日均 ' + (x.d1 > 0 ? "+" : "") + x.d1 + '%、样本 ' + x.c + ' 次</span>';
+      });
+      h += '<tr><td class="name">' + o.name + '<span class="tag">' + o.code + '</span></td>'
+        + '<td class="' + cls + '" style="color:' + (o.chg > 0 ? "#b3261e" : "#1f7a3d") + '">' + (o.chg > 0 ? "+" : "") + (+o.chg).toFixed(2) + '%</td>'
+        + '<td class="left">' + (o.expl || "") + '</td>'
+        + '<td class="left">' + badge + '</td>'
+        + '<td>' + hzY(o.netSell) + '</td>'
+        + '<td>' + (o.hiSell ? '<span class="rbadge">高危 ' + o.hiSell + '</span>' : (o.hiBuy ? '<span class="obadge">高危席位在买</span>' : '<span class="obadge">注意</span>')) + '</td></tr>';
+    });
+    document.getElementById("hzTab").innerHTML = h + '</tbody>';
+    if (!hi.length) document.getElementById("hzTab").innerHTML = '<tbody><tr><td style="text-align:left">这一天没有股票出现在高危席位名单里。</td></tr></tbody>';
+    document.getElementById("hzKpi").innerHTML =
+      '<div>高危席位 <b>' + RISK_HI.length + '</b>个（下跌概率≥70%）</div>' +
+      '<div>注意席位 <b>' + RISK_MID.length + '</b>个（62~70%）</div>' +
+      '<div>这天命中高危的股票 <b>' + hi.filter(function(o){ return o.hiSell || o.hiBuy; }).length + '</b>只</div>' +
+      '<div>这天上榜股票 <b>' + arr.length + '</b>只</div>';
+    document.getElementById("hzNote").textContent = "口径：东财「营业部交易明细」2025-09-15~2026-09-14 一年、净卖出 63,366 笔的统计；红色＝该席位卖出后次日下跌概率≥70%（基准 52.9%），橙色＝62~70%。注意：这是相关性不是因果，样本＜30 次的席位波动大；另外「拉萨系（东财拉萨各营业部）、绍兴系、上塘路」经统计并不凶（下跌概率 54~60%），别被江湖传闻带偏。";
+  }).catch(function(e){ document.getElementById("hzMsg").textContent = "抓取失败：" + (e && e.message ? e.message : e); });
+}
+
+  var LSKEY = "kpl_review_v1";
+  function loadStore(){ try { return JSON.parse(localStorage.getItem(LSKEY) || "[]"); } catch(e){ return []; } }
+  function saveStore(a){ try { localStorage.setItem(LSKEY, JSON.stringify(a)); return true; } catch(e){ return false; } }
+  function today(){
+    var d = new Date();
+    return d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
+  }
+
+  document.getElementById("btnGo").addEventListener("click", render);
+  document.getElementById("btnDemo").addEventListener("click", function(){
+    document.getElementById("inp").value =
+      "600865 百大集团 5 3.36 8.80\n" +
+      "000978 桂林旅游 3 2.96 9.99\n" +
+      "002790 瑞尔特 2 2.79 10.01\n" +
+      "603042 华脉科技 3 2.50 -0.96\n" +
+      "600792 云煤能源 2 2.46 9.55";
+    render();
+  });
+  document.getElementById("btnMode").addEventListener("click", function(){
+    MODE = (MODE === "at") ? "all" : "at";
+    renderHeat();
+  });
+  document.getElementById("btnSave").addEventListener("click", function(){
+    var r = parse(document.getElementById("inp").value);
+    if (!r.rows.length){ alert("没有可保存的内容"); return; }
+    var lib = loadStore(), d = today();
+    r.rows.forEach(function(x){
+      var L = lim(x.code, x.name), c = colOf(x.chg, L), p = TAB.at[rowOf(x.board)][c];
+      lib.push({ date:d, code:x.code, name:x.name, board:x.board, at:x.at, chg:x.chg, gap:GK[c], prob:p[0], n:p[1] });
+    });
+    if (saveStore(lib)) alert("已保存 " + r.rows.length + " 条，本地累计 " + lib.length + " 条");
+    else alert("浏览器不允许本地存储，请改用「导出复盘库 CSV」");
+  });
+  document.getElementById("btnExport").addEventListener("click", function(){
+    var lib = loadStore();
+    if (!lib.length){ alert("复盘库还是空的"); return; }
+    var head = "日期,代码,名称,板数,实际换手%,竞价涨幅%,开盘档位,当时历史晋级概率%,样本n";
+    var lines = [head].concat(lib.map(function(x){
+      return [x.date,x.code,x.name,x.board,x.at,x.chg,x.gap,x.prob,x.n].join(",");
+    }));
+    var blob = new Blob(["\ufeff" + lines.join("\n")], { type:"text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "复盘库_" + today() + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+  });
+  document.getElementById("btnClear").addEventListener("click", function(){
+    if (confirm("确定清空本地复盘库？此操作不可撤销。")) { saveStore([]); alert("已清空"); }
+  });
+
+  var sw = "";
+  [10,30,50,70,90].forEach(function(p){ sw += '<span class="sw" style="background:' + shade(p).bg + '"></span>'; });
+  document.getElementById("sws").innerHTML = sw;
+  document.getElementById("legendNote").textContent = "（灰＝样本不足 8 只）";
+
+  (function(){
+    var d = new Date(); while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+    document.getElementById("hzDate").value = d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
+  })();
+  document.getElementById("hzGo").addEventListener("click", hzGo);
+  renderHeat();
+  document.getElementById("btnDemo").click();
+})();
+</script>
+</body>
+</html>
