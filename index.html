@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -3729,7 +3729,7 @@ function attempt(T, round, seq){
 }
 
 // ===== 前几天也出现过？从存档里算（纯本地，不联网）=====
-var HISTAPP = null, HISTBUSY = false, HISTBLD = null;
+var HISTAPP = null, HISTBUSY = false, HISTBLD = null, HISTRETRY = 0;
 function histApp(){                          // 同步取；没算好就返回 null 并排队在空闲时补算（首屏别被几秒的同步计算卡住）
   if (HISTAPP) return HISTAPP;
   histAppKick();
@@ -3738,6 +3738,10 @@ function histApp(){                          // 同步取；没算好就返回 n
 function histAppKick(){
   if (HISTBUSY || HISTAPP) return;
   HISTBUSY = true;
+  if (!window.__arcReady && typeof window.ensureArc === "function"){   // 存档块（ARCDATA）还在后台拉：等它到了再算，
+    window.ensureArc(function(){ HISTBUSY = false; histAppKick(); });  // 否则会拿空对象算出「什么都没有」并永久缓存，标签就再也不出现
+    return;
+  }
   setTimeout(histAppStep, 260);              // 等首屏把表格先画出来，再开始算（每片 ≤12ms，算完自动补小标签）
 }
 function histAppStep(){
@@ -3745,6 +3749,11 @@ function histAppStep(){
   var B = HISTBLD;
   if (!B){
     var days = Object.keys(ARCDATA).sort();
+    if (!days.length){                       // ARCDATA 还没到（或加载失败）：先别缓存，稍后重试
+      HISTBUSY = false; HISTBLD = null;
+      if (HISTRETRY < 20){ HISTRETRY++; setTimeout(function(){ histAppKick(); }, 900); }
+      return;
+    }
     var dayIx = {}; days.forEach(function(d, i){ dayIx[d] = i; });
     B = HISTBLD = { days: days, dayIx: dayIx, top: {}, zt: {}, hist: {}, i: 0 };
   }
@@ -4970,11 +4979,16 @@ function render(){ ndPaint(); renderCore(); if (RENDERTAIL) RTAILAGAIN = true; e
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
 var ND_KEY = "NODE_ANCHOR";
-function ndAnchor(){ try { return localStorage.getItem(ND_KEY) || ""; } catch(e){ return ""; } }
-function ndSave(v){ try { v ? localStorage.setItem(ND_KEY, v) : localStorage.removeItem(ND_KEY); } catch(e){} }
+function ndAnchor(){ try { var v=localStorage.getItem(ND_KEY); return v===null ? "2026-05-14" : v; } catch(e){ return "2026-05-14"; } }
+function ndSave(v){ try { v==="" ? localStorage.setItem(ND_KEY,"") : localStorage.setItem(ND_KEY, v); } catch(e){} }
+function ndCal(){                          // 交易日历 + 2026 年剩余工作日（供节点前推，不改动全局 tradeDays）
+  var ks = tradeDays().slice(), d = new Date(Date.UTC(2026,9,8)), e = new Date(Date.UTC(2026,11,31));
+  while (d <= e){ var w = d.getUTCDay(); if (w > 0 && w < 6){ var t = d.toISOString().slice(0,10); if (ks.indexOf(t) < 0) ks.push(t); } d.setUTCDate(d.getUTCDate() + 1); }
+  ks.sort(); return ks;
+}
 function ndNum(day){                       // 某交易日相对起算日是第几个交易日（起算日＝第 1 个）
   var A = ndAnchor(); if (!A || !day || !window.GannNodes) return null;
-  var ks = tradeDays(), i = ks.indexOf(day), j = ks.indexOf(A);
+  var ks = ndCal(), i = ks.indexOf(day), j = ks.indexOf(A);
   if (i < 0 || j < 0) return null;
   var n = i - j + 1; return n >= 1 ? n : null;
 }
@@ -5004,12 +5018,18 @@ function ndPaint(){
   var A = ndAnchor();
   if (!A){ h.textContent = "未设起算日 → 节点列显示「未设起算」。设一个起算日（第 1 个交易日）后，节点列给出「第 N 个交易日 / 角度 / 距下个节点」。"; return; }
   var ks, j;
-  try { ks = tradeDays(); j = ks.indexOf(A); } catch(e){ j = -1; }
+  try { ks = ndCal(); j = ks.indexOf(A); } catch(e){ j = -1; }
   if (j < 0){ h.textContent = "起算日 " + A + " 不在交易日历里。"; return; }
   var G = window.GannNodes; if (!G){ h.textContent = "内核 gann-nodes.js 没加载。"; return; }
-  var up = G.upcoming(ks.slice(0, j + 61), j + 61).filter(function(v){ return v.day > j; }).slice(0, 6);
+  var N0 = ndNum(STATE.day); if (N0 === null || N0 < 1) N0 = 1;
+  var up = [], k;
+  for (k = N0 + 1; k <= N0 + 400 && up.length < 6; k++){
+    if (!G.isNode(k)) continue;
+    var idx = j + k - 1; if (idx >= ks.length) break;
+    var iv = G.info(k); up.push({ date: ks[idx], day: k, deg: iv.deg, gap: k - N0 });
+  }
   h.textContent = "起算 " + A + "（第 1 个交易日）｜之后节点：" +
-    up.map(function(v){ return v.date + "(日" + v.day + "·" + v.deg + "°)"; }).join("　");
+    up.map(function(v){ return v.date + "(日" + v.day + "·" + v.deg + "°·+" + v.gap + "d)"; }).join("　");
 }
 (function(){
   var inp = $("ndAnchor");
