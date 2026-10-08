@@ -4998,6 +4998,24 @@ function ndGap(){                          // 距下一个节点的交易日数
   for (k = N + 1; k <= N + 60; k++) if (G.isNode(k)) return { gap: k - N, at: k, deg: G.info(k).deg };
   return null;
 }
+var ND_TAILCACHE = null;
+function ndTailHit(code){                    // 代码后2位 → 命中的节点数字列表（节点≤169）
+  if (!ND_TAILCACHE){
+    ND_TAILCACHE = {}; var G = window.GannNodes, i, t;
+    if (G) for (i = 1; i <= 169; i++){ if (G.isNode(i)){ t = ("0" + i).slice(-2); (ND_TAILCACHE[t] = ND_TAILCACHE[t] || []).push(i); } }
+  }
+  return ND_TAILCACHE[String(code).slice(-2)] || null;
+}
+function tailCell(code){
+  var c = String(code || ""), t = c.slice(-2);
+  if (!/^\d{6}$/.test(c)) return '<td class="left">—</td>';
+  var hits = ndTailHit(c);
+  if (!hits) return '<td class="left" style="color:var(--muted)">' + t + '</td>';
+  var N = null; try { N = ndNum(STATE.day); } catch(e){}
+  var same = (N !== null && String(N) === t);
+  var title = '尾号 ' + t + ' 命中节点：' + hits.slice(0, 10).join('/') + (hits.length > 10 ? ' …' : '') + (same ? '；且＝今日第 ' + N + ' 天' : '');
+  return '<td class="left"><b class="hotb" title="' + title + '">' + t + '◆</b></td>';
+}
 function ndCell(){
   var G = window.GannNodes; if (!G) return '<td>—</td>';
   if (!ndAnchor()) return '<td><span class="tag">未设起算</span></td>';
@@ -5076,7 +5094,7 @@ function renderCore(){
 
   var arch = STATE.archived;
   var TI2 = topInInfo();
-  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝概念题材里昨天一起涨停的主板家数（红≥5只，蓝2-4只，小标签是其他并列题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
+  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝概念题材里昨天一起涨停的主板家数（红≥5只，蓝2-4只，小标签是其他并列题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="尾号＝股票代码后 2 位；◆＝该尾号命中节点数字（如尾号96 ↔ 节点96）。节点集合在 00–99 里覆盖约 43%，命中率高＝巧合多，非信号。非投资建议。">尾号</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
            + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。鼠标悬停看每笔净额、以及该席位历史上净卖出后次日大面（≤-5%）的概率：红＝在你自选的爆头席位名单里、橙＝33~44%、蓝＝净买入、灰＝净卖出">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>成交量</th><th>市值</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
@@ -5096,7 +5114,7 @@ function renderCore(){
       + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + '</td>'
       + '<td class="left">' + esc(r.sector || "—") + (_hr ? '<span class="' + (_hr.rank <= 5 ? "hotb" : "hotb2") + '" title="' + esc(_hr.name + "：板块热度榜第 " + _hr.rank + " 名（截至 " + _hr.d + "）｜行业 " + _hr.n + " 只、近3日涨停 " + _hr.z3 + " 家、近3日涨幅 " + (_hr.r3 > 0 ? "+" : "") + _hr.r3 + "%、放量 " + _hr.vol + "×") + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
       + '<td class="left">' + thCell(r.code) + '</td>'
-      + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + ndCell()
+      + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + tailCell(r.code) + ndCell()
       + '<td class="' + (r.chg > 0 ? "up" : "down") + '">' + (r.chg > 0 ? "+" : "") + r.chg.toFixed(2) + '%</td>'
       + '<td style="white-space:nowrap">' + gkCell(r) + '</td>'
       + '<td style="white-space:nowrap">' + pxCell(r) + '</td>'
