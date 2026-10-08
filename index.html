@@ -483,6 +483,10 @@
     历史收益＝同「板数 × 开盘档位」组合的样本均值，<b>口径为 A</b>（9:25 竞价买入 → 封板继续持有 → 第一次断板时卖出；买入日就没封住的最早只能按次日开盘价卖，受 T+1 限制），样本少于 8 只波动很大。情绪周期＝六阶段循环（冰点→修复→主升发酵→高潮→分歧衰退→退潮主跌），用四个指标的近十年分位自适应判定（只统计主板）：晋级率、大面率（昨日涨停股当日跌≤-5% 比例）、最高连板、涨停家数；优先级为 退潮 → 冰点 → 高潮 → 分歧衰退 → 主升 → 修复。本页只是历史统计工具，不构成投资建议。
   </p>
 </div>
+<script>
+/* kpl925 offline fallback: register the service worker so a flaky CDN still opens the last good cached page. */
+if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
+</script>
 <script src="lhbdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
