@@ -108,9 +108,8 @@
   }
   /* ===== 江恩九方图 ===== */
   #gsWrap{margin:8px 0 12px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--chip)}
-  #gsManual{margin-top:2px}
-  #gsWrap>h3,#gsManual>h3{font-size:13px;margin:0 0 8px;color:var(--head);font-weight:600}
-  #gsWrap .gsMeta,#gsManual .gsMeta{font-size:11.5px;color:var(--muted);font-weight:400}
+  #gsWrap>h3{font-size:13px;margin:0 0 8px;color:var(--head);font-weight:600}
+  #gsWrap .gsMeta{font-size:11.5px;color:var(--muted);font-weight:400}
   .gsCtl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted)}
   .gsCtl input,.gsCtl select{font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--fg);width:86px}
   .gsCtl input.gsCode{width:78px}
@@ -132,7 +131,6 @@
   .gsTbl .num{text-align:right}
   .gsTbl .up{color:var(--up)}.gsTbl .dn{color:var(--down)}
   .gsBody .note{margin-top:8px;font-size:12px;color:var(--muted);line-height:1.6;max-width:680px}
-  #gsCard{width:min(760px,94vw);max-height:86vh;overflow:auto}
   gann-square::part(readout){font-size:12.5px}
   /* ===== 持仓纪律（断板次日）===== */
   #plCard{position:fixed;right:14px;bottom:14px;z-index:84;width:min(980px,94vw);max-height:88vh;overflow:auto;margin:0;box-shadow:0 10px 30px rgba(0,0,0,.30)}
@@ -245,7 +243,7 @@
     <div class="bar">
       <button id="btnRefresh" class="active">刷新最新</button>
       <button id="recalcBtn" title="清掉当天缓存，把名单 / 行情 / 板块 / 情绪序列全部重新抓一遍">重算</button>
-      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="gsBtn" title="自己输入价格/代码画江恩九方图">九方图</button>
+      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button>
       <span class="optgrp">
         <button id="dPrev">◀ 前一交易日</button>
         <input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日">
@@ -261,13 +259,6 @@
       <div class="optgrp"><span>筛选</span><button id="fNL">只看能买到的（剔一字）</button></div>
       <div class="optgrp"><span>排名依据</span><button id="sAt" class="active">实际换手率</button><button id="sRet">断板卖出(A均值)</button></div>
     </div>
-  </div>
-
-  <div class="card klfloat" id="gsCard" hidden>
-    <h2><span id="gsTitle">九方图</span><span style="font-size:12px;font-weight:400;color:var(--muted)" id="gsSub"></span>
-      <button id="gsClose" style="float:right">关闭</button>
-      <button id="gsSize" style="float:right;margin-right:6px">放大</button></h2>
-    <div id="gsManual"></div>
   </div>
 
   <div class="card klfloat" id="klCard" hidden>
@@ -464,7 +455,7 @@
     <div id="vfSum" class="chips" style="margin-top:8px"></div>
     <div id="vfAn"></div>
     <div id="vfDays"></div>
-    <p class="note" id="vfNote">口径：名单＝当天「实际换手前5」的昨日涨停股（和上面榜单同一份）。<b>买入价＝当天开盘价</b>；<b>当日涨停</b>就继续持有，<b>次日再涨停就再拿一天</b>，<b>直到第一次断板，断板当天收盘价卖出</b>；<b>当天竞价买进却没能封板的（约 62.4% 的票），受 T+1 约束最早只能次日开盘卖</b>，所以这一档一律按<b>次日开盘价</b>结算，不再按当天收盘。决策记在本机浏览器里（每台设备各自保存），随时可以改；「今天空仓」＝这天不算出手。「统计全部记录」只统计你标过买/空仓的日子。</p>
+    <p class="note" id="vfNote">口径：名单＝和上面 5 只榜单完全同一份（同一套口径：主板、剔 ST、剔一字开关、实际换手前 5 或「全部昨日涨停股」模式）。<b>买入价＝当天开盘价</b>；<b>当日涨停</b>就继续持有，<b>次日再涨停就再拿一天</b>，<b>直到第一次断板，断板当天收盘价卖出</b>；<b>当天竞价买进却没能封板的（约 62.4% 的票），受 T+1 约束最早只能次日开盘卖</b>，所以这一档一律按<b>次日开盘价</b>结算，不再按当天收盘。决策记在本机浏览器里（每台设备各自保存），随时可以改；「今天空仓」＝这天不算出手。「统计全部记录」只统计你标过买/空仓的日子。</p>
   </div>
 
   <div id="zTip"></div>
@@ -1203,6 +1194,35 @@ function buildRows(list){
   });
   rows.forEach(function(r,i){ r.rankAT = i+1; });
   return rows;
+}
+function arcList(dateStr){                          // ARCDATA 的一天 → 与 renderArchive 完全相同的行对象（榜单 / 逐日决策 / 竞价建议共用同一份解析）
+  var s = ARCDATA[dateStr];
+  if (!s) return null;
+  return s.split(";").filter(Boolean).map(function(t){
+    var p = t.split(",");
+    return { code:p[0], name:NAMEMAP[p[0]] || p[0], board:+p[1], chg:+p[2], atOv:(p[3] === "" ? null : +p[3]), dc:+p[4], lu:+p[5],
+             t1o:(p[6] === undefined || p[6] === "" || isNaN(+p[6])) ? null : +p[6],
+             t1c:(p[7] === undefined || p[7] === "" || isNaN(+p[7])) ? null : +p[7],
+             // 存档里如果存过 9:25 的竞价额/五档，就直接用（老存档没有这三项，仍是「—」）
+             amount:(p[8] === undefined || p[8] === "" || isNaN(+p[8])) ? undefined : +p[8],
+             bid:(p[9] === undefined || p[9] === "" || isNaN(+p[9])) ? null : +p[9],
+             ask:(p[10] === undefined || p[10] === "" || isNaN(+p[10])) ? null : +p[10],
+             mc:(p[11] === undefined || p[11] === "" || isNaN(+p[11])) ? null : +p[11],
+             px:(p[12] === undefined || p[12] === "" || isNaN(+p[12])) ? null : +p[12] };
+  });
+}
+function pickTopRows(rows){                         // 「5 只榜单」「逐日决策」「今日竞价建议」共用的唯一选股口径：
+                                                    // 主板 + 剔 ST 已在 buildRows 里做过；这里再叠 剔一字 → ≈行沉底 → 实际换手排序 → 前 5 / 全部
+  var noAt = !rows.some(function(r){ return r.at !== null && r.at !== undefined && r.at > 0; });
+  var useBase = (STATE.mode === "all");             // 「全部昨日涨停股」模式
+  if (noAt && !useBase) useBase = true;             // 老存档没有竞价成交额（实际换手）→ 按全部口径显示
+  if (STATE.noLimit) rows = rows.filter(function(r){ return r.chg < r.L * 0.99; });   // 只看能买到的（剔一字）
+  rows.sort(function(a, b){                         // 「≈全天换手率」的近似行不能挤进前5：一律排到最后
+    if (!!a.approx !== !!b.approx) return a.approx ? 1 : -1;
+    return (b.at || 0) - (a.at || 0);
+  });
+  rows.forEach(function(r, i){ r._rankAT = i + 1; });
+  return { useBase: useBase, noAt: noAt, rows: rows, list: rows.filter(function(r){ return useBase ? true : r._rankAT <= 5; }) };
 }
 function guessDay(){
   var n = new Date(), wd = n.getDay(), hm = n.getHours()*100 + n.getMinutes(), d = new Date(n.getTime());
@@ -3476,20 +3496,8 @@ function tradeDays(){                      // CYCDATA + 自拓日期的全部交
   return lo;
 }
 function renderArchive(dateStr){
-  var s = ARCDATA[dateStr];
-  if (!s) return false;
-  var list = s.split(";").filter(Boolean).map(function(t){
-    var p = t.split(",");
-    return { code:p[0], name:NAMEMAP[p[0]] || p[0], board:+p[1], chg:+p[2], atOv:(p[3] === "" ? null : +p[3]), dc:+p[4], lu:+p[5],
-             t1o:(p[6] === undefined || p[6] === "" || isNaN(+p[6])) ? null : +p[6],
-             t1c:(p[7] === undefined || p[7] === "" || isNaN(+p[7])) ? null : +p[7],
-             // 存档里如果存过 9:25 的竞价额/五档，就直接用（老存档没有这三项，仍是「—」）
-             amount:(p[8] === undefined || p[8] === "" || isNaN(+p[8])) ? undefined : +p[8],
-             bid:(p[9] === undefined || p[9] === "" || isNaN(+p[9])) ? null : +p[9],
-             ask:(p[10] === undefined || p[10] === "" || isNaN(+p[10])) ? null : +p[10],
-             mc:(p[11] === undefined || p[11] === "" || isNaN(+p[11])) ? null : +p[11],
-             px:(p[12] === undefined || p[12] === "" || isNaN(+p[12])) ? null : +p[12] };
-  });
+  var list = arcList(dateStr);
+  if (list === null) return false;
   STATE.rows = buildRows(list);
   // 昨日涨停股今天的平均竞价溢价（9:25 就能看到的情绪读数）
   var _pv = STATE.rows.filter(function(r){ return r.chg !== null && r.chg !== undefined && !isNaN(r.chg); });
@@ -5002,24 +5010,6 @@ function ndGap(){                          // 距下一个节点的交易日数
   for (k = N + 1; k <= N + 60; k++) if (G.isNode(k)) return { gap: k - N, at: k, deg: G.info(k).deg };
   return null;
 }
-var ND_TAILCACHE = null;
-function ndTailHit(code){                    // 代码后2位 → 命中的节点数字列表（节点≤169）
-  if (!ND_TAILCACHE){
-    ND_TAILCACHE = {}; var G = window.GannNodes, i, t;
-    if (G) for (i = 1; i <= 169; i++){ if (G.isNode(i)){ t = ("0" + i).slice(-2); (ND_TAILCACHE[t] = ND_TAILCACHE[t] || []).push(i); } }
-  }
-  return ND_TAILCACHE[String(code).slice(-2)] || null;
-}
-function tailCell(code){
-  var c = String(code || ""), t = c.slice(-2);
-  if (!/^\d{6}$/.test(c)) return '<td class="left">—</td>';
-  var hits = ndTailHit(c);
-  if (!hits) return '<td class="left" style="color:var(--muted)">' + t + '</td>';
-  var N = null; try { N = ndNum(STATE.day); } catch(e){}
-  var same = (N !== null && String(N) === t);
-  var title = '尾号 ' + t + ' 命中节点：' + hits.slice(0, 10).join('/') + (hits.length > 10 ? ' …' : '') + (same ? '；且＝今日第 ' + N + ' 天' : '');
-  return '<td class="left"><b class="hotb" title="' + title + '">' + t + '◆</b></td>';
-}
 function ndCell(){
   var G = window.GannNodes; if (!G) return '<td>—</td>';
   if (!ndAnchor()) return '<td><span class="tag">未设起算</span></td>';
@@ -5067,23 +5057,16 @@ function renderCore(){
     $("tbl").innerHTML = '<tbody><tr><td class="empty">没有取到数据。请确认能联网后点「刷新」。</td></tr></tbody>';
     $("kpi").innerHTML = ""; $("note").textContent = ""; return;
   }
-  var noAt = !rows.some(function(r){ return r.at !== null && r.at !== undefined && r.at > 0; });
-  var useBase = (STATE.mode === "all");
-  if (noAt && !useBase) useBase = true;          // 老存档没有竞价成交额（实际换手）→ 按全部口径显示
+  var _pk = pickTopRows(rows);                  // 和「逐日决策」「今日竞价建议」共用同一套选股口径（主板 / 剔一字 / 实际换手前5 或 全部）
+  var useBase = _pk.useBase, noAt = _pk.noAt; rows = _pk.rows;
   if ($("mAT") && $("mALL")){ $("mAT").classList.toggle("active", !useBase); $("mALL").classList.toggle("active", !!useBase); }
-  if (STATE.noLimit) rows = rows.filter(function(r){ return r.chg < r.L * 0.99; });
   if (!rows.length){
     $("tbl").innerHTML = '<tbody><tr><td class="empty">' +
       (STATE.noLimit ? "今天没有「开盘没涨停」的昨日涨停股。" : "没有可显示的股票。") +
       '</td></tr></tbody>';
     $("kpi").innerHTML = ""; $("note").textContent = ""; return;
   }
-  rows.sort(function(a, b){                       // 「≈全天换手率」的近似行不能挤进前5：一律排到最后
-    if (!!a.approx !== !!b.approx) return a.approx ? 1 : -1;
-    return (b.at || 0) - (a.at || 0);
-  });
-  rows.forEach(function(r,i){ r._rankAT = i + 1; });
-  var list = rows.filter(function(r){ return useBase ? true : r._rankAT <= 5; });
+  var list = _pk.list;
   list.forEach(function(r){
     r._prob = useBase ? r.baseProb : r.prob;
     r._avg  = useBase ? r.baseAvg  : r.avg;
@@ -5098,7 +5081,7 @@ function renderCore(){
 
   var arch = STATE.archived;
   var TI2 = topInInfo();
-  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝概念题材里昨天一起涨停的主板家数（红≥5只，蓝2-4只，小标签是其他并列题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="尾号＝股票代码后 2 位；◆＝该尾号命中节点数字（如尾号96 ↔ 节点96）。节点集合在 00–99 里覆盖约 43%，命中率高＝巧合多，非信号。非投资建议。">尾号</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
+  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝概念题材里昨天一起涨停的主板家数（红≥5只，蓝2-4只，小标签是其他并列题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
            + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。鼠标悬停看每笔净额、以及该席位历史上净卖出后次日大面（≤-5%）的概率：红＝在你自选的爆头席位名单里、橙＝33~44%、蓝＝净买入、灰＝净卖出">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>成交量</th><th>市值</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
@@ -5118,7 +5101,7 @@ function renderCore(){
       + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + '</td>'
       + '<td class="left">' + esc(r.sector || "—") + (_hr ? '<span class="' + (_hr.rank <= 5 ? "hotb" : "hotb2") + '" title="' + esc(_hr.name + "：板块热度榜第 " + _hr.rank + " 名（截至 " + _hr.d + "）｜行业 " + _hr.n + " 只、近3日涨停 " + _hr.z3 + " 家、近3日涨幅 " + (_hr.r3 > 0 ? "+" : "") + _hr.r3 + "%、放量 " + _hr.vol + "×") + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
       + '<td class="left">' + thCell(r.code) + '</td>'
-      + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + tailCell(r.code) + ndCell()
+      + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + ndCell()
       + '<td class="' + (r.chg > 0 ? "up" : "down") + '">' + (r.chg > 0 ? "+" : "") + r.chg.toFixed(2) + '%</td>'
       + '<td style="white-space:nowrap">' + gkCell(r) + '</td>'
       + '<td style="white-space:nowrap">' + pxCell(r) + '</td>'
@@ -5585,22 +5568,14 @@ function vfClamp(d){
   return p;
 }
 function vfRows(day){
-  var s = ARCDATA[day]; if (!s) return [];
-  var list = s.split(";").filter(Boolean).map(function(t){
-    var p = t.split(",");
-    return { code:p[0], name:NAMEMAP[p[0]] || p[0], board:+p[1], chg:+p[2], atOv:(p[3] === "" ? null : +p[3]),
-             dc:+p[4], lu:+p[5], t1o:(p[6] === "" || isNaN(+p[6])) ? null : +p[6], t1c:(p[7] === "" || isNaN(+p[7])) ? null : +p[7],
-             px:(p[12] === undefined || p[12] === "" || isNaN(+p[12])) ? null : +p[12] };
-  });
+  if (!day) return [];
+  if (typeof STATE !== "undefined" && STATE.day === day && STATE.rows && STATE.rows.length)
+    return pickTopRows(STATE.rows.slice()).list;   // 当天＝直接用主页那份数据（保证和上面 5 只榜单逐只一致）
+  var list = arcList(day); if (list === null) return [];
   var keepZ = DZTSET;
   var rows = buildRows(list);
   DZTSET = keepZ;                                  // 别把主页那份涨停池覆盖掉
-  var hasAt = rows.some(function(r){ return r.at !== null && !r.approx; });
-  rows.sort(function(a, b){
-    if (a.approx !== b.approx) return a.approx ? 1 : -1;
-    return (b.at || 0) - (a.at || 0);
-  });
-  return hasAt ? rows.slice(0, 5) : rows;          // 没有实际换手数据的日子就给全部
+  return pickTopRows(rows).list;                   // 和上面 5 只榜单完全同一份（同一套主板 / 剔一字 / 前5或全部 口径）
 }
 function vfLimitUp(bars, i){                       // 主板 10%：收盘≥涨停价
   if (i <= 0 || !bars[i] || !bars[i-1].c) return false;
@@ -5718,20 +5693,14 @@ function vfShow(){
   vfRenderSum();
 }
 // ===== 今日竞价建议（按你自己回测出来的口径，逐票给 买 / 观察 / 不买）=====
-// 名单：和上面榜单同一份、同一套取前5的规则；历史日走归档，当天走页面实时那份
+// 名单：和上面榜单同一份、同一套选股口径（pickTopRows）；历史日走归档，当天走页面实时那份
 function vfAdvList(day){
   if (!day) return [];
   var rows = null;
   if (typeof ARCDATA !== "undefined" && ARCDATA[day]) rows = vfRows(day);
   else if (STATE && STATE.day === day && STATE.rows && STATE.rows.length) rows = STATE.rows.slice();
   if (!rows || !rows.length) return [];
-  var noAt = !rows.some(function(r){ return r.at !== null && r.at !== undefined && r.at > 0; });
-  var useBase = (STATE && STATE.mode === "all") || noAt;
-  if (STATE && STATE.noLimit) rows = rows.filter(function(r){ return r.chg < r.L * 0.99; });
-  if (!rows.length) return [];
-  rows.sort(function(a, b){ if (!!a.approx !== !!b.approx) return a.approx ? 1 : -1; return (b.at || 0) - (a.at || 0); });
-  rows.forEach(function(r, i){ r._rankAT = i + 1; });
-  return useBase ? rows : rows.filter(function(r){ return r._rankAT <= 5; });
+  return pickTopRows(rows).list;                   // 和 5 只榜单同一份（同一套选股口径）
 }
 // ===== 今日竞价建议 v2：856 笔 A 口径（2025-09-10 ~ 2026-09-18，246 个交易日）=====
 // 模型＝否决项(veto) + 多维加权分。每个分档都回带「n / 日数 / 历史战绩」，可信度自己看。
@@ -7012,37 +6981,6 @@ function plCoarse(){
   });
   document.addEventListener("pointerup", function(){ drag = null; });
   document.addEventListener("pointercancel", function(){ drag = null; });
-})();
-// ===== 独立九方图卡片：手动开 / 手动输价格 =====
-(function(){
-  var card = $("gsCard"); if (!card) return;
-  function show(){ card.hidden = false; }
-  $("gsBtn").addEventListener("click", function(){
-    show();
-    var w = $("gsManual"); if (w){ gsHarness(w); w.hidden = false; }
-    var f = document.querySelector("#gsCard .gsPrice"); if (f) f.focus();
-  });
-  $("gsClose").addEventListener("click", function(){ card.hidden = true; });
-  $("gsSize").addEventListener("click", function(){
-    card.classList.toggle("big");
-    this.textContent = card.classList.contains("big") ? "缩小" : "放大";
-  });
-  var hd = card.querySelector("h2"), drag = null;
-  hd.addEventListener("mousedown", function(ev){
-    if (ev.target && /button|a|input|select/i.test(ev.target.tagName)) return;
-    var rc = card.getBoundingClientRect();
-    drag = { x: ev.clientX, y: ev.clientY, l: rc.left, t: rc.top };
-    card.style.right = "auto"; card.style.bottom = "auto";
-    card.style.left = rc.left + "px"; card.style.top = rc.top + "px";
-    ev.preventDefault();
-  });
-  document.addEventListener("mousemove", function(ev){
-    if (!drag) return;
-    card.style.left = Math.max(0, Math.min(window.innerWidth - 80, drag.l + ev.clientX - drag.x)) + "px";
-    card.style.top = Math.max(0, Math.min(window.innerHeight - 40, drag.t + ev.clientY - drag.y)) + "px";
-  });
-  document.addEventListener("mouseup", function(){ drag = null; });
-  card.hidden = true;
 })();
 $("btnRefresh").addEventListener("click", function(){ STATE.picked = false; STATE.sel = ""; STATE.archived = false; STATE.force = true; load(); });
 $("recalcBtn").addEventListener("click", function(){ recalcAll(); });
