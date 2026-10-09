@@ -106,32 +106,6 @@
   .minbar i,.vbar i{display:block;height:100%;border-radius:2px}  @media (prefers-color-scheme: dark){
     :root{ --bg:#14161a; --panel:#1c1f25; --fg:#e9ebee; --muted:#9aa0a6; --border:#2b3038; --head:#9ec1f0; --chip:#222933; }
   }
-  /* ===== 江恩九方图 ===== */
-  #gsWrap{margin:8px 0 12px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--chip)}
-  #gsWrap>h3{font-size:13px;margin:0 0 8px;color:var(--head);font-weight:600}
-  #gsWrap .gsMeta{font-size:11.5px;color:var(--muted);font-weight:400}
-  .gsCtl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted)}
-  .gsCtl input,.gsCtl select{font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--fg);width:86px}
-  .gsCtl input.gsCode{width:78px}
-  .gsCtl button{font-size:12px;padding:3px 10px}
-  .gsCtl .gsHint{font-size:11px;color:var(--muted);opacity:.85;flex:1 1 240px}
-  .gsTabs{display:flex;gap:14px;margin:2px 0 8px;font-size:12.5px}
-  .gsTabs button{border:0;background:none;color:var(--muted);padding:0 0 3px;border-bottom:2px solid transparent;cursor:pointer;border-radius:0}
-  .gsTabs button.active{color:var(--fg);font-weight:600;border-bottom-color:var(--head)}
-  .gsGrid{display:grid;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-width:680px;margin:0 auto}
-  .gsCell{background:var(--panel);aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;color:var(--fg);overflow:hidden}
-  .gsCell.ax{background:rgba(224,122,31,.20)}
-  .gsCell.dg{background:rgba(31,122,61,.16)}
-  .gsCell.fc{background:rgba(37,99,235,.20);box-shadow:inset 0 0 0 2px #2563eb;font-weight:700}
-  .gsTbl{display:table;width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;max-width:680px}
-  .gsTbl .tr{display:table-row}
-  .gsTbl .tr>span{display:table-cell;padding:5px 4px;border-bottom:1px solid var(--border);white-space:nowrap}
-  .gsTbl .tr:first-child>span{color:var(--muted);font-size:12px}
-  .gsTbl .tr>span:first-child{color:var(--muted);width:20%}
-  .gsTbl .num{text-align:right}
-  .gsTbl .up{color:var(--up)}.gsTbl .dn{color:var(--down)}
-  .gsBody .note{margin-top:8px;font-size:12px;color:var(--muted);line-height:1.6;max-width:680px}
-  gann-square::part(readout){font-size:12.5px}
   /* ===== 持仓纪律（断板次日）===== */
   #plCard{position:fixed;right:14px;bottom:14px;z-index:84;width:min(980px,94vw);max-height:88vh;overflow:auto;margin:0;box-shadow:0 10px 30px rgba(0,0,0,.30)}
   #plCard.big{width:min(1240px,97vw);max-height:94vh}
@@ -266,7 +240,6 @@
       <a class="stk" id="klLink" target="_blank" rel="noopener" href="#">同花顺 ↗</a>
       <button id="klClose" style="float:right">关闭</button><button id="klSize" style="float:right;margin-right:6px">放大</button>
       <span style="float:right;margin-right:8px"><button id="klPrev">← 前一日</button><button id="klNext">后一日 →</button><button id="klSell">以这天为卖出日</button></span></h2>
-    <div id="gsWrap" hidden></div>
     <div id="klChart"></div>
     <div class="chartnote" id="klTip"></div>
     <div id="klIdx"></div>
@@ -2841,191 +2814,6 @@ function klStep(dir){                       // 前后翻一个交易日
   var j = i + dir; if (j < 0 || j > KLST.bars.length - 1) return;
   klShow(KLST.bars[j].d);
 }
-// ===== 江恩九方图（用 gann-square-widget.js 暴露的 window.GannSQ9 内核）=====
-// 口径：以 √基准价 为轴，每圈 +格距(默认 1/8=0.125)，格内数值 = (√基准 + 环数×格距)²
-function gsIncOf(wrap){
-  var el = wrap && wrap.querySelector(".gsInc");
-  var v = el ? el.value : "0.125";
-  var d = parseFloat(v);
-  return isFinite(d) && d > 0 ? d : 0.125;
-}
-function gsIncName(wrap){
-  var v = (wrap && wrap.querySelector(".gsInc") || {}).value || "0.125";
-  return v === "0.0625" ? "1/16" : (v === "0.25" ? "1/4" : "1/8");
-}
-function gsSizeOf(wrap){
-  var el = wrap && wrap.querySelector(".gsSize");
-  var v = el ? parseInt(el.value, 10) : 13;
-  return [9, 13, 17].indexOf(v) >= 0 ? v : 13;
-}
-function gsStepVal(base, k, step){ return base + (k - 1) * step; }   // 等步长螺旋梯子：中心=基准价
-function gsSqrtVal(base, ring, inc){ var r = Math.sqrt(base) + ring * inc; return r * r; }  // √价法角度位
-function gsFmt(v, d){
-  if (v < 10) d = Math.max(d, d >= 3 ? 3 : 2);
-  return v.toFixed(d);
-}
-function gsHarness(wrap){
-  if (!wrap.querySelector("h3")){
-    var h3 = document.createElement("h3");
-    h3.innerHTML = '江恩九方图 <span class="gsMeta"></span>';
-    wrap.appendChild(h3);
-  }
-  if (!wrap.querySelector(".gsCtl")){
-    var ctl = document.createElement("div");
-    ctl.className = "gsCtl";
-    ctl.innerHTML = '<span>股票</span><input class="gsCode" list="plNames" maxlength="16" placeholder="代码或名称">' +
-      '<span>基准价</span><input class="gsPrice" type="number" step="0.01" min="0.01" placeholder="价格">' +
-      '<span>格距</span><select class="gsInc"><option value="0.125">1/8 标准</option><option value="0.0625">1/16 细</option><option value="0.25">1/4 粗</option></select>' +
-      '<span>矩阵</span><select class="gsSize"><option value="9">9×9</option><option value="13" selected>13×13</option><option value="17">17×17</option></select>' +
-      '<button class="gsGo">画图</button>' +
-      '<span class="gsHint">√基准价 每圈 ±格距；中心 = 基准价，橙色 = 纵横轴（90°/270°），绿色 = 对角（45°…）。填代码或股票名自动取现价</span>';
-    wrap.appendChild(ctl);
-  }
-  if (!wrap.querySelector(".gsTabs")){
-    var tb = document.createElement("div");
-    tb.className = "gsTabs";
-    tb.innerHTML = '<button data-gt="0" class="active">矩阵</button><button data-gt="1">角度位</button><button data-gt="2">时间窗</button>';
-    wrap.appendChild(tb);
-  }
-  if (!wrap.querySelector(".gsBody")){
-    var bd = document.createElement("div");
-    bd.className = "gsBody";
-    wrap.appendChild(bd);
-  }
-  if (!wrap.dataset.bound){
-    wrap.dataset.bound = "1";
-    wrap._gt = 0;
-    function draw(){
-      var codeEl = wrap.querySelector(".gsCode"), pxEl = wrap.querySelector(".gsPrice");
-      var code = plResolve(codeEl && codeEl.value || "");
-      var p = parseFloat(pxEl && pxEl.value);
-      if (code.length === 6) gsByCode(code, p > 0 ? p : 0, wrap);
-      else if (p > 0) gsRender(wrap, "", "", p, STATE.day || "");
-    }
-    var go = wrap.querySelector(".gsGo"); if (go) go.addEventListener("click", draw);
-    Array.prototype.forEach.call(wrap.querySelectorAll(".gsCode,.gsPrice"), function(el){
-      el.addEventListener("keydown", function(e){ if (e.key === "Enter"){ e.preventDefault(); draw(); } });
-    });
-    Array.prototype.forEach.call(wrap.querySelectorAll(".gsInc,.gsSize"), function(el){
-      el.addEventListener("change", draw);
-    });
-    Array.prototype.forEach.call(wrap.querySelectorAll("[data-gt]"), function(btn){
-      btn.addEventListener("click", function(){
-        wrap._gt = +btn.getAttribute("data-gt");
-        Array.prototype.forEach.call(wrap.querySelectorAll("[data-gt]"), function(x){
-          x.classList.toggle("active", x === btn);
-        });
-        gsPaint(wrap);
-      });
-    });
-  }
-}
-function gsPaint(wrap){
-  var box = wrap.querySelector(".gsBody"); if (!box) return;
-  var cfg = wrap._cfg; if (!cfg){ box.innerHTML = '<p class="note">先填基准价，点「画图」。</p>'; return; }
-  var G = window.GannSQ9; if (!G){ box.innerHTML = '<p class="note">内核算术没加载（gann-square-widget.js）。</p>'; return; }
-  var P = cfg.price, inc = cfg.inc, N = cfg.size, d = cfg.digits, t = wrap._gt || 0;
-
-  if (t === 1){                                        // 角度位表
-    var rows = G.levels(P, inc), chain = G.limitChain(P, 0.10, 3);
-    // 角度位：√P ± n·inc 再平方（江恩九方图经典档位）
-    var h = '<div class="gsTbl"><div class="tr"><span>角度</span><span class="num">上方阻力</span><span class="num">涨幅</span><span class="num">下方支撑</span><span class="num">跌幅</span></div>';
-    rows.forEach(function(r){
-      h += '<div class="tr"><span>' + r.angle + '°</span>' +
-           '<span class="num up">' + gsFmt(r.up, d) + '</span><span class="num">+' + r.upPct.toFixed(2) + '%</span>' +
-           '<span class="num dn">' + gsFmt(r.down, d) + '</span><span class="num">' + r.downPct.toFixed(2) + '%</span></div>';
-    });
-    h += '</div><div class="note">涨停链 ' + chain.up.map(function(v){ return gsFmt(v, d); }).join(' · ') +
-         '　跌停链 ' + chain.down.map(function(v){ return gsFmt(v, d); }).join(' · ') +
-         '　（角度 = 45° 倍数，即 √价 每 1 档格距）</div>';
-    box.innerHTML = h;
-    return;
-  }
-  if (t === 2){                                        // 时间窗
-    var tl = G.timeline(cfg.start || STATE.day || '');
-    if (!tl.length){ box.innerHTML = '<p class="note">需要一个起算日（页面交易日或买入日）。</p>'; return; }
-    var h2 = '<div class="gsTbl"><div class="tr"><span>周期</span><span class="num">日历日</span><span class="num">交易日</span><span class="num">日期</span></div>';
-    tl.forEach(function(r){ h2 += '<div class="tr"><span>' + r.label + '</span><span class="num">' + r.days + '</span><span class="num">' + r.tradingDays + '</span><span class="num">' + r.date + '</span></div>'; });
-    h2 += '</div><div class="note">起算日 ' + (cfg.start || STATE.day) + '，交易日按 5/7 估算（未剔法定节假日）。</div>';
-    box.innerHTML = h2;
-    return;
-  }
-
-  var sp = G.spiral(N), focusK = 1, bestD = null;
-  var pairs = sp.cells.map(function(c){
-    var v = gsStepVal(P, c.k, inc);
-    var diff = Math.abs(v - P);
-    if (bestD === null || diff < bestD){ bestD = diff; focusK = c.k; }
-    return { c: c, v: v };
-  });
-  var fs = N >= 17 ? 9 : (N >= 13 ? 10.5 : 12);
-  var html = '<div class="gsGrid" style="font-size:' + fs + 'px;grid-template-columns:repeat(' + N + ',1fr)">';
-  pairs.forEach(function(o){
-    var cls = 'gsCell' + (o.c.isCross ? ' ax' : '') + (o.c.isDiag ? ' dg' : '') + (o.c.k === focusK ? ' fc' : '');
-    html += '<div class="' + cls + '" title="第 ' + (o.c.ring) + ' 环 · ' + o.c.angle + '° · 变盘价 ' + gsFmt(o.v, d) + '">' + gsFmt(o.v, d) + '</div>';
-  });
-  html += '</div><div class="note">矩阵 = 等步长螺旋梯子：中心格 = 基准 ' + P.toFixed(d) + '，沿螺旋每格 ' + (inc >= 0.01 ? inc.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : inc) +
-          ' 元；一圈 8 格。橙色 = 纵横轴（90°/180°/270°/360°），绿色 = 对角（45°/135°/225°/315°），蓝框 = 中心。' +
-          '　短线主要看下面「角度位」：那是 √基准价 每档 ' + inc + ' 的九方图口径（45° = +1 档）。</div>';
-  box.innerHTML = html;
-}
-function gsRender(wrap, code, name, price, startDay, srcTxt){
-  if (typeof wrap === "string") wrap = $(wrap);
-  if (!wrap) return;
-  if (!(price > 0)){ wrap.hidden = true; return; }
-  wrap.hidden = false;
-  gsHarness(wrap);
-  var inc = gsIncOf(wrap), size = gsSizeOf(wrap);
-  var digits = inc >= 0.25 ? 2 : (inc >= 0.0625 ? 3 : 4);
-  if (price >= 100) digits = inc >= 0.125 ? 1 : 2;
-  wrap._cfg = { price: price, inc: inc, size: size, digits: digits, start: startDay || "", code: code || "" };
-  if (code && wrap.querySelector(".gsCode")) wrap.querySelector(".gsCode").value = code;
-  if (wrap.querySelector(".gsPrice")) wrap.querySelector(".gsPrice").value = String(price);
-  var meta = wrap.querySelector(".gsMeta");
-  if (meta){
-    meta.textContent = (name ? name + " " : "") + (code || "") + "　基准 " + price.toFixed(digits) +
-      "　格距 " + gsIncName(wrap) + "（√ ±" + inc + "）　" + size + "×" + size +
-      (srcTxt ? "　现价源 " + srcTxt : "");
-  }
-  gsPaint(wrap);
-}
-function gsRow(code){
-  var row = null;
-  (STATE.rows || []).forEach(function(x){ if (x.code === code) row = x; });
-  return row;
-}
-function gsByCode(code, manualPrice, wrap){
-  if (typeof wrap === "string") wrap = $(wrap);
-  if (!wrap) return;
-  var row = gsRow(code), name = row ? row.name : "";
-  var sd = (row && row.buyDay) || STATE.day || "";
-  var p = parseFloat(manualPrice);
-  if (!(p > 0)) p = row && row.px > 0 ? row.px : 0;
-  if (p > 0) gsRender(wrap, code, name, p, sd, "页面数据");
-  if (manualPrice) return;                      // 手填价格，不再被现价覆盖
-  fetchQuotes([code]).then(function(r){
-    var q = r && r.m && r.m[code];
-    if (!q) return;
-    var np = (q.f2 > 0) ? +q.f2 : (q.price > 0 ? +q.price : 0);
-    if (!(np > 0)) return;
-    gsRender(wrap, code, q.f14 || q.name || name, np, sd, r.src);
-  }).catch(function(){});
-}
-function gsForCode(code, name, day){
-  var wrap = $("gsWrap"); if (!wrap) return;
-  var row = gsRow(code);
-  var sd = (row && row.buyDay) || day || STATE.day || "";
-  var p = row && row.px > 0 ? row.px : 0;
-  if (p > 0) gsRender(wrap, code, name, p, sd, "页面数据");
-  else wrap.hidden = true;
-  fetchQuotes([code]).then(function(r){
-    var q = r && r.m && r.m[code];
-    if (!q) return;
-    var np = (q.f2 > 0) ? +q.f2 : (q.price > 0 ? +q.price : 0);
-    if (!(np > 0)) return;
-    gsRender(wrap, code, name, np, sd, r.src);
-  }).catch(function(){});
-}
 function klOpen(code, name, day, day2){
   var card = $("klCard");
   if (!card) return;
@@ -3056,7 +2844,7 @@ function klOpen(code, name, day, day2){
   $("klSub").textContent = "停在 " + day + (day2 ? "（买 " + day + " → 卖 " + day2 + "）" : "");
   $("klLink").href = "https://stockpage.10jqka.com.cn/" + code + "/";
   $("klChart").innerHTML = '<p class="note">正在取 K 线…</p>';
-  try { gsForCode(code, name, day); } catch(e) { if ($("gsWrap")) $("gsWrap").hidden = true; }
+
   $("klInfo").innerHTML = "";
   $("klNote").textContent = "";
   card.scrollIntoView({ behavior: "smooth", block: "start" });
