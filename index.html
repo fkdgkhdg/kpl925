@@ -453,6 +453,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 </script>
 <script src="lhbdata.js"></script>
 <script src="teamdata.js"></script>
+<script src="sbzdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
 <script src="kpl_data.js"></script>
@@ -3593,7 +3594,7 @@ function histBadgeRefresh(){                 // 历史算完 → 只把榜单单
       var nm = (list[i] && list[i].name) ? list[i].name : (NAMEMAP[code] || code);
       var rest = '<a class="stk" href="https://stockpage.10jqka.com.cn/' + code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(nm) + '</a>'
         + '<a class="kbtn" data-kc="' + code + '" data-kn="' + esc(nm) + '">K线</a><span class="tag">' + code + '</span>';
-      cell.innerHTML = rest + appBadge(code, STATE.day) + lhbBoom(code, STATE.day);
+      cell.innerHTML = rest + appBadge(code, STATE.day) + lhbBoom(code, STATE.day) + sbzTag(code, STATE.day);
     }
   } catch(e){}
 }
@@ -3780,6 +3781,25 @@ function teamTag(code, day){
     "历史表现：当天均涨 " + pc(t.a0) + "；T+1 开盘卖均值 " + pc(t.a1) + "（胜率 " + t.w1 + "%）；T+1 收盘卖均值 " + pc(t.a2) + "（胜率 " + t.w2 + "%）。样本 " + t.cnt + " 次，仅供参考。";
   return '<span class="hotstar" style="background:#c60;margin-left:4px" title="' + esc(tip) + '">⚑三班组</span>';
 }
+function sbzTag(code, day){
+  if (typeof SBZ === "undefined" || !SBZ || !SBZ.d || !SBZ.seats) return "";
+  var p = lhbPrevDay(day); if (!p) return "";
+  var rec = SBZ.d[p]; if (!rec) return "";
+  var hit = null;
+  for (var i = 0; i < rec.length; i++){ if (rec[i][0] === code){ hit = rec[i]; break; } }
+  if (!hit) return "";
+  var why = (SBZ.rwhy && SBZ.rwhy[hit[2]]) || "";
+  var strong = (SBZ.strong || []).indexOf(hit[2]) >= 0;
+  var mem = (hit[3] || []).map(function(h){
+    var sell = h < 0, ix = sell ? (-1 - h) : h;
+    return (sell ? "卖 " : "买 ") + (SBZ.seats[ix] || "?");
+  }).join("、");
+  var tip = "疑似「三板组」：" + why + "\n命中席位：" + mem +
+    "\n套路：首板急拉 → 二板缩量一字 → 三板集中砸盘出货。口径＝公开复盘归纳的席位名单 + 席位联动特征（名单非官方认定，仅供参考）。";
+  var bg = strong ? "#b02" : "#c60";
+  var txt = strong ? "三板组" : "疑似三板组";
+  return '<span class="hotstar" style="background:' + bg + ';margin-left:4px" title="' + esc(tip) + '">' + txt + '</span>';
+}
 function renderBoomSet(){
   var el = $("bmBox"); if (!el) return;
   var L = bmList();
@@ -3789,6 +3809,9 @@ function renderBoomSet(){
   if (typeof TEAMSEAT !== "undefined" && TEAMSEAT && TEAMSEAT.t) h += '<div class="chips" style="margin:2px 0 8px">' +
     '<span class="chip big" style="background:#c60;color:#fff">⚑三班组 ' + TEAMSEAT.t.length + ' 个组合</span>' +
     '<span class="chip">股票名后出现「⚑三班组」＝这只票涨停那天，龙虎榜买入席位里同时出现了某个已知 3 席组合（共现 ≥5 次）。鼠标停在其上看是哪 3 个营业部 + 历史 T+1 收益。</span></div>';
+  if (typeof SBZ !== "undefined" && SBZ && SBZ.d) h += '<div class="chips" style="margin:2px 0 8px">' +
+    '<span class="chip big" style="background:#b02;color:#fff">三板组</span>' +
+    '<span class="chip">股票名后出现「三板组」（红）＝这票涨停那天，龙虎榜里出现了公开归纳的三板组席位（点名营业部/同门多席/池内多席）；「疑似三板组」（橙）＝没命中名单但有明显席位联动。鼠标停上去看命中席位与套路。</span></div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px">' +
     (L.length ? L.map(function(n){
         return '<span class="lseat boom"><i>' + esc(n) + '</i><b data-bmdel="' + esc(n) + '" title="点这里从名单里删掉" style="cursor:pointer">×</b></span>';
@@ -4904,7 +4927,7 @@ function renderCore(){
     var _hr = hotRankOf(r.code);        // 所属行业是否在「板块热度」榜前 10
     return '<tr class="' + (i === 0 ? 'top ' : '') + (_hi >= 0 ? 'hot' : '') + '">'
       + '<td>' + (i+1) + '</td>'
-      + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + teamTag(r.code, STATE.day) + '</td>'
+      + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + teamTag(r.code, STATE.day) + sbzTag(r.code, STATE.day) + '</td>'
       + '<td class="left">' + esc(r.sector || "—") + (_hr ? '<span class="' + (_hr.rank <= 5 ? "hotb" : "hotb2") + '" title="' + esc(_hr.name + "：板块热度榜第 " + _hr.rank + " 名（截至 " + _hr.d + "）｜行业 " + _hr.n + " 只、近3日涨停 " + _hr.z3 + " 家、近3日涨幅 " + (_hr.r3 > 0 ? "+" : "") + _hr.r3 + "%、放量 " + _hr.vol + "×") + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
       + '<td class="left">' + thCell(r.code) + '</td>'
       + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + ndCell()
