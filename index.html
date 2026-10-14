@@ -452,6 +452,7 @@
 if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
 </script>
 <script src="lhbdata.js"></script>
+<script src="teamdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
 <script src="kpl_data.js"></script>
@@ -3765,12 +3766,29 @@ function lhbBoom(code, day){
   if (!hit.length) return "";
   return '<span class="hotstar" style="background:#a11" title="' + esc("⚠ 爆头席位在卖（按你自己填的名单）：" + hit.map(function(x){ return x.name + " 净卖 " + lhbMoney(x.net); }).join("、") + "　名单在榜单下方「爆头席位名单」处可以自己增删") + '">⚠爆头席位</span>';
 }
+function teamTag(code, day){
+  if (typeof TEAMSEAT === "undefined" || !TEAMSEAT || !TEAMSEAT.d || !TEAMSEAT.t) return "";
+  var p = lhbPrevDay(day); if (!p) return "";
+  var rec = TEAMSEAT.d[p]; if (!rec) return "";
+  var ti = -1;
+  for (var i = 0; i < rec.length; i++){ if (rec[i][0] === code){ ti = rec[i][1]; break; } }
+  if (ti < 0 || !TEAMSEAT.t[ti]) return "";
+  var t = TEAMSEAT.t[ti];
+  var mem = t.m.map(function(si){ return TEAMSEAT.seats[si]; }).join("、");
+  var pc = function(v){ return (v === null || v === undefined) ? "—" : (v > 0 ? "+" : "") + v + "%"; };
+  var tip = "⚑ 疑似「三班组」：这 3 个营业部 —— " + mem + " —— 在 " + t.f + " ~ " + t.l + " 期间已经 " + t.n + " 次同一天一起买同一只票（共 " + t.ns + " 只，lift " + t.lift + "）。\n" +
+    "历史表现：当天均涨 " + pc(t.a0) + "；T+1 开盘卖均值 " + pc(t.a1) + "（胜率 " + t.w1 + "%）；T+1 收盘卖均值 " + pc(t.a2) + "（胜率 " + t.w2 + "%）。样本 " + t.cnt + " 次，仅供参考。";
+  return '<span class="hotstar" style="background:#c60;margin-left:4px" title="' + esc(tip) + '">⚑三班组</span>';
+}
 function renderBoomSet(){
   var el = $("bmBox"); if (!el) return;
   var L = bmList();
   var h = '<div class="chips" style="margin:12px 0 4px">' +
     '<span class="chip big" style="background:#a11;color:#fff">爆头席位名单 ' + L.length + ' 个（可自己增删）</span>' +
     '<span class="chip">名单里的席位 → 昨日席位列标红；若它在卖 → 逐票竞价建议一票否决</span></div>';
+  if (typeof TEAMSEAT !== "undefined" && TEAMSEAT && TEAMSEAT.t) h += '<div class="chips" style="margin:2px 0 8px">' +
+    '<span class="chip big" style="background:#c60;color:#fff">⚑三班组 ' + TEAMSEAT.t.length + ' 个组合</span>' +
+    '<span class="chip">股票名后出现「⚑三班组」＝这只票涨停那天，龙虎榜买入席位里同时出现了某个已知 3 席组合（共现 ≥5 次）。鼠标停在其上看是哪 3 个营业部 + 历史 T+1 收益。</span></div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px">' +
     (L.length ? L.map(function(n){
         return '<span class="lseat boom"><i>' + esc(n) + '</i><b data-bmdel="' + esc(n) + '" title="点这里从名单里删掉" style="cursor:pointer">×</b></span>';
@@ -4886,7 +4904,7 @@ function renderCore(){
     var _hr = hotRankOf(r.code);        // 所属行业是否在「板块热度」榜前 10
     return '<tr class="' + (i === 0 ? 'top ' : '') + (_hi >= 0 ? 'hot' : '') + '">'
       + '<td>' + (i+1) + '</td>'
-      + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + '</td>'
+      + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + teamTag(r.code, STATE.day) + '</td>'
       + '<td class="left">' + esc(r.sector || "—") + (_hr ? '<span class="' + (_hr.rank <= 5 ? "hotb" : "hotb2") + '" title="' + esc(_hr.name + "：板块热度榜第 " + _hr.rank + " 名（截至 " + _hr.d + "）｜行业 " + _hr.n + " 只、近3日涨停 " + _hr.z3 + " 家、近3日涨幅 " + (_hr.r3 > 0 ? "+" : "") + _hr.r3 + "%、放量 " + _hr.vol + "×") + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
       + '<td class="left">' + thCell(r.code) + '</td>'
       + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + ndCell()
