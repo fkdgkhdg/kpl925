@@ -69,6 +69,14 @@
   .tth.w2{background:#2f6f9f}
   .tth.w5{background:#c02c2c}
   .tth2{display:inline-block;margin-left:3px;padding:0 5px;border-radius:4px;background:rgba(128,128,128,.16);color:var(--muted);font-size:10.5px}
+  .thmain{display:block;margin-bottom:1px}
+  .thlab{display:inline-block;margin-right:3px;font-size:10px;color:#1f7a3d;font-weight:700}
+  .mth{display:inline-block;margin:0 3px 1px 0;padding:1px 6px;border-radius:5px;background:#1f7a3d;color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;text-decoration:none}
+  .mth:hover{filter:brightness(1.15)}
+  .mth.m1{background:#0f6030}
+  .thlink{cursor:pointer}
+  .thlink:hover{filter:brightness(1.15)}
+  .thk{margin-top:1px}
   .tag2{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:#2f6f9f;color:#fff;font-size:10.5px;font-weight:700;cursor:help}
   .tag2.o{background:#e07a1f}
   .tag2.g{background:#1f7a3d}
@@ -293,6 +301,12 @@
     <p class="note" id="note"></p>
   </div>
 
+  <div class="card" id="famCard" hidden>
+    <h2>字辈人气（同花顺涨停原因里的「XX字辈」，<span id="famDate"></span>）</h2>
+    <div class="tablewrap"><table id="famTbl"></table></div>
+    <p class="note" id="famNote"></p>
+  </div>
+
   <div class="card" id="yzCard" hidden>
     <h2>今日一字板 · 竞价即一字（全市场主板，<span id="yzDate"></span>）<button class="mini" id="yzRefresh" style="float:right">重新扫描</button></h2>
     <div class="chips" id="yzTop"></div>
@@ -335,6 +349,12 @@
     <div style="margin:0 0 8px"><button id="bkPool">只看蓄势池里的</button></div>
     <div class="tablewrap"><table id="bkTbl"><tbody><tr><td class="empty">点上面任意板块名，这里会列出它的主板成分股</td></tr></tbody></table></div>
     <p class="note" id="bkNote"></p>
+  </div>
+
+  <div class="card" id="thCard" hidden>
+    <h2><span id="thTitle">题材连板梯队</span><button id="thClose" style="float:right">关闭</button></h2>
+    <div class="tablewrap"><table id="thTbl"><tbody><tr><td class="empty">点榜单里的题材标签，这里会列出该题材当天的连板梯队（按板位从高到低）</td></tr></tbody></table></div>
+    <p class="note" id="thNote"></p>
   </div>
 
   <div class="card" id="hotCard" hidden>
@@ -485,6 +505,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 <script src="smashdata.js"></script>
 <script src="teamdata.js"></script>
 <script src="sbzdata.js"></script>
+<script src="ztrsdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
 <script src="kpl_data.js"></script>
@@ -1117,23 +1138,38 @@ function themeThick(code){
     var mem = BMEM[bks[i]].split(","), k = 0;
     for (var j = 0; j < mem.length; j++) if (DZTSET[mem[j]]) k++;
     if (k < 2) continue;
-    arr.push({ k:k, n:BNAME[bks[i]] || bks[i], tot:mem.length });
+    arr.push({ k:k, n:BNAME[bks[i]] || bks[i], tot:mem.length, bk:bks[i] });
   }
   arr.sort(function(a, b){ return b.k - a.k || b.tot - a.tot; });
   return arr;
 }
+// ===== 主流题材（同花顺涨停原因题材）+ 题材连板梯队 =====
+function ztDayOf(day){ var p = (typeof lhbPrevDay === "function") ? lhbPrevDay(day) : ""; return p ? p.replace(/-/g,"") : ""; }
+function ztPoolOf(day){ if (typeof ZTRS === "undefined" || !ZTRS || !ZTRS.d) return null; return ZTRS.d[ztDayOf(day)] || null; }
+function ztRec(code, day){ var pl = ztPoolOf(day); if (!pl) return null; for (var i=0;i<pl.length;i++){ if (pl[i][0] === code) return pl[i]; } return null; }
+function ztTags(code, day){ var r = ztRec(code, day); if (!r) return []; return String(r[2]).split("+").map(function(x){ return x.trim(); }).filter(Boolean); }
+function ztHHMM(t){ if (!t) return ""; try { return new Date(t*1000).toLocaleTimeString("zh-CN",{timeZone:"Asia/Shanghai",hour12:false,hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
+function maintCell(code){
+  var tags = ztTags(code, STATE.day);
+  if (!tags.length) return "";
+  var d = ztDayOf(STATE.day), n = Math.min(tags.length, 6), h = '<div class="thmain"><span class="thlab">主流</span>';
+  for (var i=0;i<n;i++) h += '<a class="mth' + (i===0?" m1":"") + '" data-th="' + esc(tags[i]) + '" data-ztd="' + d + '" title="同花顺涨停原因题材（' + d + '）：点开看这个题材的连板梯队">' + esc(tags[i]) + '</a>';
+  if (tags.length > n) h += '<span class="tth2">+' + (tags.length-n) + '</span>';
+  return h + '</div>';
+}
 function thCell(code){
+  var mth = maintCell(code);
   var list = themeThick(code);
-  if (list === undefined) return '<span class="tag">—</span>';
-  if (list === null || !list.length) return '<span class="tag">独苗</span>';
+  if (list === undefined) return mth || '<span class="tag">—</span>';
+  if (list === null || !list.length) return (mth || "") + '<span class="tag">独苗</span>';
   var all = list.map(function(t){ return t.n + " " + t.k + "只/" + t.tot + "只"; }).join("；");
   var top = list[0];
-  var html = '<span class="' + (top.k >= 5 ? "tth w5" : "tth w2") + '" title="' + esc("昨天一起涨停的题材（按家数）：" + all) + '">' + esc(top.n) + " " + top.k + "只</span>";
+  var html = '<span class="' + (top.k >= 5 ? "tth w5" : "tth w2") + ' thlink" data-bk="' + esc(top.bk || "") + '" data-th="' + esc(top.n) + '" title="' + esc("昨天一起涨停的题材（按家数）：" + all + "；点开看该题材的连板梯队") + '">' + esc(top.n) + " " + top.k + "只</span>";
   for (var i = 1; i < list.length && i < 3; i++){
-    html += '<span class="tth2" title="' + esc("昨天一起涨停的题材（按家数）：" + all) + '">' + esc(list[i].n) + list[i].k + '</span>';
+    html += '<span class="tth2 thlink" data-bk="' + esc(list[i].bk || "") + '" data-th="' + esc(list[i].n) + '" title="' + esc("昨天一起涨停的题材（按家数）：" + all + "；点开看该题材的连板梯队") + '">' + esc(list[i].n) + list[i].k + '</span>';
   }
-  if (list.length > 3) html += '<span class="tth2" title="' + esc("昨天一起涨停的题材（按家数）：" + all) + '">+' + (list.length - 3) + '</span>';
-  return html;
+  if (list.length > 3) html += '<span class="tth2">+' + (list.length - 3) + '</span>';
+  return (mth || "") + '<div class="thk">' + html + '</div>';
 }
 // ===== 热度板块标注：该股所属行业在「板块热度」榜的排名（同一口径，截至前一交易日）=====
 var HOTTOP = 10;   // 只标前 10 名
@@ -2085,6 +2121,73 @@ document.addEventListener("click", function(e){
   if (!a) return;
   e.preventDefault();
   openBk(a.getAttribute("data-bk") ? "bk" : "hy", a.getAttribute("data-bk") || a.getAttribute("data-hy"));
+});
+function openThLadder(name, bkKey, dstr){
+  var card = $("thCard"); if (!card) return;
+  dstr = dstr || ztDayOf(STATE.day);
+  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
+  var recBy = {}; pool.forEach(function(a){ recBy[a[0]] = a; });
+  var members = [], src = "";
+  if (bkKey && typeof BMEM !== "undefined" && BMEM && BMEM[bkKey]){
+    members = BMEM[bkKey].split(",").filter(function(c){ return DZTSET && DZTSET[c]; }).map(function(c){ return recBy[c] || [c, (typeof NAMEMAP!=="undefined"&&NAMEMAP[c])||c, "", "", 1, "", 0]; });
+    src = "板块成分股（昨日涨停的那几只）";
+  }
+  if (!members.length){
+    members = pool.filter(function(a){ return String(a[2]).split("+").map(function(x){return x.trim();}).indexOf(name) >= 0; });
+    src = "同花顺涨停原因含该题材";
+  }
+  members = members.slice().sort(function(a,b){ return (b[4]||0)-(a[4]||0) || (a[6]||0)-(b[6]||0); });
+  card.hidden = false;
+  var dd = dstr.slice(0,4)+"-"+dstr.slice(4,6)+"-"+dstr.slice(6,8);
+  $("thTitle").textContent = name + " · 连板梯队（" + dd + "）";
+  if (!members.length){
+    $("thTbl").innerHTML = '<tbody><tr><td class="empty">这一天这个题材没有涨停股</td></tr></tbody>';
+    $("thNote").textContent = "口径：" + src + "。";
+    card.scrollIntoView({behavior:"smooth", block:"start"}); return;
+  }
+  var h = '<thead><tr><th>#</th><th>板位</th><th>股票</th><th>板型</th><th>首封</th><th>当日涨停原因（同花顺）</th></tr></thead><tbody>';
+  h += members.map(function(a,i){
+    var nm = a[1] || ((typeof NAMEMAP!=="undefined"&&NAMEMAP[a[0]])||a[0]); var bd = a[4]||1;
+    return '<tr class="' + (i===0?"top ":"") + (bd>=3?"hot":"") + '">'
+      + '<td>' + (i+1) + '</td>'
+      + '<td><span class="bpos b' + Math.min(5, Math.max(1, bd)) + '">' + (bd>=5?"≥5板":(bd===1?"首板":bd+"板")) + '</span></td>'
+      + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + a[0] + '/" target="_blank" rel="noopener">' + esc(nm) + '</a><a class="kbtn" data-kc="' + a[0] + '" data-kn="' + esc(nm) + '">K线</a><span class="tag">' + a[0] + '</span></td>'
+      + '<td>' + esc(a[5] || "—") + '</td>'
+      + '<td>' + (ztHHMM(a[6]) || "—") + '</td>'
+      + '<td class="left">' + esc(String(a[2]).split("+").map(function(x){return x.trim();}).join(" · ")) + '</td></tr>';
+  }).join("");
+  $("thTbl").innerHTML = h + '</tbody>';
+  var tp = members[0];
+  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。「首封」＝当天第一次封板时间；板型＝换手板／一字板。数据源：同花顺涨停池「涨停原因」。";
+  card.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+function renderFam(){
+  var el = $("famCard"); if (!el) return;
+  var dstr = ztDayOf(STATE.day);
+  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || null;
+  if (!pool || !pool.length){ el.hidden = true; return; }
+  var groups = {};
+  pool.forEach(function(a){ String(a[2]).split("+").forEach(function(t){ t = t.trim(); if (/字辈$/.test(t) && t.length <= 8){ (groups[t] || (groups[t]=[])).push(a); } }); });
+  var keys = Object.keys(groups);
+  if (!keys.length){ el.hidden = true; return; }
+  keys.sort(function(x,y){ return groups[y].length - groups[x].length; });
+  el.hidden = false;
+  $("famDate").textContent = dstr.slice(0,4)+"-"+dstr.slice(4,6)+"-"+dstr.slice(6,8);
+  var h = '<thead><tr><th>字辈</th><th>家数</th><th>股票（板数）</th></tr></thead><tbody>';
+  h += keys.map(function(k, i){
+    var ms = groups[k].slice().sort(function(a,b){ return (b[4]||1)-(a[4]||1); });
+    return '<tr class="' + (i===0?"top ":"") + '"><td class="left"><a class="mth m1" data-th="' + esc(k) + '" data-ztd="' + dstr + '">' + esc(k) + '</a></td><td>' + ms.length + '</td><td class="left">' + ms.map(function(a){ var nm=a[1]||a[0]; return '<a class="stk" href="https://stockpage.10jqka.com.cn/'+a[0]+'/" target="_blank" rel="noopener">'+esc(nm)+'</a><span class="tth2">'+(a[4]||1)+'板</span>'; }).join(" ") + '</td></tr>';
+  }).join("");
+  $("famTbl").innerHTML = h + '</tbody>';
+  $("famNote").textContent = "字辈＝同花顺涨停原因里出现的「XX字辈」标签（网上当前对这批票的人气归类，如「‘羊’字辈」）。点字辈可看它的连板梯队。";
+}
+document.addEventListener("click", function(e){
+  if (e.target && e.target.id === "thClose"){ var c = $("thCard"); if (c) c.hidden = true; return; }
+  var a = (e.target && e.target.closest) ? e.target.closest(".mth,.thlink") : null;
+  if (!a) return;
+  e.preventDefault();
+  var th = a.getAttribute("data-th"); if (!th) return;
+  openThLadder(th, a.getAttribute("data-bk") || "", a.getAttribute("data-ztd") || ztDayOf(STATE.day));
 });
 function renderDD(){
   var el = $("cycDD"); if (!el) return;
@@ -4991,7 +5094,8 @@ function renderCore(){
       : ((top.at === null || !(top.at > 0)) ? "—" : top.at.toFixed(2) + "%") + ' 实际换手率') + '</div>'
     + '<div>竞价日<b>' + STATE.day + '</b>' + STATE.src + '</div>'
     + '<div>入选只数<b>' + list.length + '</b>' + (useBase ? "全部昨日涨停股" : "实际换手前5") + (STATE.noLimit ? "（剔一字，名次按剔除后重算）" : "") + '</div>';
-  $("note").textContent = "「近10日N次」＝最近 10 个交易日里它进过几次「实际换手前5」（含今天）；" + "「前N天也进过榜」＝这只票 N 个交易日前也进过「实际换手前5」；「前N天涨停过」＝它 N 个交易日前也在涨停名单里（但中间断过板）。鼠标悬停能看到具体是哪一天。\n" +
+  $("note").textContent = "「主流题材」＝同花顺涨停池的当日「涨停原因」标签（网上当前对这只票的属性，例：九阳股份＝机器人投资+厨房小家电+豆浆机+「‘羊’字辈」）；点任意题材标签可展开该题材当天的连板梯队（按板位从高到低，含板型与首封时间）。" +
+    "「近10日N次」＝最近 10 个交易日里它进过几次「实际换手前5」（含今天）；" + "「前N天也进过榜」＝这只票 N 个交易日前也进过「实际换手前5」；「前N天涨停过」＝它 N 个交易日前也在涨停名单里（但中间断过板）。鼠标悬停能看到具体是哪一天。\n" +
     ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
     "「题材厚度」＝该股所属概念题材里，前一交易日一起涨停的主板家数（已剔除昨日涨停/最近多板这类伪题材）。一只票通常挂十几个题材，这里按家数排序显示：大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只），后面的小标签是其他并列题材，鼠标悬停可看全部；所有题材都不足 2 只时显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
@@ -4999,6 +5103,7 @@ function renderCore(){
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
+  renderFam();
   renderTop();
   renderTrend();
   renderPB();
