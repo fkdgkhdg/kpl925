@@ -77,6 +77,11 @@
   .thlink{cursor:pointer}
   .thlink:hover{filter:brightness(1.15)}
   .thk{margin-top:1px}
+  #thCard.thfloat{position:fixed;right:14px;bottom:14px;width:min(760px,94vw);max-height:78vh;overflow:auto;z-index:90;margin:0;content-visibility:visible;box-shadow:0 10px 34px rgba(0,0,0,.34)}
+  #thCard.thfloat h2{cursor:move;user-select:none;position:sticky;top:-1px;z-index:2;background:var(--panel);margin:0 0 8px;padding:2px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  #thCard.thfloat h2 #thTitle{flex:1 1 auto}
+  #thCard.thfloat h2 #thClose{float:none;flex:0 0 auto}
+  @media (max-width:640px){ #thCard.thfloat{left:8px;right:8px;bottom:8px;width:auto;max-height:68vh} }
   .tag2{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:#2f6f9f;color:#fff;font-size:10.5px;font-weight:700;cursor:help}
   .tag2.o{background:#e07a1f}
   .tag2.g{background:#1f7a3d}
@@ -351,7 +356,7 @@
     <p class="note" id="bkNote"></p>
   </div>
 
-  <div class="card" id="thCard" hidden>
+  <div class="card thfloat" id="thCard" hidden>
     <h2><span id="thTitle">题材连板梯队</span><button id="thClose" style="float:right">关闭</button></h2>
     <div class="tablewrap"><table id="thTbl"><tbody><tr><td class="empty">点榜单里的题材标签，这里会列出该题材当天的连板梯队（按板位从高到低）</td></tr></tbody></table></div>
     <p class="note" id="thNote"></p>
@@ -2123,30 +2128,63 @@ document.addEventListener("click", function(e){
   openBk(a.getAttribute("data-bk") ? "bk" : "hy", a.getAttribute("data-bk") || a.getAttribute("data-hy"));
 });
 function lbcMap(){ var m = {}; try { (STATE.rows || []).forEach(function(r){ if (r && r.code) m[String(r.code)] = +r.board || 0; }); } catch (e) {} return m; }
+// 题材关键词展开：点「机器人投资」也能把整个「机器人」方向的连板梯队一起拉出来。
+// 规则：取该标签里「最长的、且当天涨停池里至少还有 2 个不同标签也含它」的子串（≥2 字）当关键词；「XX字辈」不做展开。
+var THCORE = {};
+function thCoreOf(tag, dstr){
+  if (tag.slice(-2) === "字辈") return "";
+  var cache = THCORE[dstr] || (THCORE[dstr] = {});
+  if (cache[tag] !== undefined) return cache[tag];
+  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
+  if (pool.length < 2 || tag.length < 2) return (cache[tag] = "");
+  var rowTags = pool.map(function(a){ return String(a[2]).split("+").map(function(x){ return x.trim(); }); });
+  var best = "";
+  for (var j = 2; j <= tag.length; j++){
+    var s = tag.slice(0, j);
+    if (s.length <= best.length) continue;
+    var n = 0;
+    for (var r = 0; r < rowTags.length; r++){
+      var ts = rowTags[r], f = false;
+      for (var q = 0; q < ts.length; q++){ if (ts[q].indexOf(s) >= 0){ f = true; break; } }
+      if (f){ n++; if (n >= 2) break; }
+    }
+    if (n >= 2) best = s;
+  }
+  return (cache[tag] = best);
+}
 function openThLadder(name, bkKey, dstr){
   var card = $("thCard"); if (!card) return;
   dstr = dstr || ztDayOf(STATE.day);
   var lbcM = (dstr === ztDayOf(STATE.day)) ? lbcMap() : {};
   var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
   var recBy = {}; pool.forEach(function(a){ recBy[a[0]] = a; });
-  var members = [], src = "";
+  var hit = {}, srcs = [], core = thCoreOf(name, dstr), nTag = 0;
+  pool.forEach(function(a){
+    var tags = String(a[2]).split("+").map(function(x){ return x.trim(); });
+    if (tags.indexOf(name) >= 0){ hit[a[0]] = 1; nTag++; return; }
+    if (core && tags.some(function(t){ return t.indexOf(core) >= 0; })){ hit[a[0]] = 1; nTag++; }
+  });
+  if (nTag) srcs.push("同花顺涨停原因" + (core ? "（含关键词「" + core + "」）" : ""));
   if (bkKey && typeof BMEM !== "undefined" && BMEM && BMEM[bkKey]){
-    members = BMEM[bkKey].split(",").filter(function(c){ return DZTSET && DZTSET[c]; }).map(function(c){ return recBy[c] || [c, (typeof NAMEMAP!=="undefined"&&NAMEMAP[c])||c, "", "", 1, "", 0]; });
-    src = "板块成分股（昨日涨停的那几只）";
+    var added = 0;
+    BMEM[bkKey].split(",").forEach(function(c){ if (DZTSET && DZTSET[c] && !hit[c]){ hit[c] = 1; added++; } });
+    srcs.push("东财「" + ((typeof BNAME !== "undefined" && BNAME[bkKey]) || bkKey) + "」成分股里当日也涨停的 " + added + " 只");
   }
-  if (!members.length){
-    members = pool.filter(function(a){ return String(a[2]).split("+").map(function(x){return x.trim();}).indexOf(name) >= 0; });
-    src = "同花顺涨停原因含该题材";
-  }
+  var members = Object.keys(hit).map(function(c){
+    var a = recBy[c]; if (a) return a.slice();
+    return [c, (typeof NAMEMAP !== "undefined" && NAMEMAP[c]) || c, "", "", 1, "", 0];
+  });
+  var src = srcs.length ? srcs.join(" ＋ ") : "同花顺涨停原因（该题材当天没有成分股）";
   members.forEach(function(a){ var b = lbcM[String(a[0])]; a[4] = b || a[4] || 1; });
   members = members.slice().sort(function(a,b){ return (b[4]||0)-(a[4]||0) || (a[6]||0)-(b[6]||0); });
   card.hidden = false;
+  thDragBind(card);
   var dd = dstr.slice(0,4)+"-"+dstr.slice(4,6)+"-"+dstr.slice(6,8);
-  $("thTitle").textContent = name + " · 连板梯队（" + dd + "）";
+  $("thTitle").textContent = name + ((core && core !== name) ? "（" + core + "）" : "") + " · 连板梯队（" + dd + "）";
   if (!members.length){
     $("thTbl").innerHTML = '<tbody><tr><td class="empty">这一天这个题材没有涨停股</td></tr></tbody>';
     $("thNote").textContent = "口径：" + src + "。";
-    card.scrollIntoView({behavior:"smooth", block:"start"}); return;
+    return;
   }
   var h = '<thead><tr><th>#</th><th>板位</th><th>股票</th><th>板型</th><th>首封</th><th>当日涨停原因（同花顺）</th></tr></thead><tbody>';
   h += members.map(function(a,i){
@@ -2162,8 +2200,29 @@ function openThLadder(name, bkKey, dstr){
   }).join("");
   $("thTbl").innerHTML = h + '</tbody>';
   var tp = members[0];
-  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。「板位」用东财口径的连板数（和上面 5 只榜单一致）；板位右边的小字＝同花顺「N天M板」（区间内涨停总次数，中间可以有断板）。「首封」＝当天第一次封板时间；板型＝换手板／一字板。数据源：同花顺涨停池「涨停原因」。";
-  card.scrollIntoView({ behavior:"smooth", block:"start" });
+  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；板位右边小字＝同花顺「N天M板」（区间内涨停总次数，中间可断板）。「首封」＝当天第一次封板时间；板型＝换手板／一字板。点题材标签会把同一关键词（如「机器人」）方向的票一起拉出来。";
+}
+// 连板梯队改成右下角浮动面板（可拖动标题栏移动），不再把页面滚到下面
+function thDragBind(card){
+  var btn = $("thClose");
+  if (btn && !btn.dataset.dragbound){
+    btn.dataset.dragbound = "1";
+    var hd = card.querySelector("h2"), drag = null;
+    if (hd) hd.addEventListener("mousedown", function(ev){
+      if (ev.target && /button|a/i.test(ev.target.tagName)) return;
+      var rc = card.getBoundingClientRect();
+      drag = { x: ev.clientX, y: ev.clientY, l: rc.left, t: rc.top };
+      card.style.margin = "0"; card.style.right = "auto"; card.style.bottom = "auto";
+      card.style.left = rc.left + "px"; card.style.top = rc.top + "px";
+      ev.preventDefault();
+    });
+    document.addEventListener("mousemove", function(ev){
+      if (!drag) return;
+      card.style.left = Math.max(0, Math.min(window.innerWidth - 90, drag.l + ev.clientX - drag.x)) + "px";
+      card.style.top = Math.max(0, Math.min(window.innerHeight - 44, drag.t + ev.clientY - drag.y)) + "px";
+    });
+    document.addEventListener("mouseup", function(){ drag = null; });
+  }
 }
 function renderFam(){
   var el = $("famCard"); if (!el) return;
