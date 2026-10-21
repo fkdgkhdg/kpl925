@@ -163,6 +163,18 @@
   .lseat.boom{background:#f8dcdc;color:#9d1c1c}
   .lseat.boom b{color:#a11}
   .lseat.more{display:inline-block;width:auto;background:transparent;color:#9aa0a6;padding:0 2px;margin:0}
+  .lseat{cursor:pointer}
+  .lseat:hover{filter:brightness(.95)}
+  #scCard{display:none;position:fixed;right:14px;bottom:14px;width:min(580px,95vw);max-height:88vh;z-index:92;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.32);flex-direction:column;overflow:hidden}
+  #scHead{padding:7px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--chip)}
+  #scBody{padding:10px;overflow:auto;font-size:12px}
+  #scGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+  #scGrid .m{background:var(--chip);border-radius:6px;padding:6px 8px;overflow:hidden}
+  #scGrid .m b{display:block;font-size:15px;font-variant-numeric:tabular-nums;line-height:1.3}
+  #scGrid .m span{font-size:10px;color:var(--muted)}
+  #scVerdict{font-size:12px;line-height:1.55;padding:7px 9px;border-radius:6px;background:#f6f7f9}
+  #scTabs button{font-size:11.5px;padding:2px 8px;margin-right:4px;border-radius:6px}
+  #scBadge{font-size:11px;padding:1px 6px;border-radius:4px;vertical-align:middle}
   .vfBuy{margin:0 2px;padding:0 8px}
   .vfBuy.vfon{background:#c02c2c;color:#fff;border-color:#c02c2c;font-weight:700}
   .vfBuy.vfoff{background:var(--chip);font-weight:700}
@@ -441,6 +453,14 @@
     <iframe id="rvFrame" style="flex:1;border:0;width:100%;background:#fff" src="about:blank"></iframe>
   </div>
   <div id="tpCard"></div>
+  <div id="scCard">
+    <div id="scHead">
+      <b style="font-size:13px">席位砸盘档案</b>
+      <span id="scName" style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <button id="scClose">关闭</button>
+    </div>
+    <div id="scBody"></div>
+  </div>
 
   <p class="note">
     口径：竞价涨幅＝9:25 竞价成交价 ÷ 前收盘；竞价成交额＝9:25 集合竞价成交额（取当日第一根分钟 K 线 09:30 的成交额）；实际换手＝竞价成交额 ÷ 实际流通市值（取最近一次统计值，未收录个股用普通换手率顶替并标「≈」）。开盘档位＝竞价高低按<b>绝对涨幅</b>分 6 档：低开 / 平开 0~2% / 高开 2~5% / 5~7% / 7~9.5% / ≥9.5%（以前用的是「竞价涨幅 ÷ 涨停幅度」的相对档，现已换成绝对涨幅，因为绝对涨幅档对断板卖出的收益区分度最高）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）里不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%；低开最差 -2.09%、7~9.5% -1.75%）；⚠ 高位高开＝<b>≥4 板且高开 >7%</b>，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%（30 笔），其中 4 板高开 7~9.5% 最差：均值 -4.09% / 中位 -9.56%（15 笔）；同是 ≥4 板，平开 0~5% 反而是均值 +3.52% / 中位 +0.75%（68 笔）。回测口径：856 笔 / 246 个交易日（2025-09-10 ~ 2026-09-18）。
@@ -452,6 +472,7 @@
 if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
 </script>
 <script src="lhbdata.js"></script>
+<script src="smashdata.js"></script>
 <script src="teamdata.js"></script>
 <script src="sbzdata.js"></script>
 <script src="gann-square-widget.js"></script>
@@ -6916,6 +6937,87 @@ vfInit();
   }); };
   if (document.readyState === "complete") setTimeout(kick, 400);
   else window.addEventListener("load", function(){ setTimeout(kick, 400); });
+})();
+</script>
+<script>
+/* ===== 席位砸盘档案：点「昨日席位」里的席位名弹出（数据 smashdata.js / window.SMASHSEAT）===== */
+(function(){
+  var SS = (typeof SMASHSEAT !== "undefined") ? SMASHSEAT : null;
+  var WA = [["A","全部"],["w60","近60日"],["w20","近20日"]];
+  var curWin = "A", curSeat = "";
+  function $(id){ return document.getElementById(id); }
+  function num(v,d){ return (v==null||v===""||isNaN(v)) ? "—" : (+v).toFixed(d==null?1:d); }
+  function sgn(v,d){ return (v==null) ? "—" : ((v>0?"+":"")+(+v).toFixed(d==null?1:d)); }
+  function money(v){ if(v==null) return "—"; return (v<0?"-":"") + Math.abs(v).toFixed(2) + "亿"; }
+  function getRec(seat){ if(!SS||!SS.m) return null; var r=SS.m[seat]; if(!r) return null;
+    return { full: r[0]||seat, yz: r[1]===1, amtSell: r[2], nRec: r[3], A: r[4], w20: r[5], w60: r[6] }; }
+  function W(r){ return curWin==="A" ? r.A : (curWin==="w60" ? r.w60 : r.w20); }
+  function verdict(w){
+    if(!w || w[0]==null || w[0]<5) return { t:"样本不足：该窗口高位净卖只有 " + (w&&w[0]!=null?w[0]:0) + " 次，统计不显著。", c:"#6b7280" };
+    var d1=w[5], d3=w[6], sm=w[7], pu=w[4], sh=w[3];
+    if(d1!=null && d1<=-1.5 && sm!=null && sm>=45) return { t:"⚠ 砸盘型：卖完次日就跌 —— 后1日 "+sgn(d1)+"% / 后3日 "+sgn(d3)+"% / 大面率 "+sm+"%，净卖占成交额 "+num(sh)+"%。", c:"#b02a2a" };
+    if(d1!=null && d1<=-0.5) return { t:"偏砸盘：后1日 "+sgn(d1)+"% / 后3日 "+sgn(d3)+"% / 大面率 "+sm+"%。", c:"#b06a00" };
+    if(pu!=null && pu<=0.15 && d1!=null && d1>=0) return { t:"高位全抛但票还在涨（打板出货型）：买/(买+卖) 仅 "+num(pu,2)+"，后1日仍 "+sgn(d1)+"% / 后3日 "+sgn(d3)+"%。", c:"#1f7a3d" };
+    if(d1!=null && d1>0.5) return { t:"净卖方次日偏强：后1日 "+sgn(d1)+"% / 后3日 "+sgn(d3)+"%。", c:"#1f7a3d" };
+    return { t:"中性：后1日 "+sgn(d1)+"% / 后3日 "+sgn(d3)+"% / 大面率 "+sm+"%。", c:"#6b7280" };
+  }
+  function renderCard(seat){
+    curSeat = seat;
+    var c = $( "scCard" ); if(!c) return;
+    var r = getRec(seat);
+    if(!r){
+      $("scName").textContent = seat;
+      $("scBody").innerHTML = '<div style="color:#6b7280;line-height:1.6">该席位不在砸盘王统计里（近两年没有高位净卖的龙虎榜记录）。</div>';
+      c.style.display = "flex"; return;
+    }
+    var w = W(r), v = verdict(w);
+    $("scName").textContent = r.full || seat;
+    var badge = r.yz ? '<span id="scBadge" style="background:#eef3fb;color:#3b6f96">游资</span>'
+                     : '<span id="scBadge" style="background:#f2f3f5;color:#6b7280">机构/通道</span>';
+    var g = [
+      ["高位净卖次数", w&&w[0]!=null?w[0]:"—"],
+      ["其中涨停日", w&&w[1]!=null?w[1]:"—"],
+      ["高位净卖额", w?money(w[2]):"—"],
+      ["净卖占成交额均", w&&w[3]!=null?num(w[3])+"%":"—"],
+      ["买/(买+卖)均", w&&w[4]!=null?num(w[4],2):"—"],
+      ["后1日均", w?sgn(w[5]):"—"],
+      ["后3日均", w?sgn(w[6]):"—"],
+      ["后1日大面率", w&&w[7]!=null?w[7]+"%":"—"],
+      ["上影线均", w&&w[8]!=null?num(w[8])+"%":"—"],
+      ["「全抛」次数", w&&w[9]!=null?w[9]:"—"],
+      ["净卖总额(全量)", money(r.amtSell)],
+      ["末次上榜", w&&w[10]?w[10].slice(5):"—"]
+    ];
+    var tabs = WA.map(function(t){ return '<button data-w="'+t[0]+'" class="'+(t[0]===curWin?"active":"")+'">'+t[1]+'</button>'; }).join("");
+    $("scBody").innerHTML =
+      '<div style="margin-bottom:2px"><b style="font-size:13px">'+esc(r.full||seat)+'</b> '+badge+
+      '</div><div style="margin:6px 0 2px"><span style="color:var(--muted)">窗口：</span><span id="scTabs">'+tabs+'</span></div>'+
+      '<div id="scGrid">'+g.map(function(x){ return '<div class="m"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'; }).join("")+'</div>'+
+      '<div id="scVerdict" style="color:'+v.c+'">'+v.t+'</div>'+
+      '<div style="color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px">口径：龙虎榜只有日频，看不到盘中真实价位；「高位」＝上榜当日涨幅≥5%（涨停另计）；「全抛」＝买/(买+卖)≤0.15；「大面率」＝该席位净卖出后次日收盘≤-5% 的比例。样本 '+(SS.range?SS.range[0]+" ~ "+SS.range[1]:"")+'，共 '+SS.days+' 个上榜日。</div>';
+    c.style.display = "flex";
+  }
+  document.addEventListener("click", function(e){
+    var t = e.target.closest ? e.target.closest(".lseat") : null;
+    if(!t || t.classList.contains("more")) return;
+    if(t.closest && t.closest("#bmBox")) return;
+    var i = t.querySelector("i"); var nm = i ? i.textContent : "";
+    if(!nm) return;
+    curWin = "A";
+    renderCard(nm.trim());
+    e.preventDefault(); e.stopPropagation();
+  });
+  document.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("#scTabs button") : null;
+    if(!b || !curSeat) return;
+    curWin = b.getAttribute("data-w") || "A";
+    renderCard(curSeat);
+    e.preventDefault();
+  });
+  document.addEventListener("click", function(e){
+    if(e.target && e.target.id === "scClose"){ var c=$("scCard"); if(c) c.style.display="none"; }
+  });
+  window.__scSmoke = function(seat){ renderCard(seat); var c=$("scCard"); return c?c.style.display:"none"; };
 })();
 </script>
 </body>
