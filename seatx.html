@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>席位结构对照（预览）</title>
+<style>
+:root{--up:#c02c2c;--dn:#1f7a3d;--mut:#6b7280;--line:#e5e7eb;--bg:#f7f8fa;--hl:#fff5e6;}
+*{box-sizing:border-box}
+body{margin:0;padding:14px 16px 40px;font:13px/1.5 -apple-system,"Microsoft YaHei",sans-serif;background:var(--bg);color:#111}
+h1{font-size:17px;margin:0 0 4px}
+h2{font-size:14px;margin:18px 0 8px;padding-left:8px;border-left:3px solid #c02c2c}
+.sub{color:var(--mut);font-size:12px;margin-bottom:10px}
+.note{background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12px;color:#374151;margin:10px 0}
+.note b{color:#111}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+select,label{font-size:12px}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:12px}
+th,td{border:1px solid var(--line);padding:3px 5px;text-align:center;white-space:nowrap}
+th{background:#f3f4f6;font-weight:600;color:#374151;position:sticky;top:0}
+td.nm{text-align:left;font-weight:600}
+tr.hl{background:var(--hl)}
+.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut)}
+.tag{display:inline-block;padding:0 4px;border-radius:3px;font-size:11px;border:1px solid #f0c98a;background:#fdf3e3;color:#a15c00;margin-left:3px}
+.k{display:inline-block;padding:0 4px;border-radius:3px;font-size:11px;margin-right:2px}
+.k.you{background:#eef4ff;color:#2352a0;border:1px solid #cfdefb}
+.k.bei{background:#eaf7ee;color:#1f7a3d;border:1px solid #cbe9d6}
+.k.jg{background:#f6eefc;color:#7b3fa0;border:1px solid #e6d6f5}
+.k.ls{background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb}
+.warn{color:#c02c2c;font-weight:700}
+.chip{display:inline-block;padding:0 4px;border-radius:3px;font-size:11px;margin:1px 2px 1px 0;border:1px solid #dbeafe;background:#f0f6ff;color:#1f3d7a}
+.chip.r{border-color:#f3c9c9;background:#fdf0f0;color:#a01c1c}
+.chip.o{border-color:#f0c98a;background:#fdf3e3;color:#a15c00}
+.chip.g{border-color:#cbe9d6;background:#eaf7ee;color:#1f7a3d}
+.chip.v{border-color:#cfdefb;background:#eef4ff;color:#2352a0}
+.small{font-size:11px;color:var(--mut)}
+table.cmp{max-width:960px}
+.hlbox{background:#fff;border:1px solid #f0c98a;border-left:4px solid #e29b3c;border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0}
+.sec{background:#fdf3e3;color:#a15c00;text-align:left;font-weight:600}
+</style>
+</head>
+<body>
+<h1>席位结构对照 · 买一占比 / 净买 / 席位性质</h1>
+<div class="sub" id="gen"></div>
+<div class="note">
+口径：数据来自东财龙虎榜营业部明细（<b>lhb_main.json</b>，2024-09 起全量）。一只票当天可能同时上多个榜，只取<b>买入合计最大</b>的那个榜（连板股通常是「连续三个交易日涨幅偏离」三日榜，故 span=三日榜）。<br>
+<b>买一占成交</b> = 榜内买入第一大席位的买入额 ÷ 上榜区间成交额（三日榜算三日累计）；成交额用日K「量×均价」估算，非官方值，看量级别用。<br>
+<b>卖方机构/北向</b> = 卖方榜里是否出现机构专用 / 沪股通·深股通席位。<br>
+<b>次日</b> = 上榜日的下一个交易日收盘对比上榜日收盘；<b>涨停</b>=次日涨幅≥9.7% 且收盘=当日最高；<b>大面</b>=次日收盘≤-5%；<b>跌停</b>=≤-9.5%；<b>天地板</b>=次日最高≥9.7% 且最低≤-9.5%。
+</div>
+<div class="hlbox" id="hlbox"></div>
+<h2>A. 榜单日 → 主板涨停股的席位结构 <span class="small" id="aDay"></span></h2>
+<div class="note" id="aNote"></div>
+<div class="bar">
+  <label>榜单日 <select id="daysel"></select></label>
+  <label>排序 <select id="sortsel">
+    <option value="turn">实际换手</option>
+    <option value="shareAmt">买一占成交</option>
+    <option value="netAmt">净买占成交</option>
+  </select></label>
+  <label><input type="checkbox" id="onlyseat"> 只看有龙虎榜</label>
+  <span class="small">黄底行 = 工具按「实际换手」选出的 5 只</span>
+</div>
+<div style="overflow:auto"><table id="tA"></table></div>
+<h2>B. 席位特征 × 次日表现（历史全量 · 底稿）</h2>
+<div class="small">A 表「档位判读」列已内联本表分档结论；下面四张是完整底稿。</div>
+<div class="small" id="bmeta"></div>
+<div style="overflow:auto"><table class="cmp" id="tB1"></table></div>
+<div style="overflow:auto"><table class="cmp" id="tB2"></table></div>
+<div style="overflow:auto"><table class="cmp" id="tB3"></table></div>
+<div style="overflow:auto"><table class="cmp" id="tB4"></table></div>
+<h2>C. 为什么「买一占比高」有时是利好、有时是警报（条件拆解）</h2>
+<div class="small">同一档「买一占比」，再叠加 位置（连板数） 或 区间成交额 之后，次日表现会完全两极。</div>
+<div style="overflow:auto"><table class="cmp" id="tC"></table></div>
+<h2>D. 最新一档龙虎榜（<span id="dDay">-</span>，收盘后已出 · 已并入 A）</h2>
+<div class="small">A 节那张表是「当个交易日的 9:25 名单」，席位取自名单里股票的涨停日，所以永远是<b>前一日</b>的榜。<br>
+这一节直接取<b>最近一档已出的龙虎榜</b>（含当日涨停股），也就是<b>明早 9:25 名单</b>会用到的席位结构 —— 收盘后当晚就能看。</div>
+<div class="bar"><label><input type="checkbox" id="dOnlyUp"> 只看今日涨停</label></div>
+<div style="overflow:auto"><table id="tD"></table></div>
+<div class="note">读法：买一占比是<b>放大器</b>，不是方向。<b>小盘缩量</b>时它=筹码锁死（利好）；<b>高位 + 大成交</b>时它=一票兑现就崩（警报）。龙渊阁说的「超两成放弃」，前提正是<b>高位连板 + 区间成交大</b>。样本 n&lt;100 的档位只作参考。</div>
+<h2>E. 最近高连板股活跃席位（<span id="eDay">-</span>）</h2>
+<div class="small">取最近 N 个交易日里「当日涨停且 ≥3 板」的主板股，汇总其上榜席位。<b>点任意席位行 → 展开它参与过哪些票。</b><br>
+板数 = 当日往前连续涨停数；性质：游资 / 机构专用 / 北向（沪股通·深股通）/ 拉萨系。<b>历史大面率</b> = 该席位历史<b>净卖出后</b>次日收盘 ≤-5% 的占比（红 ≥45%、橙 33~44%）；「净卖后次日均」= 同样口径的平均次日涨跌幅，n 为样本数。</div>
+<div class="bar">
+  <label>窗口 <select id="eDaySel"><option value="20">近 20 日</option><option value="40">近 40 日</option></select></label>
+  <label>排序 <select id="eSort"><option value="cnt">上榜次数</option><option value="sc">涉及只数</option><option value="net">净买额</option><option value="netsell">净卖额</option><option value="big">历史大面率</option></select></label>
+  <label><input type="checkbox" id="eOnly"> 只看游资</label>
+  <span class="small" id="eMeta"></span>
+</div>
+<div style="overflow:auto"><table id="tE"></table></div>
+<div id="eBox" style="display:none">
+  <div class="small" id="eCap" style="margin:8px 0 4px"></div>
+  <div style="overflow:auto"><table id="tE2"></table></div>
+</div>
+<script src="seatx_hot.js"></script>
+<script src="seatx_data.js"></script>
+<script>
+var X = window.SEATX || null;
+function el(id){ return document.getElementById(id); }
+function yi(v){ var a=Math.abs(v); return a>=1e8 ? (v/1e8).toFixed(2)+"亿" : (v/1e4).toFixed(0)+"万"; }
+function pc(v,d){ if(v==null||!isFinite(v)) return "-"; return (v>=0?"+":"")+(v*100).toFixed(d==null?1:d)+"%"; }
+function p2(v){ if(v==null||!isFinite(v)) return "-"; return (v>=0?"+":"")+v.toFixed(2)+"%"; }
+function cls(v){ return v>0?"up":(v<0?"dn":"mut"); }
+function kindTag(k){ var m={"游资":"you","北向":"bei","机构":"jg","拉萨系":"ls"}; return "<span class='k "+(m[k]||"ls")+"'>"+(k||"-")+"</span>"; }
+function statRow(r){
+  if(!r.n) return "<tr><td class='sec' colspan='9'>"+r.label+"</td></tr>";
+  var ztCls = r.zt>=45?"up":(r.zt<=25?"mut":"");
+  var bigCls = r.big>=30?"warn":"";
+  var dnCls = r.dn>=25?"warn":"";
+  return "<tr>"+
+    "<td class='nm'>"+r.label+"</td>"+
+    "<td>"+r.n+"</td>"+
+    "<td class='"+cls(r.avg)+"'>"+p2(r.avg)+"</td>"+
+    "<td class='"+cls(r.med)+"'>"+p2(r.med)+"</td>"+
+    "<td class='"+ztCls+"'>"+r.zt+"%</td>"+
+    "<td class='"+bigCls+"'>"+r.big+"%</td>"+
+    "<td class='"+dnCls+"'>"+r.dn+"%</td>"+
+    "<td class='"+cls(r.low)+"'>"+p2(r.low)+"</td>"+
+    "<td>"+r.td+"%</td>"+
+  "</tr>";
+}
+var BH = ["档位","n","次日均涨","中位","涨停率","大面率","跌停率","T+1最低均","天地板率"];
+function tbl(rows,title){
+  if(!rows||!rows.length) return "";
+  var h = "<tr><th class='sec' colspan='9'>"+title+"</th></tr>"+
+          "<tr>"+BH.map(function(t){ return "<th>"+t+"</th>"; }).join("")+"</tr>";
+  rows.forEach(function(r){ h += statRow(r); });
+  return h;
+}
+var HEAD = ["#","股票","竞价涨幅","实际换手","当日涨跌幅","晋级","榜口","总买","总卖","净买","区间成交","买一席位","买一占成交","档位判读","买方席位","卖方机构/北向","席位（净额 · 历史大面率）"];
+function shareBucket(sa){ if(sa==null) return null; return sa<0.10?"<10%":(sa<0.20?"10~20%":"\u226520%"); }
+function verOf(m,lbc){
+  if(!m||m.shareAmt==null) return null;
+  var s=shareBucket(m.shareAmt), amt=m.amt, hi=(lbc>=3), C=X.C||[], want=null;
+  if(hi && s==="\u226520%"){
+    if(amt!=null&&amt<3e8) want="\u226520% \u00b7 \u22653\u677f \u00b7 \u533a\u95f4\u6210\u4ea4<3\u4ebf";
+    else if(amt!=null&&amt>=3e8) want="\u226520% \u00b7 \u22653\u677f \u00b7 \u533a\u95f4\u6210\u4ea4\u22653\u4ebf";
+  }
+  if(!want && hi && s==="<10%") want="买一占成交<10% · 高位 ≥3板";
+  if(!want && s==="\u226520%") want = (amt!=null&&amt<2e8)?("\u4e70\u4e00\u5360\u6210\u4ea4\u226520% \u00b7 \u533a\u95f4\u6210\u4ea4<2\u4ebf\uff08\u5c0f\u76d8\u7f29\u91cf\uff09"):("\u4e70\u4e00\u5360\u6210\u4ea4\u226520% \u00b7 \u533a\u95f4\u6210\u4ea4\u22652\u4ebf");
+  if(!want && s==="<10%") want = (amt!=null&&amt<2e8)?("\u4e70\u4e00\u5360\u6210\u4ea4<10% \u00b7 \u533a\u95f4\u6210\u4ea4<2\u4ebf\uff08\u5c0f\u76d8\u7f29\u91cf\uff09"):("\u4e70\u4e00\u5360\u6210\u4ea4<10% \u00b7 \u533a\u95f4\u6210\u4ea4\u22652\u4ebf");
+  for(var i=0;i<C.length;i++){ if(C[i].label===want && C[i].n) return C[i]; }
+  var b=(X.B&&X.B.shareAmt)||[];
+  for(var j=0;j<b.length;j++){
+    var L=b[j].label;
+    if(s==="<10%" && m.shareAmt<0.04 && L.indexOf("<4%")>=0) return b[j];
+    if(s==="<10%" && m.shareAmt>=0.04 && L.indexOf("4~10%")>=0) return b[j];
+    if(s==="10~20%" && L.indexOf("10~20%")>=0) return b[j];
+    if(s==="\u226520%" && L.indexOf("\u226520%")>=0) return b[j];
+  }
+  return null;
+}
+function verCell(m,lbc){
+  if(!m) return "<span class='mut'>\u65e0\u699c</span>";
+  if(m.shareAmt==null) return "<span class='mut'>-</span>";
+  var v=verOf(m,lbc);
+  if(!v) return "<span class='mut'>-</span>";
+  var c2 = v.big>=30?"r":(v.big>=20?"o":(v.avg>=3?"g":"v"));
+  var tip = v.label+" | n="+v.n+" | \u6b21\u65e5\u5747 "+p2(v.avg)+" | \u4e2d\u4f4d "+p2(v.med)+" | \u6da8\u505c\u7387 "+v.zt+"% | \u5927\u9762\u7387 "+v.big+"% | \u8dcc\u505c\u7387 "+v.dn+"%";
+  return "<span class='chip "+c2+"' title='"+tip+"'>"+v.label.replace("买一占成交","").replace("区间成交","成交").replace("小盘缩量","缩量")+"</span>"+
+    "<div class='small'>n="+v.n+" \u00b7 \u5747"+p2(v.avg)+" \u00b7 \u5927\u9762"+(v.big>=30?"<span class='warn'>"+v.big+"%</span>":v.big+"%")+"</div>";
+}
+function renderA(){
+  var sel = el("daysel").value, sortK = el("sortsel").value, only = el("onlyseat").checked;
+  var isLat = (sel==="-1"), rows, dayLabel;
+  if(isLat){
+    var L = X.LATEST; dayLabel = L.date+" \u00b7 \u6700\u65b0\u4e00\u6863\uff08\u6536\u76d8\u540e\uff09";
+    rows = (L.rows||[]).map(function(r,i){ return {rank:i+1, name:r.name, lbc:r.lbc, auct:null, turn:null, chg:r.chg, up:!!r.limitUp, m:r.m||null}; });
+  } else {
+    var d = X.A[parseInt(sel,10)]; dayLabel = d.day + " \u00b7 9:25 \u540d\u5355";
+    rows = d.rows.slice();
+  }
+  if(only) rows = rows.filter(function(r){ return r.m; });
+  if(el("aDay")) el("aDay").textContent = dayLabel;
+  if(!rows.length){ el("tA").innerHTML = "<tr><td>\u6ca1\u6709\u6570\u636e</td></tr>"; return; }
+  if(sortK!=="turn"){ rows = rows.slice().sort(function(a,b){ var va=a.m&&a.m[sortK]!=null?a.m[sortK]:-99, vb=b.m&&b.m[sortK]!=null?b.m[sortK]:-99; return vb-va; }); }
+  var h = "<tr>"+HEAD.map(function(t){ return "<th>"+t+"</th>"; }).join("")+"</tr>";
+  rows.forEach(function(r){
+    var m = r.m;
+    var nm = "<span>"+r.name+"</span><span class='tag'>"+(r.lbc>1?r.lbc+"\u677f":"\u9996\u677f")+"</span>"+(r.rank<=5&&!isLat?"<span class='tag'>\u5de5\u51775\u53ea</span>":"");
+    var cnt="-", top1="-", sh="-", buyK="-", sk="-", seatCell="-";
+    if(m){
+      cnt = m.span===3?"\u4e09\u65e5\u699c":"\u5f53\u65e5\u699c";
+      top1 = m.top1 + "<div class='small'>"+yi(m.top1amt)+" \u00b7 "+kindTag(m.top1kind)+"</div>";
+      sh = m.shareAmt==null ? "-" : "<span class='"+(m.shareAmt>=0.10?"warn":"")+"'>"+pc(m.shareAmt)+"</span>";
+      var bk=[]; if(m.buyKinds){ for(var k in m.buyKinds){ bk.push((m.buyKinds[k]||0)+kindTag(k)); } }
+      buyK = bk.join(" ") || "-";
+      sk = (m.orgSell?"<span class='k jg'>\u673a\u6784</span>":"")+(m.northSell?"<span class='k bei'>\u5317\u5411</span>":"") || "<span class='small'>\u7eaf\u6e38\u8d44</span>";
+      seatCell = (m.seats||[]).map(function(s){
+        var nm2=s[0], net=s[1], big=s[2];
+        var cl = (big!=null && big>=45) ? "r" : "";
+        var btag = (big!=null) ? ("<span class='small'>\u00b7</span>"+(big>=45?"<span class='warn'>"+big+"%</span>":"<span class='mut'>"+big+"%</span>")) : "";
+        return "<span class='chip "+cl+"'>"+nm2+" "+(net>=0?"+":"")+net+"\u4e07"+btag+"</span>";
+      }).join("");
+    }
+    h += "<tr class='"+(r.rank<=5&&!isLat?"hl":"")+"'>"+
+      "<td>"+r.rank+"</td>"+
+      "<td class='nm'>"+nm+"</td>"+
+      "<td class='"+cls(r.auct)+"'>"+(isFinite(r.auct)?p2(r.auct):"<span class='mut'>-</span>")+"</td>"+
+      "<td>"+(isFinite(r.turn)&&r.turn?r.turn.toFixed(2)+"%":"<span class='mut'>-</span>")+"</td>"+
+      "<td class='"+cls(r.chg)+"'>"+(isFinite(r.chg)?p2(r.chg):"-")+"</td>"+
+      "<td>"+(r.up?"<span class='up'>\u6da8\u505c</span>":"<span class='dn'>-</span>")+"</td>"+
+      "<td class='small'>"+cnt+"</td>"+
+      "<td>"+(m?yi(m.buy5):"-")+"</td>"+
+      "<td>"+(m?yi(m.sell5):"-")+"</td>"+
+      "<td class='"+cls(m?m.net:0)+"'>"+(m?(m.net>=0?"+":"-")+yi(Math.abs(m.net)):"-")+"</td>"+
+      "<td>"+(m?yi(m.amt):"-")+"</td>"+
+      "<td class='small'>"+top1+"</td>"+
+      "<td>"+sh+"</td>"+
+      "<td class='small'>"+verCell(m,r.lbc)+"</td>"+
+      "<td class='small'>"+buyK+"</td>"+
+      "<td class='small'>"+sk+"</td>"+
+      "<td class='small'>"+seatCell+"</td>"+
+      "</tr>";
+  });
+  el("tA").innerHTML = h;
+}
+function aNoteBuild(){
+  var B=X.B||{}, SA=B.shareAmt||[], CX=B.cross||[];
+  function pick(arr,sub){ for(var i=0;i<arr.length;i++){ if(arr[i].label.indexOf(sub)>=0) return arr[i]; } return null; }
+  var b21=pick(SA,"\u226520%"), cy=pick(CX,"\u226510% \u00b7 \u5356\u65b9\u7eaf\u6e38\u8d44"), cj=pick(CX,"\u226510% \u00b7 \u5356\u65b9\u542b");
+  var h="<b>A \u8868\u300c\u6863\u4f4d\u5224\u8bfb\u300d\u5217 = B/C/D \u5408\u5e76\u5230\u6bcf\u884c\u3002</b>";
+  h+="\u65e5\u671f\u9009\u300c\u6700\u65b0\u4e00\u6863\uff08\u6536\u76d8\u540e\uff09\u300d=D\u3002\u6863\u4f4d\u989c\u8272\uff1a\u7ea2=\u5927\u9762\u226530% \u00b7 \u6a59=20~29% \u00b7 \u7eff=\u6b21\u65e5\u5747\u6da8\u22653% \u00b7 \u84dd=\u5e73\u5eb8\u3002";
+  if(b21) h+=" \u57fa\u7ebf\uff1a\u4e70\u4e00\u5360\u6210\u4ea4\u226520% n="+b21.n+" \u00b7 \u6b21\u65e5\u5747 <b class='up'>+"+b21.avg+"%</b> \u00b7 \u5927\u9762 "+b21.big+"%";
+  if(cy) h+=" \uff5c \u4e70\u4e00\u226510%+\u5356\u65b9\u7eaf\u6e38\u8d44 n="+cy.n+" \u00b7 \u5747 <b class='up'>+"+cy.avg+"%</b> \u00b7 \u5927\u9762 "+cy.big+"%";
+  if(cj) h+=" \uff5c \u5356\u65b9\u542b\u673a\u6784/\u5317\u5411 n="+cj.n+" \u00b7 \u5747 +"+cj.avg+"% \u00b7 \u5927\u9762 "+cj.big+"%";
+  h+="<br><b>\u4e70\u4e00\u5360\u6bd4\u662f\u653e\u5927\u5668\uff0c\u4e0d\u662f\u65b9\u5411\uff1a</b>\u5c0f\u76d8\u7f29\u91cf\uff08\u533a\u95f4\u6210\u4ea4<2\u4ebf\uff09+ \u72ec\u5927 = \u7b79\u7801\u9501\u6b7b\uff08\u6b21\u65e5\u5747\u6da8\u53ef\u8fbe +5%\u3001\u5927\u9762 7%\uff09\uff1b\u9ad8\u4f4d\uff08\u22653\u677f\uff09+ \u5927\u6210\u4ea4\uff08\u22653\u4ebf\uff09= \u4e00\u7968\u5151\u73b0\u5c31\u5d29\uff08\u5927\u9762 45%\u3001\u8dcc\u505c 36%\uff09\u3002\u6837\u672c n<100 \u7684\u6863\u4f4d\u53ea\u4f5c\u53c2\u8003\u3002";
+  el("aNote").innerHTML = h;
+}
+function hlboxBuild(){
+  var C = X.C||[];
+  function g(lab){ for(var i=0;i<C.length;i++){ if(C[i].label===lab) return C[i]; } return null; }
+  var s20 = g("买一占成交≥20% · 区间成交<2亿（小盘缩量）");
+  var b20 = g("买一占成交≥20% · 区间成交≥2亿");
+  var v3  = g("≥20% · ≥3板 · 区间成交≥3亿");
+  var h = "<b>你和视频都对，只是说的不是一回事：视频讲「尾部风险（大面率）」，这张统计讲「平均收益」。</b><br>";
+  h += "<b>买一占比本身不是好坏，是放大器：</b> ";
+  if(s20) h += "小盘缩量（成交&lt;2亿）时，买一≥20% = 筹码锁死 → 次日均涨 <b class='up'>+"+s20.avg+"%</b>、涨停率 "+s20.zt+"%、大面率仅 "+s20.big+"%；";
+  if(b20) h += "大成交（成交≥2亿）时，同样买一≥20% = 一票兑现就崩 → 均涨只剩 <b>+"+b20.avg+"%</b>、大面率飙到 <b class='warn'>"+b20.big+"%</b>、跌停率 "+b20.dn+"%；";
+  if(v3)  h += "视频那种「≥20% + ≥3板 + 成交≥3亿」大面率 <b class='warn'>"+v3.big+"%</b>、跌停率 <b class='warn'>"+v3.dn+"%</b>、次日最低均 "+v3.low+"%。";
+  h += "<br>他举的万象（21.98%）、正裕（22.7%）都落在「高位+大成交」那一格，所以他说超两成放弃；而同样独大的小盘缩量票，次日反而普遍涨停。";
+  h += "<br><b>结论：别单看「买一占比」，要和高位、区间成交额一起看。</b>";
+  el("hlbox").innerHTML = h;
+}
+/* ===== E 节：最近高连板股活跃席位 ===== */
+var EH = window.SEATHOT || null;
+var eOpen = null;
+function seatKind(nm){ if(/机构专用/.test(nm)) return "机构"; if(/(深股通|沪股通|陆股通|港股通)/.test(nm)) return "北向"; if(/拉萨/.test(nm)) return "拉萨系"; return "游资"; }
+function shortSeat(nm){ return String(nm)
+  .replace(/证券股份有限公司/g,"").replace(/证券有限责任公司/g,"").replace(/证券有限公司/g,"")
+  .replace(/股份有限公司/g,"").replace(/有限责任公司/g,"").replace(/有限公司/g,"")
+  .replace(/证券营业部/g,"").replace(/营业部/g,"").replace(/证券分公司/g,"").replace(/分公司/g,""); }
+function eCut(){ var N=parseInt(el("eDaySel").value,10)||20; var ds=EH.days; return ds[Math.max(0,ds.length-N)]; }
+function eAgg(){
+  var cut=eCut(), only=el("eOnly").checked, M={}, rows=EH.rows;
+  for(var ri=0;ri<rows.length;ri++){
+    var r=rows[ri]; if(r[0]<cut) continue;
+    var ss=r[5]||[];
+    for(var si=0;si<ss.length;si++){
+      var sp=ss[si], idx=sp[0], info=EH.seats[idx]||[], nm=info[0]||("席位#"+idx), kd=seatKind(nm);
+      if(/投资者分类|其他席位|机构专用合计/.test(nm)) continue;
+      if(only && kd!=="游资") continue;
+      var o=M[idx];
+      if(!o){ o=M[idx]={idx:idx,nm:nm,short:shortSeat(nm),kd:kd,big:info[1],avg:info[2],ns:info[3],cnt:0,codes:{},buy:0,sell:0,net:0,ev:[]}; }
+      o.cnt++; o.codes[r[1]]=1; o.buy+=sp[2]; o.sell+=sp[3]; o.net+=sp[1];
+      o.ev.push([r[0],r[1],r[2],r[3],r[4],sp[2],sp[3],sp[1]]);
+    }
+  }
+  var arr=[],k2; for(k2 in M){ M[k2].sc=Object.keys(M[k2].codes).length; arr.push(M[k2]); }
+  var k=el("eSort").value;
+  arr.sort(function(a,b){
+    if(k==="sc") return b.sc-a.sc || b.cnt-a.cnt || b.net-a.net;
+    if(k==="net") return b.net-a.net;
+    if(k==="netsell") return a.net-b.net;
+    if(k==="big") return (b.big==null?-1:b.big)-(a.big==null?-1:a.big) || b.cnt-a.cnt;
+    return b.cnt-a.cnt || b.net-a.net;
+  });
+  return arr;
+}
+function eBig(v){ if(v==null) return "<span class='mut'>-</span>"; if(v>=45) return "<span class='warn'>"+v+"%</span>"; if(v>=33) return "<span style='color:#a15c00'>"+v+"%</span>"; return "<span class='mut'>"+v+"%</span>"; }
+function eKind(kd){ var c = kd==="机构"?"jg":(kd==="北向"?"bei":(kd==="拉萨系"?"ls":"you")); return "<span class='k "+c+"'>"+kd+"</span>"; }
+function eNum(v){ return (v>=0?"+":"-")+yi(Math.abs(v)); }
+function eAmt(v){ if(!v) return "-"; if(Math.abs(v)<1e4) return "<1万"; return yi(v); }
+function renderE(){
+  var t=el("tE"); if(!t) return;
+  if(!EH){ t.innerHTML="<tr><td class='mut'>没读到 _seatx_hot.js</td></tr>"; return; }
+  var arr=eAgg(), cut=eCut(), last=EH.days[EH.days.length-1];
+  el("eDay").textContent = cut+" ~ "+last;
+  var rd=0; for(var i=0;i<EH.rows.length;i++){ if(EH.rows[i][0]>=cut) rd++; }
+  el("eMeta").textContent = "窗口内「涨停且≥3板」股票-日 "+rd+" 个 · 席位 "+arr.length+" 个 · 生成 "+EH.gen;
+  h="<tr><th>#</th><th>席位</th><th>性质</th><th>上榜次数</th><th>涉及只数</th><th>买入</th><th>卖出</th><th>净额</th><th>历史大面率</th><th>净卖后次日均</th><th>n</th><th>明细</th></tr>";
+  arr.forEach(function(o,i){
+    var open = (eOpen===o.idx);
+    h += "<tr class='seatrow' data-i='"+o.idx+"' style='cursor:pointer'>"+
+      "<td>"+(i+1)+"</td>"+
+      "<td class='nm' title='"+o.nm+"'>"+o.short+"</td>"+
+      "<td>"+eKind(o.kd)+"</td>"+
+      "<td><b>"+o.cnt+"</b></td>"+
+      "<td>"+o.sc+"</td>"+
+      "<td>"+yi(o.buy)+"</td>"+
+      "<td>"+yi(o.sell)+"</td>"+
+      "<td class='"+cls(o.net)+"'>"+eNum(o.net)+"</td>"+
+      "<td>"+eBig(o.big)+"</td>"+
+      "<td class='"+(o.avg==null?"mut":cls(o.avg))+"'>"+(o.avg==null?"-":p2(o.avg))+"</td>"+
+      "<td class='mut'>"+(o.ns==null?"-":o.ns)+"</td>"+
+      "<td class='small'>"+(open?"收起 ▲":"展开 ▼")+"</td>"+
+    "</tr>";
+  });
+  t.innerHTML=h;
+  renderE2(arr);
+}
+var E2HEAD=["日期","股票","板数","当日涨幅","买入","卖出","净额"];
+function renderE2(arr){
+  var t=el("tE2"), box=el("eBox"); if(!t||!box) return;
+  var o=null; for(var i=0;i<arr.length;i++){ if(arr[i].idx===eOpen){ o=arr[i]; break; } }
+  if(!o){ box.style.display="none"; t.innerHTML=""; return; }
+  box.style.display="";
+  el("eCap").innerHTML = "<b>"+o.short+"</b> "+eKind(o.kd)+" · 上榜 "+o.cnt+" 次 / "+o.sc+" 只 · 净额 <b class='"+cls(o.net)+"'>"+eNum(o.net)+"</b> · 历史大面率 "+eBig(o.big)+" · 样本 n="+(o.ns==null?"-":o.ns);
+  var ev=o.ev.slice().sort(function(a,b){ return a[0]<b[0]?1:-1; });
+  var h="<tr>"+E2HEAD.map(function(x){ return "<th>"+x+"</th>"; }).join("")+"</tr>";
+  ev.forEach(function(e){
+    h += "<tr>"+
+      "<td class='small'>"+e[0]+"</td>"+
+      "<td class='nm'>"+e[2]+" <span class='small mut'>"+e[1]+"</span></td>"+
+      "<td>"+(e[3]>1?e[3]+"板":"首板")+"</td>"+
+      "<td class='"+cls(e[4])+"'>"+p2(e[4])+"</td>"+
+      "<td>"+eAmt(e[5])+"</td>"+
+      "<td>"+eAmt(e[6])+"</td>"+
+      "<td class='"+cls(e[7])+"'>"+eNum(e[7])+"</td>"+
+    "</tr>";
+  });
+  t.innerHTML=h;
+}
+if(!X){ document.body.innerHTML = "<p>没读到 _seatx_data.js</p>"; }
+else {
+  var DHEAD = ["#","股票","板数","今日","今日涨幅","区间成交","榜口","总买","总卖","净买","买一席位","买一占成交","买方席位","卖方机构/北向","席位（净额 · 历史大面率）"];
+function renderD(){
+  var t = el("tD"); if(!t) return;
+  var S = X && X.LATEST; if(!S || !S.rows || !S.rows.length){ t.innerHTML = "<tr><td class='mut'>没有数据</td></tr>"; return; }
+  el("dDay").textContent = S.date;
+  var only = el("dOnlyUp").checked;
+  var rows = S.rows.slice().filter(function(r){ return !only || r.limitUp; });
+  var h = "<tr>"+DHEAD.map(function(x){ return "<th>"+x+"</th>"; }).join("")+"</tr>";
+  rows.forEach(function(r,i){
+    var m = r.m;
+    var nm = "<span>"+r.name+"</span>"+(r.limitUp?"<span class='tag'>"+(r.lbc>1?r.lbc+"板":"首板")+"</span>":"");
+    var cnt = m.span===3?"三日榜":"当日榜";
+    var top1 = m.top1 + "<div class='small'>"+yi(m.top1amt)+" · "+kindTag(m.top1kind)+"</div>";
+    var sh = m.shareAmt==null ? "-" : "<span class='"+(m.shareAmt>=0.10?"warn":"")+"'>"+pc(m.shareAmt)+"</span>";
+    var bk=[]; if(m.buyKinds){ for(var k in m.buyKinds){ bk.push((m.buyKinds[k]||0)+kindTag(k)); } }
+    var sk = (m.orgSell?"<span class='k jg'>机构</span>":"")+(m.northSell?"<span class='k bei'>北向</span>":"") || "<span class='small'>纯游资</span>";
+    var seatCell = (m.seats||[]).map(function(s){ var cl=(s[2]!=null&&s[2]>=45)?"r":""; var btag=(s[2]!=null)?("<span class='small'>·</span>"+(s[2]>=45?"<span class='warn'>"+s[2]+"%</span>":"<span class='mut'>"+s[2]+"%</span>")):""; return "<span class='chip "+cl+"'>"+s[0]+" "+(s[1]>=0?"+":"")+s[1]+"万"+btag+"</span>"; }).join("");
+    h += "<tr>"+
+      "<td>"+(i+1)+"</td>"+
+      "<td class='nm'>"+nm+"</td>"+
+      "<td>"+(r.limitUp?(r.lbc>1?r.lbc+"板":"首板"):"<span class='mut'>—</span>")+"</td>"+
+      "<td>"+(r.limitUp?"<span class='up'>涨停</span>":"<span class='mut'>-</span>")+"</td>"+
+      "<td class='"+cls(r.chg)+"'>"+(r.chg==null?"-":p2(r.chg))+"</td>"+
+      "<td>"+(m.amt==null?"-":yi(m.amt))+"</td>"+
+      "<td class='small'>"+cnt+"</td>"+
+      "<td>"+yi(m.buy5)+"</td>"+
+      "<td>"+yi(m.sell5)+"</td>"+
+      "<td class='"+cls(m.net)+"'>"+(m.net>=0?"+":"-")+yi(Math.abs(m.net))+"</td>"+
+      "<td class='small'>"+top1+"</td>"+
+      "<td>"+sh+"</td>"+
+      "<td class='small'>"+(bk.join(" ")||"-")+"</td>"+
+      "<td class='small'>"+sk+"</td>"+
+      "<td class='small'>"+seatCell+"</td>"+
+      "</tr>";
+  });
+  t.innerHTML = h;
+}
+el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板涨停股上榜，2024-09 起）";
+  var ds = el("daysel");
+  var oLat=document.createElement("option"); oLat.value="-1"; oLat.textContent="最新一档（收盘后 · D）"; ds.appendChild(oLat);
+  X.A.forEach(function(d,i){ var o=document.createElement("option"); o.value=i; o.textContent=d.day; ds.appendChild(o); });
+  ds.value = "0";
+  el("tB1").innerHTML = tbl([X.B.base].concat(X.B.shareAmt), "买一占成交（集中度）");
+  el("tB2").innerHTML = tbl([X.B.base].concat(X.B.netAmt), "净买占成交（买卖净额 ÷ 区间成交）");
+  el("tB3").innerHTML = tbl([X.B.base].concat(X.B.kind, X.B.sell), "买一席位性质 / 卖方是否含机构·北向");
+  el("tB4").innerHTML = tbl([X.B.base].concat(X.B.cross), "买一占比 × 卖方性质（交叉）");
+  el("tC").innerHTML  = tbl(X.C, "条件拆解（同一买一占比，叠加位置 / 成交额）");
+  el("bmeta").textContent = "基线："+X.B.base.label+" · n="+X.B.base.n+" · 次日均涨 "+p2(X.B.base.avg)+" / 中位 "+p2(X.B.base.med)+" / 涨停率 "+X.B.base.zt+"% / 大面率 "+X.B.base.big+"% / 跌停率 "+X.B.base.dn+"% / T+1最低均 "+p2(X.B.base.low);
+  ds.addEventListener("change", renderA);
+  el("sortsel").addEventListener("change", renderA);
+  el("onlyseat").addEventListener("change", renderA);
+  renderA();
+  renderD();
+  el("dOnlyUp").addEventListener("change", renderD);
+  if(EH){ renderE(); el("eDaySel").addEventListener("change", function(){ eOpen=null; renderE(); }); el("eSort").addEventListener("change", function(){ eOpen=null; renderE(); }); el("eOnly").addEventListener("change", function(){ eOpen=null; renderE(); }); el("tE").addEventListener("click", function(ev){ var tr=(ev.target&&ev.target.closest)?ev.target.closest("tr[data-i]"):null; if(!tr) return; var ii=parseInt(tr.getAttribute("data-i"),10); eOpen=(eOpen===ii)?null:ii; renderE(); }); }
+  hlboxBuild();
+  aNoteBuild();
+}
+</script>
+</body>
+</html>

@@ -229,7 +229,7 @@
     <div class="bar">
       <button id="btnRefresh" class="active">刷新最新</button>
       <button id="recalcBtn" title="清掉当天缓存，把名单 / 行情 / 板块 / 情绪序列全部重新抓一遍">重算</button>
-      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button>
+      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位）">龙虎榜席位 ▸</button>
       <span class="optgrp">
         <button id="dPrev">◀ 前一交易日</button>
         <input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日">
@@ -460,6 +460,16 @@
       <button id="scClose">关闭</button>
     </div>
     <div id="scBody"></div>
+  </div>
+  <div id="seatxWrap" style="position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.42);display:none;align-items:center;justify-content:center">
+    <div id="seatxBox" style="width:min(1240px,97vw);height:90vh;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden">
+      <div id="seatxBar" style="padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--chip)">
+        <b style="font-size:13px">龙虎榜席位结构对照</b>
+        <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">A 榜单日席位结构 · B 席位特征×次日表现 · C 买一占比条件拆解 · D 最新一档龙虎榜明细 · E 最近高连板活跃席位</span>
+        <button id="seatxBig">放大</button><button id="seatxOpen">新窗口 ↗</button><button id="seatxClose">关闭</button>
+      </div>
+      <iframe id="seatxFrame" data-src="seatx.html" src="about:blank" title="龙虎榜席位结构对照" style="flex:1;border:0;width:100%;background:#fff"></iframe>
+    </div>
   </div>
 
   <p class="note">
@@ -4985,7 +4995,7 @@ function renderCore(){
     ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
     "「题材厚度」＝该股所属概念题材里，前一交易日一起涨停的主板家数（已剔除昨日涨停/最近多板这类伪题材）。一只票通常挂十几个题材，这里按家数排序显示：大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只），后面的小标签是其他并列题材，鼠标悬停可看全部；所有题材都不足 2 只时显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
-    "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行左边是席位、右边是净额，鼠标悬停看样本数。颜色：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中即标红，如果它昨天净卖→逐票竞价建议一票否决），橙＝33~44%（该席位历史上净卖出后次日大面率），蓝＝昨天净买入，灰＝昨天净卖出（历史大面率不高）。没上龙虎榜就显示「无龙虎榜」。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
+    "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行左边是席位、右边是净额，鼠标悬停看样本数。颜色：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中即标红，如果它昨天净卖→逐票竞价建议一票否决），橙＝33~44%（该席位历史上净卖出后次日大面率），蓝＝昨天净买入，灰＝昨天净卖出（历史大面率不高）。没上龙虎榜就显示「无龙虎榜」。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
@@ -7018,6 +7028,34 @@ vfInit();
     if(e.target && e.target.id === "scClose"){ var c=$("scCard"); if(c) c.style.display="none"; }
   });
   window.__scSmoke = function(seat){ renderCard(seat); var c=$("scCard"); return c?c.style.display:"none"; };
+})();
+
+/* ===== 龙虎榜席位结构对照：点「龙虎榜席位 ▸」弹出面板（内容 seatx.html）===== */
+(function(){
+  function $(id){ return document.getElementById(id); }
+  var loaded = false, big = false;
+  function open(){
+    var w = $("seatxWrap"), f = $("seatxFrame");
+    if(!w || !f) return;
+    if(!loaded){ f.src = f.getAttribute("data-src") || "seatx.html"; loaded = true; }
+    w.style.display = "flex";
+  }
+  function close(){ var w = $("seatxWrap"); if(w) w.style.display = "none"; }
+  function toggleBig(){
+    var b = $("seatxBox"); if(!b) return; big = !big;
+    b.style.width = big ? "99vw" : "min(1240px,97vw)";
+    b.style.height = big ? "98vh" : "90vh";
+  }
+  document.addEventListener("click", function(e){
+    var t = e.target; if(!t || !t.id) return;
+    if(t.id === "seatxBtn"){ open(); e.preventDefault(); return; }
+    if(t.id === "seatxClose"){ close(); e.preventDefault(); return; }
+    if(t.id === "seatxBig"){ toggleBig(); e.preventDefault(); return; }
+    if(t.id === "seatxOpen"){ window.open("seatx.html", "_blank", "noopener"); e.preventDefault(); return; }
+    if(t.id === "seatxWrap"){ close(); }
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
+  window.__seatxSmoke = function(){ open(); var f = $("seatxFrame"); return f ? f.getAttribute("src") : "none"; };
 })();
 </script>
 </body>
