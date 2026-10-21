@@ -82,6 +82,13 @@
   #thCard.thfloat h2 #thTitle{flex:1 1 auto}
   #thCard.thfloat h2 #thClose{float:none;flex:0 0 auto}
   @media (max-width:640px){ #thCard.thfloat{left:8px;right:8px;bottom:8px;width:auto;max-height:68vh} }
+  .thdirs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;max-height:96px;overflow:auto}
+  .thdirs .dlab{font-size:12px;color:#8792a6}
+  .thdirs .dchip{cursor:pointer;border:1px solid #d7dde6;border-radius:12px;padding:2px 9px;font-size:12px;background:#fff;color:#33415c;white-space:nowrap}
+  .thdirs .dchip b{color:#c0392b;font-weight:600;margin-left:4px}
+  .thdirs .dchip.fam{background:#f7f2ff;border-color:#dccdf7}
+  .thdirs .dchip.on{background:#2b3a55;color:#fff;border-color:#2b3a55}
+  .thdirs .dchip.on b{color:#ffd9c2}
   .tag2{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:#2f6f9f;color:#fff;font-size:10.5px;font-weight:700;cursor:help}
   .tag2.o{background:#e07a1f}
   .tag2.g{background:#1f7a3d}
@@ -358,6 +365,7 @@
 
   <div class="card thfloat" id="thCard" hidden>
     <h2><span id="thTitle">题材连板梯队</span><button id="thClose" style="float:right">关闭</button></h2>
+    <div class="thdirs" id="thDirs"></div>
     <div class="tablewrap"><table id="thTbl"><tbody><tr><td class="empty">点榜单里的题材标签，这里会列出该题材当天的连板梯队（按板位从高到低）</td></tr></tbody></table></div>
     <p class="note" id="thNote"></p>
   </div>
@@ -2128,16 +2136,52 @@ document.addEventListener("click", function(e){
   openBk(a.getAttribute("data-bk") ? "bk" : "hy", a.getAttribute("data-bk") || a.getAttribute("data-hy"));
 });
 function lbcMap(){ var m = {}; try { (STATE.rows || []).forEach(function(r){ if (r && r.code) m[String(r.code)] = +r.board || 0; }); } catch (e) {} return m; }
-// 题材关键词展开：点「机器人投资」也能把整个「机器人」方向的连板梯队一起拉出来。
-// 规则：取该标签里「最长的、且当天涨停池里至少还有 2 个不同标签也含它」的子串（≥2 字）当关键词；「XX字辈」不做展开。
+// 题材「方向」自动归类：把当天涨停股按主流方向（机器人／军工／家电／低空经济…）归堆，点方向或字辈就能看该方向当天的连板梯队。
+var DIRS = [
+  ["机器人", ["机器人","具身智能","减速器","丝杠","灵巧手","机械臂","伺服","谐波","空心杯","AGV","关节","运控"]],
+  ["AI算力", ["算力","智算","IDC","数据中心","光模块","CPO","液冷","服务器","PCB","光通信","交换机","铜连接"]],
+  ["AI应用", ["智能体","AI短剧","短剧","AI医疗","AI教育","多模态","AI眼镜","AI PC","端侧AI","AIoT","AI ISP","AI手机","大模型"]],
+  ["半导体", ["半导体","芯片","存储","封测","晶圆","光刻","碳化硅","GaN","模拟芯片","无线芯片","集成电路","先进封装"]],
+  ["消费电子", ["消费电子","折叠屏","耳机","智能终端","果链","苹果","小米","华为","LED封装","面板"]],
+  ["汽车", ["新能源汽车","汽车零部件","一体化压铸","智能驾驶","汽车电子","整车","轮胎","智驾","线控"]],
+  ["锂电储能", ["固态电池","锂电池","钠电池","电池","正极","负极","隔膜","电解液","储能","锂盐","充电桩"]],
+  ["光伏", ["光伏","硅料","硅片","逆变器","电池片","HJT","TOPCon","BC电池","太阳能","光热","组件"]],
+  ["电力", ["电力","特高压","智能电网","核电","可控核聚变","水电","绿电","火电","虚拟电厂","空气能热泵"]],
+  ["军工", ["军工","国防","兵器","导弹","军贸","舰船","航空发动机","大飞机","军民融合","商业航天","卫星","火箭","北斗","无人机"]],
+  ["低空经济", ["低空经济","飞行汽车","eVTOL","通航","低空","无人机"]],
+  ["家电", ["家电","白电","厨电","小家电","清洁电器","空调","冰箱","洗衣机","炊具","扫地机","家居"]],
+  ["医药", ["创新药","医药","制药","疫苗","中药","医疗器械","GLP-1","减肥药","集采","原料药","制剂","CXO","头孢"]],
+  ["消费", ["白酒","食品","饮料","旅游","免税","零售","纺织","服装","宠物","预制菜","调味品","啤酒","水产","饲料","零食"]],
+  ["央国企改革", ["国企改革","央企","并购重组","资产注入","国资","壳资源","股权转让","重组"]],
+  ["数据要素", ["数据要素","信创","国产软件","网络安全","信息安全","量子科技","操作系统","鸿蒙","政务","国资云"]],
+  ["有色资源", ["稀土","永磁","钨","锂矿","铜","黄金","有色","煤炭","石油","磷矿"]],
+  ["化工", ["化工","氟化工","磷化工","钛白粉","农药","化肥","化学原料","胶粘","新材料"]],
+  ["基建地产", ["基建","地产","建筑","水利","工程机械","市政","输送机械","液压","混凝土","水泥","环卫"]],
+  ["金融", ["券商","银行","保险","多元金融","参股金融","金融科技","创投"]],
+  ["交运物流", ["物流","航运","港口","快递","航空","铁路","公路","供应链"]],
+  ["传媒", ["传媒","影视","游戏","出版","彩票"]],
+  ["农业", ["种业","农业","养殖","转基因","猪价","禽"]],
+  ["海南自贸", ["海南自贸港","自贸区","海南","海峡两岸","对台"]]
+];
 var THCORE = {};
+var THDIR = {};
+function thFamName(t){ var s = String(t).replace(/[\u201c\u201d"'\u2018\u2019]/g, ""); var m = s.match(/^(.+)\u5b57\u8f88$/); return m ? m[1] + "\u5b57\u8f88" : null; }
+function thTagsOf(a){ return String(a[2]).split("+").map(function(x){ return x.trim(); }).filter(function(x){ return x; }); }
+function dirOfTag(tag){
+  var t = String(tag);
+  for (var i=0;i<DIRS.length;i++){
+    var kw = DIRS[i][1];
+    for (var j=0;j<kw.length;j++){ if (t.indexOf(kw[j]) >= 0) return DIRS[i][0]; }
+  }
+  return null;
+}
 function thCoreOf(tag, dstr){
-  if (tag.slice(-2) === "字辈") return "";
+  if (thFamName(tag)) return "";
   var cache = THCORE[dstr] || (THCORE[dstr] = {});
   if (cache[tag] !== undefined) return cache[tag];
   var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
   if (pool.length < 2 || tag.length < 2) return (cache[tag] = "");
-  var rowTags = pool.map(function(a){ return String(a[2]).split("+").map(function(x){ return x.trim(); }); });
+  var rowTags = pool.map(function(a){ return thTagsOf(a); });
   var best = "";
   for (var j = 2; j <= tag.length; j++){
     var s = tag.slice(0, j);
@@ -2152,19 +2196,58 @@ function thCoreOf(tag, dstr){
   }
   return (cache[tag] = best);
 }
+function thGroups(dstr){
+  if (THDIR[dstr]) return THDIR[dstr];
+  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
+  var byCode = {}; pool.forEach(function(a){ byCode[a[0]] = a; });
+  var list = [];
+  DIRS.forEach(function(d){
+    var hit = {}, tags = {};
+    pool.forEach(function(a){
+      var ts = thTagsOf(a);
+      for (var i=0;i<ts.length;i++){
+        var f = false;
+        for (var j=0;j<d[1].length;j++){ if (ts[i].indexOf(d[1][j]) >= 0){ f = true; break; } }
+        if (f){ hit[a[0]] = 1; tags[ts[i]] = 1; }
+      }
+    });
+    var codes = Object.keys(hit);
+    if (codes.length) list.push({ n: d[0], kw: d[1], codes: codes, tags: Object.keys(tags), kind: "dir" });
+  });
+  var fams = {};
+  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ var f = thFamName(t); if (f){ (fams[f] || (fams[f] = [])).push(a[0]); } }); });
+  Object.keys(fams).forEach(function(f){
+    var u = {}; fams[f].forEach(function(c){ u[c] = 1; });
+    list.push({ n: f, kw: [], codes: Object.keys(u), tags: [f], kind: "fam" });
+  });
+  list.sort(function(x,y){ return y.codes.length - x.codes.length || (x.kind === "dir" ? 0 : 1) - (y.kind === "dir" ? 0 : 1); });
+  THDIR[dstr] = { list: list, byCode: byCode, pool: pool };
+  return THDIR[dstr];
+}
 function openThLadder(name, bkKey, dstr){
   var card = $("thCard"); if (!card) return;
   dstr = dstr || ztDayOf(STATE.day);
   var lbcM = (dstr === ztDayOf(STATE.day)) ? lbcMap() : {};
-  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
-  var recBy = {}; pool.forEach(function(a){ recBy[a[0]] = a; });
-  var hit = {}, srcs = [], core = thCoreOf(name, dstr), nTag = 0;
-  pool.forEach(function(a){
-    var tags = String(a[2]).split("+").map(function(x){ return x.trim(); });
-    if (tags.indexOf(name) >= 0){ hit[a[0]] = 1; nTag++; return; }
-    if (core && tags.some(function(t){ return t.indexOf(core) >= 0; })){ hit[a[0]] = 1; nTag++; }
-  });
-  if (nTag) srcs.push("同花顺涨停原因" + (core ? "（含关键词「" + core + "」）" : ""));
+  var G = thGroups(dstr), recBy = G.byCode;
+  var hit = {}, srcs = [], nTag = 0, tgt = null, core = "";
+  G.list.forEach(function(x){ if (!tgt && x.n === name) tgt = x; });
+  if (!tgt){ var dn = dirOfTag(name); if (dn) G.list.forEach(function(x){ if (!tgt && x.n === dn) tgt = x; }); }
+  if (tgt){
+    tgt.codes.forEach(function(c){ hit[c] = 1; nTag++; });
+    if (tgt.kind === "dir"){
+      srcs.push("方向「" + tgt.n + "」＝同花顺涨停原因或东财概念命中关键词（" + tgt.kw.slice(0, 8).join("/") + (tgt.kw.length > 8 ? " 等" : "") + "）的票" + (name !== tgt.n ? "；由标签「" + name + "」展开" : ""));
+    } else {
+      srcs.push("字辈「" + tgt.n + "」＝同花顺涨停原因里的「XX字辈」人气归类");
+    }
+  } else {
+    core = thCoreOf(name, dstr);
+    G.pool.forEach(function(a){
+      var tags = thTagsOf(a);
+      if (tags.indexOf(name) >= 0){ hit[a[0]] = 1; nTag++; return; }
+      if (core && tags.some(function(t){ return t.indexOf(core) >= 0; })){ hit[a[0]] = 1; nTag++; }
+    });
+    if (nTag) srcs.push("同花顺涨停原因" + (core ? "（含关键词「" + core + "」）" : ""));
+  }
   if (bkKey && typeof BMEM !== "undefined" && BMEM && BMEM[bkKey]){
     var added = 0;
     BMEM[bkKey].split(",").forEach(function(c){ if (DZTSET && DZTSET[c] && !hit[c]){ hit[c] = 1; added++; } });
@@ -2179,8 +2262,14 @@ function openThLadder(name, bkKey, dstr){
   members = members.slice().sort(function(a,b){ return (b[4]||0)-(a[4]||0) || (a[6]||0)-(b[6]||0); });
   card.hidden = false;
   thDragBind(card);
+  var de = $("thDirs");
+  if (de) de.innerHTML = '<span class="dlab">自动归类</span>' + G.list.map(function(x){
+    var on = tgt ? (x.n === tgt.n) : false;
+    return '<span class="dchip' + (on ? " on" : "") + (x.kind === "fam" ? " fam" : "") + '" data-dn="' + esc(x.n) + '" data-ztd="' + dstr + '" title="' + esc((x.kind === "fam" ? "字辈 " : "方向 ") + x.n + "：" + x.codes.length + " 只") + '">' + esc(x.n) + '<b>' + x.codes.length + '</b></span>';
+  }).join("");
   var dd = dstr.slice(0,4)+"-"+dstr.slice(4,6)+"-"+dstr.slice(6,8);
-  $("thTitle").textContent = name + ((core && core !== name) ? "（" + core + "）" : "") + " · 连板梯队（" + dd + "）";
+  var tf = tgt ? (name === tgt.n ? tgt.n : name + "（" + tgt.n + "）") : name + ((core && core !== name) ? "（" + core + "）" : "");
+  $("thTitle").textContent = tf + " · 连板梯队（" + dd + "）";
   if (!members.length){
     $("thTbl").innerHTML = '<tbody><tr><td class="empty">这一天这个题材没有涨停股</td></tr></tbody>';
     $("thNote").textContent = "口径：" + src + "。";
@@ -2196,11 +2285,11 @@ function openThLadder(name, bkKey, dstr){
       + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + a[0] + '/" target="_blank" rel="noopener">' + esc(nm) + '</a><a class="kbtn" data-kc="' + a[0] + '" data-kn="' + esc(nm) + '">K线</a><span class="tag">' + a[0] + '</span></td>'
       + '<td>' + esc(a[5] || "—") + '</td>'
       + '<td>' + (ztHHMM(a[6]) || "—") + '</td>'
-      + '<td class="left">' + esc(String(a[2]).split("+").map(function(x){return x.trim();}).join(" · ")) + '</td></tr>';
+      + '<td class="left">' + esc(thTagsOf(a).join(" · ")) + '</td></tr>';
   }).join("");
   $("thTbl").innerHTML = h + '</tbody>';
   var tp = members[0];
-  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；板位右边小字＝同花顺「N天M板」（区间内涨停总次数，中间可断板）。「首封」＝当天第一次封板时间；板型＝换手板／一字板。点题材标签会把同一关键词（如「机器人」）方向的票一起拉出来。";
+  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「自动归类」条＝当天涨停股按主流方向（机器人／军工／家电／低空经济…）和「XX字辈」自动归堆，点一下就换一个方向看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；板位右边小字＝同花顺「N天M板」；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。";
 }
 // 连板梯队改成右下角浮动面板（可拖动标题栏移动），不再把页面滚到下面
 function thDragBind(card){
@@ -2247,10 +2336,10 @@ function renderFam(){
 }
 document.addEventListener("click", function(e){
   if (e.target && e.target.id === "thClose"){ var c = $("thCard"); if (c) c.hidden = true; return; }
-  var a = (e.target && e.target.closest) ? e.target.closest(".mth,.thlink") : null;
+  var a = (e.target && e.target.closest) ? e.target.closest(".mth,.thlink,.dchip") : null;
   if (!a) return;
   e.preventDefault();
-  var th = a.getAttribute("data-th"); if (!th) return;
+  var th = a.getAttribute("data-th") || a.getAttribute("data-dn"); if (!th) return;
   openThLadder(th, a.getAttribute("data-bk") || "", a.getAttribute("data-ztd") || ztDayOf(STATE.day));
 });
 function renderDD(){
