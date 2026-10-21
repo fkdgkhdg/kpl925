@@ -2224,6 +2224,29 @@ function thGroups(dstr){
   THDIR[dstr] = { list: list, byCode: byCode, pool: pool };
   return THDIR[dstr];
 }
+function thFamRecent(famName, dstr, members){
+  if (typeof ZTRS === "undefined" || !ZTRS || !ZTRS.days) return "";
+  var days = ZTRS.days, i = days.indexOf(dstr);
+  if (i < 0) return "";
+  var cur = {}; members.forEach(function(a){ cur[String(a[0])] = 1; });
+  var seen = {}, out = [];
+  var hi = Math.min(i + 3, days.length - 1);
+  for (var k = hi; k >= i - 5; k--){
+    if (k === i || k < 0) continue;
+    var dd = days[k], pool = (ZTRS.d && ZTRS.d[dd]) || [];
+    for (var r = 0; r < pool.length; r++){
+      var a = pool[r], c = String(a[0]);
+      if (cur[c] || seen[c]) continue;
+      var tags = String(a[2]).split("+").map(function(x){ return x.trim(); });
+      var isFam = false;
+      for (var q = 0; q < tags.length; q++){ if (thFamName(tags[q]) === famName){ isFam = true; break; } }
+      if (isFam){ seen[c] = 1; out.push({ c: c, n: a[1] || c, d: dd }); }
+    }
+  }
+  if (!out.length) return "";
+  var txt = out.slice(0, 14).map(function(x){ return x.d.slice(4,6) + "-" + x.d.slice(6,8) + " " + x.n + "[" + x.c + "]"; }).join("、");
+  return " 该字辈最近的涨停票（本日梯队之外）：" + txt + "。（同花顺按「XX字辈」标签归类，本日池里没标签的票不在此列。）"
+}
 function openThLadder(name, bkKey, dstr){
   var card = $("thCard"); if (!card) return;
   dstr = dstr || ztDayOf(STATE.day);
@@ -2289,7 +2312,8 @@ function openThLadder(name, bkKey, dstr){
   }).join("");
   $("thTbl").innerHTML = h + '</tbody>';
   var tp = members[0];
-  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「自动归类」条＝当天涨停股按主流方向（机器人／军工／家电／低空经济…）和「XX字辈」自动归堆，点一下就换一个方向看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；板位右边小字＝同花顺「N天M板」；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。";
+  var famExtra = (tgt && tgt.kind === "fam") ? thFamRecent(tgt.n, dstr, members) : "";
+  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「自动归类」条＝当天涨停股按主流方向（机器人／军工／家电／低空经济…）和「XX字辈」自动归堆，点一下就换一个方向看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；板位右边小字＝同花顺「N天M板」；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。" + famExtra;
 }
 // 连板梯队改成右下角浮动面板（可拖动标题栏移动），不再把页面滚到下面
 function thDragBind(card){
