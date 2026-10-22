@@ -400,10 +400,9 @@ el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板�
 }
 </script>
 <script>
-/* ===== 今日刷新：现场抓东财最新一档龙虎榜 → 腾讯日K重算 D 表（最新一档）===== */
+/* ===== 今日刷新：现场抓东财最新一档龙虎榜 → 新浪日K重算 D 表（最新一档）===== */
 (function(){
   var EM = "https://datacenter-web.eastmoney.com/api/data/v1/get";
-  var TX = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/fqkline/get";
   function note(t){ var n=document.getElementById("sxNote"); if(n) n.textContent=t; }
   function jget(u){ return fetch(u,{cache:"no-store"}).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }); }
   function seatKind(n){ if(/机构专用/.test(n)) return "机构"; if(/(深股通|沪股通|陆股通|港股通)/.test(n)) return "北向"; if(/拉萨/.test(n)) return "拉萨系"; return "游资"; }
@@ -442,16 +441,34 @@ el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板�
     return step();
   }
   function secId(c){ return (c.charAt(0)==="6"?"sh":"sz")+c; }
-  function kline(code){
-    var s=secId(code);
-    var u=TX+"?param="+s+",day,,,14,qfq";
-    return jget(u).then(function(j){ var d=(j.data||{})[s]||{}; var a=d.qfqday||d.day||[]; return a.map(function(x){ return {d:x[0],o:+x[1],c:+x[2],h:+x[3],l:+x[4],v:+x[5]}; }); });
+    var KLSEQ=0;
+  function jp(url,name,ms){
+    return new Promise(function(res,rej){
+      var sc=document.createElement(String.fromCharCode(115,99,114,105,112,116)), t=setTimeout(function(){ fin(); rej(new Error("timeout")); }, ms||9000), done=false;
+      function fin(){ if(done) return; done=true; clearTimeout(t); try{ if(name) delete window[name]; }catch(e){} if(sc.parentNode) sc.parentNode.removeChild(sc); }
+      if(name) window[name]=function(j){ fin(); res(j); };
+      sc.src=url; sc.onerror=function(){ fin(); rej(new Error("load")); };
+      document.head.appendChild(sc);
+    });
   }
-  function barIdx(k,dd){ for(var i=0;i<k.length;i++) if(k[i].d===dd) return i; return -1; }
+  function kline(code){
+    var sd=secId(code), nm="SXK"+code+"_"+(++KLSEQ);
+    var sina="https://quotes.sina.cn/cn/api/jsonp_v2.php/"+nm+"/CN_MarketDataService.getKLineData?symbol="+sd+"&scale=240&ma=no&datalen=30";
+    var em="https://push2delay.eastmoney.com/api/qt/stock/kline/get?secid="+(code.charAt(0)==="6"?"1.":"0.")+code+"&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=0&end=20500101&lmt=30&cb="+nm+"E";
+    return jp(sina,nm,9000).then(function(j){
+      if(j&&j.length) return j.map(function(x){ return {d:String(x.day).slice(0,10),o:+x.open,c:+x.close,h:+x.high,l:+x.low,v:(+x.volume||0)/100}; });
+      return jp(em,nm+"E",9000).then(function(e){
+        var kl=(e&&e.data&&e.data.klines)||[];
+        if(!kl.length) throw new Error("no-kline");
+        return kl.map(function(x){ var p=String(x).split(","); return {d:p[0],o:+p[1],c:+p[2],h:+p[3],l:+p[4],v:+p[5],amt:+p[6]}; });
+      });
+    });
+  }
+function barIdx(k,dd){ for(var i=0;i<k.length;i++) if(k[i].d===dd) return i; return -1; }
   function isLim(k,i){ if(i<1) return false; var r=(k[i].c/k[i-1].c-1)*100; return r>=9.7 && Math.abs(k[i].h-k[i].c)<1e-6; }
   function lbcAt(k,i){ if(i<1) return 1; var n=0; for(var j=i;j>=1;j--){ if(isLim(k,j)) n++; else break; } return Math.max(n,1); }
-  function amtOf(k,i,span){ if(i<0) return null; var s=0; for(var j=Math.max(0,i-span+1);j<=i;j++){ s+=(k[j].v||0)*100*((k[j].h+k[j].l+k[j].c)/3); } return s||null; }
-  function buildGroups(rows){
+    function amtOf(k,i,span){ if(i<0) return null; var s=0; for(var j=Math.max(0,i-span+1);j<=i;j++){ var b=k[j]; s+=(b.amt||((b.v||0)*100*((b.h+b.l+b.c)/3))); } return s||null; }
+function buildGroups(rows){
     var grp={}, nameOf={};
     rows.forEach(function(r){
       var c=r.SECURITY_CODE; if(!/^(60|00)/.test(c||"")) return;
@@ -502,7 +519,7 @@ el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板�
       return fetchDept(LD).then(function(rows){ if(!rows.length) throw new Error(LD+" 暂无明细（可能还没出榜）"); return {LD:LD,rows:rows}; });
     }).then(function(o){
       var g=buildGroups(o.rows), codes=Object.keys(g.byCode);
-      note("③ 重算 "+codes.length+" 只（腾讯日K）…");
+      note("③ 重算 "+codes.length+" 只（新浪日K）…");
       var out=[], idx=0, miss=0;
       function step(){
         if(idx>=codes.length) return Promise.resolve();
@@ -519,12 +536,13 @@ el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板�
       }
       return step().then(function(){
         out.sort(function(a,b){ return (b.m.shareAmt||0)-(a.m.shareAmt||0); });
+        if(!out.length) throw new Error(o.LD+" 有龙虎榜但算不出（日K可能还没更新当天）");
         window.SEATX.LATEST={date:o.LD, rows:out};
         if(el("dDay")) el("dDay").textContent=o.LD;
         try{ renderD(); }catch(e){}
         try{ if(el("daysel")&&el("daysel").value==="-1") renderA(); }catch(e){}
         var zt=out.filter(function(r){ return r.limitUp; }).length;
-        note("✓ 已更新到 "+o.LD+"：主板上榜 "+out.length+" 只（涨停 "+zt+" 只）· "+((Date.now()-t0)/1000).toFixed(0)+"s · 采集 "+new Date().toLocaleTimeString());
+        note("✓ 已更新到 "+o.LD+"：主板上榜 "+out.length+" 只（涨停 "+zt+" 只）·"+(miss?miss+"只算不出·":"")+" "+((Date.now()-t0)/1000).toFixed(0)+"s · 采集 "+new Date().toLocaleTimeString());
       });
     }).catch(function(e){
       note("✗ 刷新失败："+((e&&e.message)?e.message:e)+" · 出榜一般在 17:00 后，稍后再点一次。");
