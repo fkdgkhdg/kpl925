@@ -42,6 +42,7 @@ table.cmp{max-width:960px}
 <body>
 <h1>席位结构对照 · 买一占比 / 净买 / 席位性质</h1>
 <div class="sub" id="gen"></div>
+<div class="bar" id="sxbar"><button id="sxRefresh" title="现场抓东财最新一档龙虎榜并重算下面 D 表；出榜一般 17:00 后">今日刷新</button><span class="small" id="sxNote">点「今日刷新」= 现场抓东财最新龙虎榜、重算 D 表；晚间出榜后不用等自动更新。</span></div>
 <div class="note">
 口径：数据来自东财龙虎榜营业部明细（<b>lhb_main.json</b>，2024-09 起全量）。一只票当天可能同时上多个榜，只取<b>买入合计最大</b>的那个榜（连板股通常是「连续三个交易日涨幅偏离」三日榜，故 span=三日榜）。<br>
 <b>买一占成交</b> = 榜内买入第一大席位的买入额 ÷ 上榜区间成交额（三日榜算三日累计）；成交额用日K「量×均价」估算，非官方值，看量级别用。<br>
@@ -160,6 +161,16 @@ function verCell(m,lbc){
   return "<span class='chip "+c2+"' title='"+tip+"'>"+v.label.replace("买一占成交","").replace("区间成交","成交").replace("小盘缩量","缩量")+"</span>"+
     "<div class='small'>n="+v.n+" \u00b7 \u5747"+p2(v.avg)+" \u00b7 \u5927\u9762"+(v.big>=30?"<span class='warn'>"+v.big+"%</span>":v.big+"%")+"</div>";
 }
+function seatChipsOf(m){
+  if(!m) return "-";
+  var s=(m.seats||[]).map(function(x){
+    var nm2=x[0], net=x[1], big=x[2];
+    var cl=(big!=null && big>=45)?"r":"";
+    var btag=(big!=null)?("<span class='small'>·</span>"+(big>=45?"<span class='warn'>"+big+"%</span>":"<span class='mut'>"+big+"%</span>")):"";
+    return "<span class='chip "+cl+"'>"+nm2+" "+(net>=0?"+":"")+net+"万"+btag+"</span>";
+  }).join("");
+  return s || "-";
+}
 function renderA(){
   var sel = el("daysel").value, sortK = el("sortsel").value, only = el("onlyseat").checked;
   var isLat = (sel==="-1"), rows, dayLabel;
@@ -186,12 +197,7 @@ function renderA(){
       var bk=[]; if(m.buyKinds){ for(var k in m.buyKinds){ bk.push((m.buyKinds[k]||0)+kindTag(k)); } }
       buyK = bk.join(" ") || "-";
       sk = (m.orgSell?"<span class='k jg'>\u673a\u6784</span>":"")+(m.northSell?"<span class='k bei'>\u5317\u5411</span>":"") || "<span class='small'>\u7eaf\u6e38\u8d44</span>";
-      seatCell = (m.seats||[]).map(function(s){
-        var nm2=s[0], net=s[1], big=s[2];
-        var cl = (big!=null && big>=45) ? "r" : "";
-        var btag = (big!=null) ? ("<span class='small'>\u00b7</span>"+(big>=45?"<span class='warn'>"+big+"%</span>":"<span class='mut'>"+big+"%</span>")) : "";
-        return "<span class='chip "+cl+"'>"+nm2+" "+(net>=0?"+":"")+net+"\u4e07"+btag+"</span>";
-      }).join("");
+      seatCell = seatChipsOf(m);
     }
     h += "<tr class='"+(r.rank<=5&&!isLat?"hl":"")+"'>"+
       "<td>"+r.rank+"</td>"+
@@ -349,6 +355,7 @@ function renderD(){
     var sh = m.shareAmt==null ? "-" : "<span class='"+(m.shareAmt>=0.10?"warn":"")+"'>"+pc(m.shareAmt)+"</span>";
     var bk=[]; if(m.buyKinds){ for(var k in m.buyKinds){ bk.push((m.buyKinds[k]||0)+kindTag(k)); } }
     var sk = (m.orgSell?"<span class='k jg'>机构</span>":"")+(m.northSell?"<span class='k bei'>北向</span>":"") || "<span class='small'>纯游资</span>";
+    var seatCell = seatChipsOf(m);
     var seatCell = (m.seats||[]).map(function(s){ var cl=(s[2]!=null&&s[2]>=45)?"r":""; var btag=(s[2]!=null)?("<span class='small'>·</span>"+(s[2]>=45?"<span class='warn'>"+s[2]+"%</span>":"<span class='mut'>"+s[2]+"%</span>")):""; return "<span class='chip "+cl+"'>"+s[0]+" "+(s[1]>=0?"+":"")+s[1]+"万"+btag+"</span>"; }).join("");
     h += "<tr>"+
       "<td>"+(i+1)+"</td>"+
@@ -392,5 +399,141 @@ el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板�
   aNoteBuild();
 }
 </script>
+<script>
+/* ===== 今日刷新：现场抓东财最新一档龙虎榜 → 腾讯日K重算 D 表（最新一档）===== */
+(function(){
+  var EM = "https://datacenter-web.eastmoney.com/api/data/v1/get";
+  var TX = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/fqkline/get";
+  function note(t){ var n=document.getElementById("sxNote"); if(n) n.textContent=t; }
+  function jget(u){ return fetch(u,{cache:"no-store"}).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }); }
+  function seatKind(n){ if(/机构专用/.test(n)) return "机构"; if(/(深股通|沪股通|陆股通|港股通)/.test(n)) return "北向"; if(/拉萨/.test(n)) return "拉萨系"; return "游资"; }
+  function shortSeat(n){ return String(n).replace("股份有限公司","").replace("证券有限责任公司","").replace("有限责任公司","").replace("有限公司","").replace(/证券营业部$/,"").replace(/营业部$/,"").replace(/分公司$/,"").replace("证券","").trim(); }
+  function spanOf(exp){ return /连续三个交易日/.test(exp)?3:1; }
+  var seatStat=null;
+  function initSeatStat(){
+    if(seatStat) return seatStat; seatStat={};
+    var S=(window.LHBSEAT&&window.LHBSEAT.seats)||null;
+    if(!S){ try{ S=(window.parent&&window.parent.LHBSEAT&&window.parent.LHBSEAT.seats)||null; }catch(e){ S=null; } }
+    if(S) S.forEach(function(s){ seatStat[s[0]]={big:s[1],avg:s[2],n:s[3]}; });
+    return seatStat;
+  }
+  function norm(s){ return String(s).replace(/[\s\u3000（）()·．.\-_、]/g,""); }
+  function statOf(name){
+    var st=initSeatStat(), k=norm(name), hit=null, hl=-1;
+    for(var n in st){ var kn=norm(n); if(kn.indexOf(k)===0||k.indexOf(kn)===0){ if(kn.length>hl){ hl=kn.length; hit=st[n]; } } }
+    return hit;
+  }
+  function latestDate(){
+    var u=EM+"?reportName=RPT_OPERATEDEPT_TRADE_DETAILS&columns=TRADE_DATE&sortColumns=TRADE_DATE&sortTypes=-1&pageSize=1&pageNumber=1&source=WEB&client=WEB";
+    return jget(u).then(function(j){ var r=(j.result&&j.result.data)||[]; return r.length?(r[0].TRADE_DATE||"").slice(0,10):""; });
+  }
+  function fetchDept(date){
+    var out=[], page=1;
+    function step(){
+      var f="(TRADE_DATE='"+date+"')";
+      var u=EM+"?reportName=RPT_OPERATEDEPT_TRADE_DETAILS&columns=TRADE_DATE,SECURITY_CODE,SECURITY_NAME_ABBR,OPERATEDEPT_NAME,ACT_BUY,ACT_SELL,EXPLANATION&filter="+encodeURIComponent(f)+"&pageSize=500&pageNumber="+page+"&source=WEB&client=WEB";
+      return jget(u).then(function(j){
+        var rows=(j.result&&j.result.data)||[]; out=out.concat(rows);
+        var pages=(j.result&&j.result.pages)||1;
+        if(page<pages&&page<20){ page++; return step(); }
+        return out;
+      });
+    }
+    return step();
+  }
+  function secId(c){ return (c.charAt(0)==="6"?"sh":"sz")+c; }
+  function kline(code){
+    var s=secId(code);
+    var u=TX+"?param="+s+",day,,,14,qfq";
+    return jget(u).then(function(j){ var d=(j.data||{})[s]||{}; var a=d.qfqday||d.day||[]; return a.map(function(x){ return {d:x[0],o:+x[1],c:+x[2],h:+x[3],l:+x[4],v:+x[5]}; }); });
+  }
+  function barIdx(k,dd){ for(var i=0;i<k.length;i++) if(k[i].d===dd) return i; return -1; }
+  function isLim(k,i){ if(i<1) return false; var r=(k[i].c/k[i-1].c-1)*100; return r>=9.7 && Math.abs(k[i].h-k[i].c)<1e-6; }
+  function lbcAt(k,i){ if(i<1) return 1; var n=0; for(var j=i;j>=1;j--){ if(isLim(k,j)) n++; else break; } return Math.max(n,1); }
+  function amtOf(k,i,span){ if(i<0) return null; var s=0; for(var j=Math.max(0,i-span+1);j<=i;j++){ s+=(k[j].v||0)*100*((k[j].h+k[j].l+k[j].c)/3); } return s||null; }
+  function buildGroups(rows){
+    var grp={}, nameOf={};
+    rows.forEach(function(r){
+      var c=r.SECURITY_CODE; if(!/^(60|00)/.test(c||"")) return;
+      if(!r.OPERATEDEPT_NAME) return;
+      if(r.SECURITY_NAME_ABBR) nameOf[c]=r.SECURITY_NAME_ABBR;
+      var key=c+"|"+(r.EXPLANATION||""); (grp[key]=grp[key]||[]).push(r);
+    });
+    var byCode={};
+    Object.keys(grp).forEach(function(key){
+      var p=key.split("|"), c=p[0], exp=p.slice(1).join("|");
+      var buy5=0, sell5=0, seatAgg={}, buySeats=[], sellSeats=[];
+      grp[key].forEach(function(r){
+        var b=+r.ACT_BUY||0, s=+r.ACT_SELL||0; buy5+=b; sell5+=s;
+        var nm=r.OPERATEDEPT_NAME;
+        var sa=(seatAgg[nm]=seatAgg[nm]||{buy:0,sell:0,kind:seatKind(nm)});
+        sa.buy+=b; sa.sell+=s;
+        if(b>0) buySeats.push({name:nm,amt:b});
+        if(s>0) sellSeats.push({name:nm,amt:s});
+      });
+      if(!buy5) return;
+      if(!byCode[c] || byCode[c].buy5<buy5){ byCode[c]={code:c,exp:exp,buy5:buy5,sell5:sell5,seatAgg:seatAgg,buySeats:buySeats,sellSeats:sellSeats}; }
+    });
+    return {byCode:byCode,nameOf:nameOf};
+  }
+  function metrics(b, amt){
+    if(!b||!b.buy5) return null;
+    var bs=b.buySeats.slice().sort(function(x,y){ return y.amt-x.amt; });
+    if(!bs.length) return null;
+    var t1=bs[0], bk={}, sk={};
+    b.buySeats.forEach(function(s){ var kk=seatKind(s.name); bk[kk]=(bk[kk]||0)+1; });
+    b.sellSeats.forEach(function(s){ var kk=seatKind(s.name); sk[kk]=(sk[kk]||0)+1; });
+    var span=spanOf(b.exp), net=b.buy5-b.sell5;
+    var seats=Object.keys(b.seatAgg).map(function(nm){ var a=b.seatAgg[nm], st=statOf(nm); return [shortSeat(nm), Math.round((a.buy-a.sell)/1e4), st?st.big:null, a.kind]; })
+      .sort(function(x,y){ return Math.abs(y[1])-Math.abs(x[1]); }).slice(0,4);
+    return { buy5:b.buy5, sell5:b.sell5, net:net, span:span, amt:amt,
+      top1:shortSeat(t1.name), top1kind:seatKind(t1.name), top1amt:t1.amt, share:t1.amt/b.buy5,
+      shareAmt: amt?t1.amt/amt:null, netAmt: amt?net/amt:null,
+      buyKinds:bk, orgSell:!!sk["机构"], northSell:!!sk["北向"], seatOrg:+(sk["机构"]||0), seats:seats };
+  }
+  var busy=false;
+  window.__sxRefresh=function(){
+    if(busy){ note("正在刷新中…"); return; }
+    busy=true; var t0=Date.now();
+    note("① 查最新一档龙虎榜日期…");
+    latestDate().then(function(LD){
+      if(!LD) throw new Error("取不到龙虎榜日期");
+      note("② 抓 "+LD+" 营业部明细…");
+      return fetchDept(LD).then(function(rows){ if(!rows.length) throw new Error(LD+" 暂无明细（可能还没出榜）"); return {LD:LD,rows:rows}; });
+    }).then(function(o){
+      var g=buildGroups(o.rows), codes=Object.keys(g.byCode);
+      note("③ 重算 "+codes.length+" 只（腾讯日K）…");
+      var out=[], idx=0, miss=0;
+      function step(){
+        if(idx>=codes.length) return Promise.resolve();
+        var c=codes[idx++];
+        return kline(c).then(function(k){
+          var i=barIdx(k,o.LD), span=spanOf(g.byCode[c].exp), amt=amtOf(k,i,span), m=metrics(g.byCode[c],amt);
+          if(m) out.push({ code:c, name:(g.nameOf[c]||c), lbc:lbcAt(k,i), limitUp:isLim(k,i), m:m,
+            chg:(i<1?null:(k[i].c/k[i-1].c-1)*100) });
+          else miss++;
+        }).catch(function(){ miss++; }).then(function(){
+          if(idx%10===0) note("③ 重算中… "+idx+"/"+codes.length);
+          return new Promise(function(res){ setTimeout(res,80); }).then(step);
+        });
+      }
+      return step().then(function(){
+        out.sort(function(a,b){ return (b.m.shareAmt||0)-(a.m.shareAmt||0); });
+        window.SEATX.LATEST={date:o.LD, rows:out};
+        if(el("dDay")) el("dDay").textContent=o.LD;
+        try{ renderD(); }catch(e){}
+        try{ if(el("daysel")&&el("daysel").value==="-1") renderA(); }catch(e){}
+        var zt=out.filter(function(r){ return r.limitUp; }).length;
+        note("✓ 已更新到 "+o.LD+"：主板上榜 "+out.length+" 只（涨停 "+zt+" 只）· "+((Date.now()-t0)/1000).toFixed(0)+"s · 采集 "+new Date().toLocaleTimeString());
+      });
+    }).catch(function(e){
+      note("✗ 刷新失败："+((e&&e.message)?e.message:e)+" · 出榜一般在 17:00 后，稍后再点一次。");
+    }).then(function(){ busy=false; });
+  };
+  var btn=document.getElementById("sxRefresh");
+  if(btn) btn.addEventListener("click", function(){ window.__sxRefresh(); });
+})();
+</script>
+
 </body>
 </html>

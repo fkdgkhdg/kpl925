@@ -499,7 +499,7 @@
       <div id="seatxBar" style="padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--chip)">
         <b style="font-size:13px">龙虎榜席位结构对照</b>
         <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">A 榜单日席位结构 · B 席位特征×次日表现 · C 买一占比条件拆解 · D 最新一档龙虎榜明细 · E 最近高连板活跃席位</span>
-        <button id="seatxBig">放大</button><button id="seatxOpen">新窗口 ↗</button><button id="seatxClose">关闭</button>
+        <button id="seatxRefresh" title="现场抓东财最新一档龙虎榜，重算 D 表；晚间出榜后不用等自动更新">今日刷新</button><button id="seatxBig">放大</button><button id="seatxOpen">新窗口 ↗</button><button id="seatxClose">关闭</button>
       </div>
       <iframe id="seatxFrame" data-src="seatx.html" src="about:blank" title="龙虎榜席位结构对照" style="flex:1;border:0;width:100%;background:#fff"></iframe>
     </div>
@@ -7332,6 +7332,7 @@ vfInit();
     var t = e.target; if(!t || !t.id) return;
     if(t.id === "seatxBtn"){ open(); e.preventDefault(); return; }
     if(t.id === "seatxClose"){ close(); e.preventDefault(); return; }
+    if(t.id === "seatxRefresh"){ var ff=$("seatxFrame"); if(ff && ff.contentWindow && ff.contentWindow.__sxRefresh){ try{ ff.contentWindow.__sxRefresh(); }catch(err){} } else { alert("席位页还没加载好，稍等一两秒再点。"); } e.preventDefault(); return; }
     if(t.id === "seatxBig"){ toggleBig(); e.preventDefault(); return; }
     if(t.id === "seatxOpen"){ window.open("seatx.html", "_blank", "noopener"); e.preventDefault(); return; }
     if(t.id === "seatxWrap"){ close(); }
