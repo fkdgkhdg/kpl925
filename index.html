@@ -2015,7 +2015,7 @@ function renderNode(){
     " → 满足 " + G5.got + "/3",
     "① 最近涨得多的股票（近10日出现≥3连板的高标池）开始跌后止跌　② 最高连板抬升　③ 跌停家数比前日减少一半以上；满足 ≥2 个算触发"]);
   var h = '<thead><tr><th>节点</th><th>层次</th><th>状态</th><th>读数</th></tr></thead><tbody>';
-  var LEVEL = { "① 指数放量大阳": "大盘", "② 题材启动": "题材", "③ 主线分歧": "节奏", "④ 横盘突破": "形态", "⑤ 冰点转修复": "周期" };
+  var LEVEL = { "① 指数放量大阳": "大盘", "② 新题材出现": "题材", "③ 高标断板后再走强": "节奏", "④ 横盘突破": "形态", "⑤ 冰点转修复": "周期" };
   rows.slice().sort(function(a, b){ return (b[1] ? 1 : 0) - (a[1] ? 1 : 0); }).forEach(function(r){
     h += '<tr class="' + (r[1] ? 'hot' : '') + '"><td class="left"><b>' + r[0] + '</b><div style="font-size:11.5px;color:#888">' + r[3] + '</div></td>' +
       '<td><span class="tag">' + (LEVEL[r[0]] || "") + '</span></td>' +
@@ -2524,6 +2524,93 @@ function tpTopInHTML(){
   return H;
 }
 
+function tpNodeBlk(){
+  var d0 = (STATE.cyc && STATE.cyc.day) ? STATE.cyc.day : null;
+  if (!d0 || typeof ddSignals !== "function") return "";
+  var nk = ddSignals(d0);
+  if (!nk) return "";
+  var pd0 = (typeof prevTradeDay === "function") ? prevTradeDay(d0) : null;
+  var cT = cycOf(d0), cP = pd0 ? cycOf(pd0) : null;
+  var mT = cT ? cT[2] : null, mP = cP ? cP[2] : null;
+  var vT = mktOf(d0), vP = pd0 ? mktOf(pd0) : null;
+  // 节点日＝⑤冰点转修复满足≥2 或「最高板掉档＋放量」（断板日高切低）
+  function hitOf(d){
+    var g = ddSignals(d); if (!g) return null;
+    var pdx = prevTradeDay(d), cA = cycOf(d), cB = pdx ? cycOf(pdx) : null;
+    var mA = cA ? cA[2] : null, mB = cB ? cB[2] : null;
+    var vA = mktOf(d), vB = pdx ? mktOf(pdx) : null;
+    var A = !!(mB !== null && mA !== null && mB >= 4 && mA < mB && vA && vB && vA.v > vB.v);
+    var cn = (g.s1 ? 1 : 0) + (g.s2 ? 1 : 0) + (g.s3 ? 1 : 0);
+    var hit = (g.got >= 2) || A;
+    var why = "";
+    if (g.got >= 2){
+      var sg = [];
+      if (g.s1) sg.push("①涨多止跌"); if (g.s2) sg.push("②连板高度增"); if (g.s3) sg.push("③跌停收缩");
+      why = "⑤ " + g.got + "/3（" + sg.join("+") + "）";
+    } else if (A) why = "最高板 " + mB + "→" + mA + " 掉档＋放量";
+    return { hit: hit, why: why, g: g, cn: cn, A: A, mB: mB, mA: mA };
+  }
+  var A0 = !!(mP !== null && mT !== null && mP >= 4 && mT < mP && vT && vP && vT.v > vP.v);
+  var f5 = nk.got >= 2;
+  var hit = f5 || A0;
+  // ① 指数放量大阳（同「节点信号」卡口径）
+  var id1 = { ok: false, s: "" };
+  try {
+    if (typeof IDX !== "undefined" && IDX && IDX.dates){
+      var di = IDX.dates.indexOf(d0);
+      if (di > 6){
+        var chg = (IDX.sh[di] / IDX.sh[di - 1] - 1) * 100;
+        var p5 = (IDX.sh[di - 1] / IDX.sh[di - 6] - 1) * 100;
+        var vp = vT ? vT.pct * 100 : null;
+        id1.ok = (chg >= 1 && p5 <= -2 && vp !== null && vp >= 60);
+        id1.s = "上证 " + (chg > 0 ? "+" : "") + chg.toFixed(2) + "%、前5日 " + (p5 > 0 ? "+" : "") + p5.toFixed(2) + "%、量能分位 " + (vp === null ? "—" : vp.toFixed(0) + "%");
+      } else id1.s = "指数数据不足";
+    }
+  } catch(e){ id1.s = "计算失败"; }
+  var nb = (typeof NEWT !== "undefined" && NEWT[d0]) ? NEWT[d0] : [];
+  var gb = (typeof GB !== "undefined" && GB[d0]) ? GB[d0] : [];
+  var bk = (typeof BN !== "undefined" && BN[d0] && BN[d0].b) ? BN[d0].b : [];
+  // 回扫最近节点日（同口径）
+  var dts = (typeof tradeDays === "function") ? tradeDays() : [];
+  var i0 = dts.indexOf(d0), lastNd = null, recent = [];
+  for (var i = i0; i >= 0 && i >= i0 - 260; i--){
+    var h1 = hitOf(dts[i]);
+    if (h1 && h1.hit){ if (lastNd === null) lastNd = dts[i]; if (recent.length < 4) recent.push({ d: dts[i], why: h1.why }); }
+  }
+  var gap = "—";
+  if (lastNd) gap = String(i0 - dts.indexOf(lastNd));
+  // 今天 9:25 可买的接力池（＝ D0 涨停池）按板位
+  var RP = STATE.rows || [];
+  var c1 = 0, c2 = 0, c3 = 0;
+  RP.forEach(function(r){ var b = r.board || 1; if (b <= 1) c1++; else if (b === 2) c2++; else c3++; });
+  var hitCls = function(on){ return on ? 'background:rgba(31,122,61,.15);color:#1f7a3d;font-weight:700' : 'opacity:.42'; };
+  var col = hit ? "#c02c2c" : "#6b7280";
+  var H = '<div class="tpblk"><div class="lb">节点（' + d0 + ' 收盘判定 · 用于今天 ' + STATE.day + ' 9:25）</div>' +
+    '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:2px 0 3px">' +
+      '<span style="font-size:18px;font-weight:900;color:' + col + '">' + (hit ? "D0 是节点日" : "D0 不是节点日") + '</span>' +
+      '<span style="font-size:12px;font-weight:700;color:var(--muted)">⑤ ' + nk.got + '/3' +
+        (A0 ? ' · 最高板 ' + mP + '→' + mT + ' 掉档＋放量' : '') + ' · 距最近节点日 ' + gap + ' 天</span>' +
+    '</div>' +
+    '<div class="chips">' +
+      '<span class="chip" style="' + hitCls(id1.ok) + '" title="' + esc(id1.s) + '">' + (id1.ok ? "● " : "○ ") + '① 指数放量大阳</span>' +
+      '<span class="chip" style="' + hitCls(nb.length > 0) + '">' + (nb.length > 0 ? "● " : "○ ") + '② 新题材 ' + (nb.length || "—") + '</span>' +
+      '<span class="chip" style="' + hitCls(gb.length > 0) + '">' + (gb.length > 0 ? "● " : "○ ") + '③ 高标再走强 ' + (gb.length || "—") + '</span>' +
+      '<span class="chip" style="' + hitCls(bk.length > 0) + '">' + (bk.length > 0 ? "● " : "○ ") + '④ 横盘突破 ' + (bk.length || "—") + '</span>' +
+      '<span class="chip" style="' + hitCls(f5) + '">' + (f5 ? "● " : "○ ") + '⑤ 冰点转修复 ' + nk.got + '/3</span>' +
+    '</div>' +
+    '<div style="font-size:11.5px;font-weight:600;color:var(--fg);line-height:1.5;margin-top:4px">⑤ ①涨多的票止跌 ' + (nk.s1 ? "✓" : "✗") +
+      '（高标池均涨 ' + (nk.hb ? (nk.hb[1] > 0 ? "+" : "") + nk.hb[1] + "%" : "—") + '）· ②连板高度 ' + (nk.s2 ? "✓" : "✗") +
+      '（' + (nk.hP === null ? "—" : nk.hP) + '→' + (nk.hT === null ? "—" : nk.hT) + '）· ③跌停收缩 ' + (nk.s3 ? "✓" : "✗") +
+      '（' + (nk.prev ? nk.prev[1] : "—") + '→' + (nk.cur ? nk.cur[1] : "—") + '）</div>' +
+    '<div style="font-size:11.5px;font-weight:600;color:var(--fg);line-height:1.5;margin-top:3px">今天 9:25 可买的接力池（＝' + d0 + ' 涨停池，共 ' + RP.length + ' 只）：' +
+      '首板 ' + c1 + ' 只 · 2板 ' + c2 + ' 只 · 3板+ ' + c3 + ' 只。' +
+      '历史节点日晋级率 首板 19% · 2板 36% · 3板+ 46%（全交易日基线 19/34/44%）——节点本身只多约 2 个点，真正抬胜率的是竞价涨幅（2板＋竞价≥3% 节点日 57%、≥9% 时 76%）。</div>' +
+    '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：节点日＝⑤冰点转修复满足 ≥2 个信号，或「最高板掉档（≥4板）+ 当日放量」；判定用 ' + d0 + ' 收盘数据，决定今天 9:25 敢不敢下手（择时开关），不是直接选票。' +
+      '统计窗口 2024-09-10 ~ 2026-10-21（508 个交易日、175 个节点日，主板口径，非预测）。' +
+      (recent.length ? '　最近节点日：' + recent.map(function(r){ return r.d.slice(5) + (r.why ? "（" + esc(r.why) + "）" : ""); }).join("、") : '') + '</div>' +
+    '</div>';
+  return H;
+}
 function topInTag(r, TI){
   TI = TI || topInInfo();
   if (!r || !TI || !TI.inC || !TI.inC[r.code]) return "";
@@ -2675,7 +2762,7 @@ function renderTop(){
         (envHitN ? '<div style="font-size:10.5px;color:#c02c2c;margin-top:3px">命中：' + esc(envHitNames) + '</div>' : '') +
         '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：248 个交易日（2025-09-10 ~ 2026-09-17）· 主板昨日涨停股 · 当日池＝按实际换手取前 5（含一字；点「只看能买到的（剔一字）」可切换）· 9:25 竞价等权买 5 只；A 口径＝封板则持有到第一次断板当日收盘卖，买入日即断板则次日开盘卖。命中条数越多越该空仓（分档统计，非投资建议）。' +
         '挑选说明：五条都按 hit0 与 hit≥2 的差距筛出，已要求含/剔一字双口径同向；⑤ 与前四条重叠少（③ 0/7、④ 2/7），补的是「普涨过热」这一头，单条最重（7 日 A −6.01%、大跌率 71%）。剔一字对照：hit0 −0.05%、hit≥2 −3.67%。' +
-        '⚠ ④ 是纯数据里挑出来的，单条方向是「换手越高隔夜越差」（34 日、t=−2.49），不是先验逻辑，有过拟合风险；实际换手字段 2025-09-10 才有，样本仅 248 日、无真正样本外。必空档是本方案最结实的部分；出手档的正期望大部分来自买不到的一字板。</div></div>' + tpTopInHTML();
+        '⚠ ④ 是纯数据里挑出来的，单条方向是「换手越高隔夜越差」（34 日、t=−2.49），不是先验逻辑，有过拟合风险；实际换手字段 2025-09-10 才有，样本仅 248 日、无真正样本外。必空档是本方案最结实的部分；出手档的正期望大部分来自买不到的一字板。</div></div>' + tpNodeBlk();
       stp.className = "tpflex";
       stp.innerHTML = H;
     }
