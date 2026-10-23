@@ -205,7 +205,9 @@ function renderA(){
   var h = "<tr>"+HEAD.map(function(t){ return "<th>"+t+"</th>"; }).join("")+"</tr>";
   rows.forEach(function(r){
     var m = r.m;
-    var nm = "<span>"+r.name+"</span>"+themeChip(r.code, ztd)+"<span class='tag'>"+(r.lbc>1?r.lbc+"\u677f":"\u9996\u677f")+"</span>"+(r.rank<=5&&!isLat?"<span class='tag'>\u5de5\u51775\u53ea</span>":"");
+    var _cnt = (r.lbc>1 ? r.lbc+"板" : "首板");
+    var _bt = isLat ? (r.up ? "<span class='tag'>"+_cnt+"</span>" : "") : "<span class='tag'>昨"+_cnt+(r.up ? "" : "·断")+"</span>";
+    var nm = "<span>"+r.name+"</span>"+themeChip(r.code, ztd)+_bt+(r.rank<=5&&!isLat?"<span class='tag'>工具5只</span>":"");
     var cnt="-", top1="-", sh="-", buyK="-", sk="-", seatCell="-";
     if(m){
       cnt = m.span===3?"\u4e09\u65e5\u699c":"\u5f53\u65e5\u699c";
