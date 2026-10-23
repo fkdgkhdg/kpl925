@@ -37,6 +37,7 @@ tr.hl{background:var(--hl)}
 table.cmp{max-width:960px}
 .hlbox{background:#fff;border:1px solid #f0c98a;border-left:4px solid #e29b3c;border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0}
 .sec{background:#fdf3e3;color:#a15c00;text-align:left;font-weight:600}
+.thchip{display:inline-block;padding:0 4px;border-radius:3px;font-size:11px;margin-left:3px;border:1px solid #bfe0cb;background:#eef8f1;color:#1f7a3d;cursor:help}
 </style>
 </head>
 <body>
@@ -94,9 +95,24 @@ table.cmp{max-width:960px}
   <div style="overflow:auto"><table id="tE2"></table></div>
 </div>
 <script src="seatx_hot.js"></script>
+<script src="ztrsdata.js"></script>
 <script src="seatx_data.js"></script>
 <script>
 var X = window.SEATX || null;
+var TH = (function(){ var byDay={}, latest={}, Z=(typeof window.ZTRS!=="undefined")?window.ZTRS:null;
+  if(!Z||!Z.days||!Z.d) return {byDay:byDay, latest:latest};
+  Z.days.forEach(function(d){ var pl=Z.d[d]||[], m=(byDay[d]={});
+    pl.forEach(function(r){ var tags=String(r[2]||"").split("+").map(function(x){return x.trim();}).filter(Boolean);
+      if(!tags.length) return; m[r[0]]=tags; latest[r[0]]={tags:tags, day:d}; }); });
+  return {byDay:byDay, latest:latest}; })();
+function themeChip(code, day){
+  if(!code) return ""; var d=String(day||""), tags=null;
+  if(TH.byDay[d] && TH.byDay[d][code]) tags=TH.byDay[d][code];
+  else if(TH.latest[code]){ tags=TH.latest[code].tags; d=TH.latest[code].day; }
+  if(!tags||!tags.length) return "";
+  var tip=(d?("同花顺涨停原因（"+d+"）："):"")+tags.join(" + ");
+  return '<span class="thchip" title="'+tip+'">'+tags[0]+'</span>';
+}
 function el(id){ return document.getElementById(id); }
 function yi(v){ var a=Math.abs(v); return a>=1e8 ? (v/1e8).toFixed(2)+"亿" : (v/1e4).toFixed(0)+"万"; }
 function pc(v,d){ if(v==null||!isFinite(v)) return "-"; return (v>=0?"+":"")+(v*100).toFixed(d==null?1:d)+"%"; }
@@ -176,7 +192,7 @@ function renderA(){
   var isLat = (sel==="-1"), rows, dayLabel;
   if(isLat){
     var L = X.LATEST; dayLabel = L.date+" \u00b7 \u6700\u65b0\u4e00\u6863\uff08\u6536\u76d8\u540e\uff09";
-    rows = (L.rows||[]).map(function(r,i){ return {rank:i+1, name:r.name, lbc:r.lbc, auct:null, turn:null, chg:r.chg, up:!!r.limitUp, m:r.m||null}; });
+    rows = (L.rows||[]).map(function(r,i){ return {rank:i+1, code:r.code, name:r.name, lbc:r.lbc, auct:null, turn:null, chg:r.chg, up:!!r.limitUp, m:r.m||null}; });
   } else {
     var d = X.A[parseInt(sel,10)]; dayLabel = d.day + " \u00b7 9:25 \u540d\u5355";
     rows = d.rows.slice();
@@ -185,10 +201,11 @@ function renderA(){
   if(el("aDay")) el("aDay").textContent = dayLabel;
   if(!rows.length){ el("tA").innerHTML = "<tr><td>\u6ca1\u6709\u6570\u636e</td></tr>"; return; }
   if(sortK!=="turn"){ rows = rows.slice().sort(function(a,b){ var va=a.m&&a.m[sortK]!=null?a.m[sortK]:-99, vb=b.m&&b.m[sortK]!=null?b.m[sortK]:-99; return vb-va; }); }
+  var ztd = isLat ? String((X.LATEST&&X.LATEST.date)||"").replace(/-/g,"") : (function(){ var o=X.A[parseInt(sel,10)]||{}; return String(o.prev||o.day||"").replace(/-/g,""); })();
   var h = "<tr>"+HEAD.map(function(t){ return "<th>"+t+"</th>"; }).join("")+"</tr>";
   rows.forEach(function(r){
     var m = r.m;
-    var nm = "<span>"+r.name+"</span><span class='tag'>"+(r.lbc>1?r.lbc+"\u677f":"\u9996\u677f")+"</span>"+(r.rank<=5&&!isLat?"<span class='tag'>\u5de5\u51775\u53ea</span>":"");
+    var nm = "<span>"+r.name+"</span>"+themeChip(r.code, ztd)+"<span class='tag'>"+(r.lbc>1?r.lbc+"\u677f":"\u9996\u677f")+"</span>"+(r.rank<=5&&!isLat?"<span class='tag'>\u5de5\u51775\u53ea</span>":"");
     var cnt="-", top1="-", sh="-", buyK="-", sk="-", seatCell="-";
     if(m){
       cnt = m.span===3?"\u4e09\u65e5\u699c":"\u5f53\u65e5\u699c";
@@ -346,10 +363,11 @@ function renderD(){
   el("dDay").textContent = S.date;
   var only = el("dOnlyUp").checked;
   var rows = S.rows.slice().filter(function(r){ return !only || r.limitUp; });
+  var ztd = String((X.LATEST&&X.LATEST.date)||"").replace(/-/g,"");
   var h = "<tr>"+DHEAD.map(function(x){ return "<th>"+x+"</th>"; }).join("")+"</tr>";
   rows.forEach(function(r,i){
     var m = r.m;
-    var nm = "<span>"+r.name+"</span>"+(r.limitUp?"<span class='tag'>"+(r.lbc>1?r.lbc+"板":"首板")+"</span>":"");
+    var nm = "<span>"+r.name+"</span>"+themeChip(r.code, ztd)+""+(r.limitUp?"<span class='tag'>"+(r.lbc>1?r.lbc+"板":"首板")+"</span>":"");
     var cnt = m.span===3?"三日榜":"当日榜";
     var top1 = m.top1 + "<div class='small'>"+yi(m.top1amt)+" · "+kindTag(m.top1kind)+"</div>";
     var sh = m.shareAmt==null ? "-" : "<span class='"+(m.shareAmt>=0.10?"warn":"")+"'>"+pc(m.shareAmt)+"</span>";
