@@ -1970,7 +1970,7 @@ function renderNode(){
   var d = STATE.cyc && STATE.cyc.day;
   if (!d){ el.hidden = true; return; }
   el.hidden = false;
-  $("ndDate").textContent = d + "，用于 " + STATE.day + " 9:25";
+  $("ndDate").textContent = d + "，判定所用收盘日 · 用于 " + (d === STATE.day ? "下一交易日" : STATE.day) + " 9:25";
   var rows = [];
   var mark = function(v){ return v ? '<span style="color:#1f7a3d;font-weight:700">触发</span>' : '<span style="color:#9aa0a6">未触发</span>'; };
   // ① 指数放量大阳（结束下杀之后）
@@ -2526,6 +2526,7 @@ function tpTopInHTML(){
 
 function tpNodeBlk(){
   var d0 = (STATE.cyc && STATE.cyc.day) ? STATE.cyc.day : null;
+  var _nd = (d0 === STATE.day) ? "下一交易日" : STATE.day;   // 判定所用收盘日＝竞价日时，服务下一交易日
   if (!d0 || typeof ddSignals !== "function") return "";
   var nk = ddSignals(d0);
   if (!nk) return "";
@@ -2585,7 +2586,7 @@ function tpNodeBlk(){
   RP.forEach(function(r){ var b = r.board || 1; if (b <= 1) c1++; else if (b === 2) c2++; else c3++; });
   var hitCls = function(on){ return on ? 'background:rgba(31,122,61,.15);color:#1f7a3d;font-weight:700' : 'opacity:.42'; };
   var col = hit ? "#c02c2c" : "#6b7280";
-  var H = '<div class="tpblk"><div class="lb">节点（' + d0 + ' 收盘判定 · 用于今天 ' + STATE.day + ' 9:25）</div>' +
+  var H = '<div class="tpblk"><div class="lb">节点（' + d0 + ' 收盘判定 · 供' + _nd + ' 9:25 用）</div>' +
     '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:2px 0 3px">' +
       '<span style="font-size:18px;font-weight:900;color:' + col + '">' + (hit ? "D0 是节点日" : "D0 不是节点日") + '</span>' +
       '<span style="font-size:12px;font-weight:700;color:var(--muted)">⑤ ' + nk.got + '/3' +
@@ -2602,10 +2603,10 @@ function tpNodeBlk(){
       '（高标池均涨 ' + (nk.hb ? (nk.hb[1] > 0 ? "+" : "") + nk.hb[1] + "%" : "—") + '）· ②连板高度 ' + (nk.s2 ? "✓" : "✗") +
       '（' + (nk.hP === null ? "—" : nk.hP) + '→' + (nk.hT === null ? "—" : nk.hT) + '）· ③跌停收缩 ' + (nk.s3 ? "✓" : "✗") +
       '（' + (nk.prev ? nk.prev[1] : "—") + '→' + (nk.cur ? nk.cur[1] : "—") + '）</div>' +
-    '<div style="font-size:11.5px;font-weight:600;color:var(--fg);line-height:1.5;margin-top:3px">今天 9:25 可买的接力池（＝' + d0 + ' 涨停池，共 ' + RP.length + ' 只）：' +
+    '<div style="font-size:11.5px;font-weight:600;color:var(--fg);line-height:1.5;margin-top:3px">供' + _nd + ' 9:25 可买的接力池（＝' + d0 + ' 涨停池，共 ' + RP.length + ' 只）：' +
       '首板 ' + c1 + ' 只 · 2板 ' + c2 + ' 只 · 3板+ ' + c3 + ' 只。' +
       '历史节点日晋级率 首板 19% · 2板 36% · 3板+ 46%（全交易日基线 19/34/44%）——节点本身只多约 2 个点，真正抬胜率的是竞价涨幅（2板＋竞价≥3% 节点日 57%、≥9% 时 76%）。</div>' +
-    '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：节点日＝⑤冰点转修复满足 ≥2 个信号，或「最高板掉档（≥4板）+ 当日放量」；判定用 ' + d0 + ' 收盘数据，决定今天 9:25 敢不敢下手（择时开关），不是直接选票。' +
+    '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：节点日＝⑤冰点转修复满足 ≥2 个信号，或「最高板掉档（≥4板）+ 当日放量」；判定用 ' + d0 + ' 收盘数据，决定' + _nd + ' 9:25 敢不敢下手（择时开关），不是直接选票。' +
       '统计窗口 2024-09-10 ~ 2026-10-21（508 个交易日、175 个节点日，主板口径，非预测）。' +
       (recent.length ? '　最近节点日：' + recent.map(function(r){ return r.d.slice(5) + (r.why ? "（" + esc(r.why) + "）" : ""); }).join("、") : '') + '</div>' +
     '</div>';
