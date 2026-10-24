@@ -968,7 +968,7 @@ function fetchTqQuotes(codes, gated){       // 行情源：腾讯批量（每请
             var bid = (+f[10]||0) + (+f[12]||0) + (+f[14]||0) + (+f[16]||0) + (+f[18]||0);   // 五档委买（手）
             var ask = (+f[20]||0) + (+f[22]||0) + (+f[24]||0) + (+f[26]||0) + (+f[28]||0);   // 五档委卖（手）
             out[c] = { name:(f[1] || "").trim(), price:+f[3], pre:+f[4], open:+f[5], chg:+f[32],
-                       hs:+f[38], amtW:+f[37], mc:+f[44], up:+f[47], vr:+f[49], bid:bid, ask:ask };   // f44=流通市值（口径）
+                       hs:+f[38], amtW:+f[37], mc:(+f[44]||0)*1e8, up:+f[47], vr:+f[49], bid:bid, ask:ask };   // f44=流通市值(亿)→转元（与存档口径一致）
             window[k] = function(){};
           });
         } catch(e) {}
@@ -5339,7 +5339,7 @@ function renderCore(){
         ((r.bid || r.ask) ? (((r.bid - r.ask) / (r.bid + r.ask) * 100).toFixed(0) + '%') + '<span class="tag">' +
           (r.bid >= r.ask ? '买>卖' : '卖>买') + '</span>' : "—") + '</td>'
       + '<td class="up"><b>' + (r.amount ? (r.amount >= 1e8 ? (r.amount/1e8).toFixed(2)+'亿' : (r.amount/1e4).toFixed(0)+'万') : '—') + '</b></td>'
-      + '<td class="up"><b>' + ((r.mc||r.fshare) ? ((r.mc||0)>=1e8?((r.mc||0)/1e8).toFixed(2)+'亿':(r.mc||0).toLocaleString()) : '—') + '</b></td>'
+      + '<td class="up"><b>' + ((r.mc||r.fshare) ? ((r.mc||r.fshare||0)>=1e8?((r.mc||r.fshare||0)/1e8).toFixed(2)+'亿':(r.mc||r.fshare||0).toLocaleString()) : '—') + '</b></td>'
       + '<td class="' + ((r._avg === null || r._avg > 0) ? "up" : "down") + '">' + ((r._avg === null || r._n === 0) ? "—" : '<b>' + (r._avg > 0 ? "+" : "") + r._avg.toFixed(2) + '%</b>' + (STATE.sort === "ret" ? '<span class="vbar" style="width:64px"><i style="width:' + Math.min(100, Math.abs(r._key) / maxV * 100).toFixed(0) + '%;background:' + (r._avg > 0 ? '#c02c2c' : '#1f7a3d') + '"></i></span>' : '')) + '</td>'
       + '<td>' + (r._n === 0 ? "—" : r._wr.toFixed(1) + '%') + '</td>'
       + '<td class="' + ((r._avgC === null || r._avgC > 0) ? "up" : "down") + '">' + ((r._avgC === null || r._n === 0) ? "—" : '<b>' + (r._avgC > 0 ? "+" : "") + r._avgC.toFixed(2) + '%</b>' + '<span class="vbar" style="width:64px"><i style="width:' + Math.min(100, Math.abs(r._avgC) / maxMed * 100).toFixed(0) + '%;background:' + (r._avgC > 0 ? '#c02c2c' : '#1f7a3d') + '"></i></span>') + '</td>'
