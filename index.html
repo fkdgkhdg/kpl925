@@ -237,6 +237,20 @@
   #advToggle{font:13px inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--chip);color:var(--fg);cursor:pointer;width:100%;text-align:left;font-weight:600}
   #advToggle:hover{border-color:var(--head)}
   @media (max-width: 640px){ #advToggle{padding:11px 14px} }
+  /* 人气榜 */
+  #phbTbl td.phbCell{vertical-align:top;white-space:normal;padding:8px 10px}
+  #phbTabs button{border:1px solid var(--border);background:var(--chip);color:var(--muted);border-radius:6px;padding:2px 9px;margin-left:5px;font-size:12px;cursor:pointer}
+  #phbTabs button.active{background:var(--head);color:#fff;border-color:var(--head)}
+  .phbRank{display:inline-block;min-width:22px;text-align:center;border-radius:5px;color:#fff;font-weight:700;font-size:12px;padding:1px 4px;background:#8a8f98}
+  .phbRank.r1{background:#c02c2c}.phbRank.r2{background:#e07a1f}.phbRank.r3{background:#b8860b}
+  .phbChg{font-size:11.5px;margin:0 6px 0 5px}
+  .phbHeat{font-size:12px;color:#c02c2c;font-weight:700;margin-left:8px;font-variant-numeric:tabular-nums}
+  .phbTags{margin-top:4px}
+  .phbTag{display:inline-block;font-size:11px;color:#e07a1f;border:1px solid #e07a1f;border-radius:5px;padding:0 5px;margin:0 4px 3px 0;background:rgba(224,122,31,.07)}
+  .phbTag.lb{color:#3a6ea5;border-color:#3a6ea5;background:rgba(58,110,165,.07)}
+  .phbTag.yd{color:#c02c2c;border-color:#c02c2c;background:rgba(192,44,44,.07);font-weight:600}
+  .phbWhy{color:var(--muted);font-size:11.5px;line-height:1.65;margin-top:4px;cursor:pointer;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .phbWhy.open{display:block}
 </style>
 </head>
 <body>
@@ -249,7 +263,7 @@
     <div class="bar">
       <button id="btnRefresh" class="active">刷新最新</button>
       <button id="recalcBtn" title="清掉当天缓存，把名单 / 行情 / 板块 / 情绪序列全部重新抓一遍">重算</button>
-      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位）">龙虎榜席位 ▸</button>
+      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="phbBtn" title="开盘啦人气榜：热度排名 / 排名飙升 / 热度飙升，含题材标签、板型、异动预警、解读">人气榜 ▸</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位）">龙虎榜席位 ▸</button>
       <span class="optgrp">
         <button id="dPrev">◀ 前一交易日</button>
         <input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日">
@@ -333,6 +347,16 @@
     <p class="note" id="nvNote"></p>
   </div>
 
+  <div class="card" id="phbCard" hidden>
+    <h2>人气榜 · 开盘啦口径（截至 <span id="phbDate"></span>）
+      <span id="phbTabs" style="float:right;white-space:nowrap">
+        <button data-pt="1" class="active">热度排名</button><button data-pt="2">排名飙升</button><button data-pt="3">热度飙升</button>
+      </span>
+    </h2>
+    <div class="tablewrap"><table id="phbTbl"></table></div>
+    <p class="note" id="phbLive" style="color:#1f7a3d"></p>
+    <p class="note" id="phbNote"></p>
+  </div>
   <div class="card" id="ndCard" hidden>
     <h2>节点信号 · 五个<b>互相独立</b>的节点，今天触发了哪几个（截至 <span id="ndDate"></span>）</h2>
     <div class="tablewrap"><table id="ndTbl"></table></div>
@@ -520,6 +544,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 <script src="sbzdata.js"></script>
 <script src="ztrsdata.js"></script>
 <script src="kplthdata.js"></script>
+<script src="kplhotdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
 <script src="kpl_data.js"></script>
@@ -5246,6 +5271,91 @@ function renderTail(){                        // 每张卡之间让出一帧，�
     soon(next, 40);
   })();
 }
+/* ===== 人气榜（开盘啦口径）：热度排名 / 排名飙升 / 热度飙升 ===== */
+var PHBT = 1;
+function phbFmt(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function phbHeat(rank, chg, lb){
+  var base = 58000 / Math.pow(Math.max(1, rank || 1), 0.34);
+  var k = 1, m = /(\d+)连板/.exec(lb || "");
+  if (m) k *= Math.min(1.5, 1 + (+m[1]) / 25); else if (/首板/.test(lb || "")) k *= 1.15;
+  k *= (chg > 0) ? (1 + Math.min(chg, 300) / 500) : (1 + Math.max(chg, -50) / 300);
+  return Math.round(base * k);
+}
+function phbDay(){
+  if (typeof KPLHOT === "undefined" || !KPLHOT || !KPLHOT.days || !KPLHOT.days.length) return null;
+  var ds = KPLHOT.days;
+  for (var i = ds.length - 1; i >= 0; i--){ var d = KPLHOT.d[ds[i]]; if (d && d.t1 && d.t1.length) return d; }
+  return null;
+}
+function phbBind(){
+  var tabs = $("phbTabs");
+  if (tabs && !tabs.dataset.bound){
+    tabs.dataset.bound = "1";
+    tabs.addEventListener("click", function(e){
+      var b = e.target && e.target.closest ? e.target.closest("button[data-pt]") : null; if (!b) return;
+      PHBT = +b.getAttribute("data-pt") || 1;
+      Array.prototype.forEach.call(tabs.querySelectorAll("button"), function(x){ x.classList.toggle("active", x === b); });
+      renderPhb();
+    });
+  }
+  var btn = $("phbBtn");
+  if (btn && !btn.dataset.bound){
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", function(){
+      var el = $("phbCard"); if (!el) return;
+      if (el.hidden) renderPhb();
+      try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(err){ el.scrollIntoView(); }
+      el.style.boxShadow = "0 0 0 3px #c02c2c";
+      setTimeout(function(){ el.style.boxShadow = ""; }, 1000);
+    });
+  }
+  if (!document.__phbWhy){
+    document.__phbWhy = 1;
+    document.addEventListener("click", function(e){
+      var t = e.target && e.target.closest ? e.target.closest(".phbWhy") : null; if (!t) return;
+      t.classList.toggle("open");
+      e.preventDefault();
+    });
+  }
+}
+function renderPhb(){
+  var el = $("phbCard"); if (!el) return;
+  var d = phbDay(); if (!d){ el.hidden = true; return; }
+  el.hidden = false;
+  phbBind();
+  var codes = d["t" + PHBT] || [];
+  var label = PHBT === 1 ? "热度排名" : PHBT === 2 ? "排名飙升" : "热度飙升";
+  if ($("phbDate")) $("phbDate").textContent = d.day + " · " + label + "（" + codes.length + " 只）";
+  var h = "";
+  codes.forEach(function(c, i){
+    var r = d.rows[c]; if (!r) return;
+    var name = r[0], zf = +r[1] || 0, chg = +r[2] || 0, rank = +r[3] || (i + 1), zt = +r[4] || 0;
+    var th = r[5] || "", lb = r[6] || "", why = r[8] || "", yd = r[9] || "";
+    var rk = i + 1, rcls = rk === 1 ? "r1" : rk === 2 ? "r2" : rk === 3 ? "r3" : "";
+    var chgTxt = chg > 0 ? "▲" + chg : (chg < 0 ? "▼" + Math.abs(chg) : "—");
+    var chgCls = chg > 0 ? "up" : (chg < 0 ? "down" : "");
+    var tags = "";
+    th.split("、").filter(Boolean).slice(0, 6).forEach(function(t){ tags += '<span class="phbTag">' + esc(t) + '</span>'; });
+    if (lb) tags += '<span class="phbTag lb">' + esc(lb) + '</span>';
+    if (zt) tags += '<span class="phbTag lb">涨停</span>';
+    if (yd) tags += '<span class="phbTag yd">' + esc(yd) + '</span>';
+    h += '<tr class="phbRow"><td class="left phbCell">'
+      + '<span class="phbRank ' + rcls + '">' + rk + '</span>'
+      + '<span class="phbChg ' + chgCls + '">' + chgTxt + '</span>'
+      + '<a class="stk" href="https://stockpage.10jqka.com.cn/' + c + '/" target="_blank" rel="noopener">' + esc(name) + '</a>'
+      + '<a class="kbtn" data-kc="' + c + '" data-kn="' + esc(name) + '">K线</a>'
+      + '<span class="tag">' + c + '</span>'
+      + '<span class="' + (zf > 0 ? "up" : (zf < 0 ? "down" : "")) + '" style="margin-left:6px;font-weight:600">' + (zf > 0 ? "+" : "") + zf + '%</span>'
+      + '<span class="phbHeat" title="按榜位 / 名次变化 / 板型估算，不是开盘啦官方人气值">🔥' + phbFmt(phbHeat(rank, chg, lb)) + '</span>'
+      + (tags ? '<div class="phbTags">' + tags + '</div>' : '')
+      + (why ? '<div class="phbWhy" title="点一下展开/收起">' + esc(why) + '</div>' : '')
+      + '</td></tr>';
+  });
+  $("phbTbl").innerHTML = '<tbody>' + (h || '<tr><td class="empty">这一天没有数据</td></tr>') + '</tbody>';
+  if ($("phbLive")) $("phbLive").textContent = "开盘啦人气榜只提供实时快照、没有历史回填：最近一次抓取＝" + d.day + "，本页展示的就是这份快照。";
+  if ($("phbNote")) $("phbNote").innerHTML = "三个榜都是同一批（榜位前 50）股票，只是排序不同：热度排名＝按榜位；排名飙升＝按名次变化（▲ 比上次抓取升了几名）；热度飙升＝按开盘啦的热度增量（接口不给数值，按它给的顺序展示）。" +
+    " 题材标签、板型（N连板/首板）、异动预警、解读文字都来自开盘啦；<b>🔥 是热度估值</b>——开盘啦接口不返回真实人气值，这里按「榜位 + 名次变化 + 板型/涨停」估算，只用于同屏横向比较。点解读文字可展开。";
+}
 function render(){ ndPaint(); renderCore(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
@@ -5406,6 +5516,7 @@ function renderCore(){
   renderBoardHot();
   renderBN();
   renderNode();
+  renderPhb();
   boardAdvice();
   if (!$("wlTbl").dataset.loaded) { $("wlTbl").dataset.loaded = "1"; renderWatch(); }
   if (!LDC) soon(loadLeaders, 2200);          // 逐日涨停池不急：首屏后 2.2 秒再开始，且下面的 step 会分批让出主线程
