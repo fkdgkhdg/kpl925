@@ -238,6 +238,14 @@
   #advToggle:hover{border-color:var(--head)}
   @media (max-width: 640px){ #advToggle{padding:11px 14px} }
   
+  /* 题材榜（开盘啦口径） */
+  #tbTbl td{padding-top:7px;padding-bottom:7px}
+  .tbRank{display:inline-block;min-width:20px;text-align:center;border-radius:5px;color:#fff;font-weight:700;font-size:11.5px;padding:1px 4px;background:#8a8f98}
+  .tbRank.r1{background:#c02c2c}.tbRank.r2{background:#e07a1f}.tbRank.r3{background:#b8860b}
+  .tbTag{display:inline-block;font-size:11px;color:#8a8f98;border:1px solid #b8bcc4;border-radius:5px;padding:0 5px;margin:0 4px 3px 0;background:rgba(138,143,152,.07);white-space:nowrap}
+  .tbTag.hi{color:#c02c2c;border-color:#c02c2c;font-weight:600;background:rgba(192,44,44,.07)}
+  .tbTag.mid{color:#e07a1f;border-color:#e07a1f;background:rgba(224,122,31,.07)}
+  #tbTbl .thlink{font-weight:600}
 </style>
 </head>
 <body>
@@ -371,6 +379,11 @@
     <p class="note" id="thNote"></p>
   </div>
 
+  <div class="card" id="tbCard" hidden>
+    <h2>题材榜 · 开盘啦口径（截至 <span id="tbDate"></span>）</h2>
+    <div class="tablewrap"><table id="tbTbl"></table></div>
+    <p class="note" id="tbNote"></p>
+  </div>
   <div class="card" id="hotCard" hidden>
     <h2>板块热度 · 最近资金在哪个板块活跃（截至 <span id="hotDate"></span>）</h2>
     <div class="tablewrap"><table id="hotTbl"></table></div>
@@ -5247,6 +5260,81 @@ function renderTail(){                        // 每张卡之间让出一帧，�
     soon(next, 40);
   })();
 }
+/* ===== 题材榜（开盘啦口径）：开盘啦「涨停原因」题材按涨停家数排开，点题材看连板梯队 ===== */
+function tbFmtDay(ds){ return ds ? (ds.slice(0,4) + "-" + ds.slice(4,6) + "-" + ds.slice(6,8)) : ""; }
+function tbDay(){ var ds = (typeof ztDayOf === "function") ? ztDayOf(STATE.day) : ""; return kthDay(ds) ? ds : null; }
+var TBCACHE = {};
+function tbAgg(ds){
+  if (TBCACHE[ds]) return TBCACHE[ds];
+  var D = kthDay(ds); if (!D) return null;
+  var days = (KPLTH.days || []).filter(function(x){ return x <= ds; });
+  var d3 = days.slice(-3);
+  var prev = days.length >= 2 ? days[days.length - 2] : "";
+  var map = {};
+  function get(t){ var o = map[t]; if (!o){ o = map[t] = { n:0, prev:0, d3:0, boards:{}, lead:null }; } return o; }
+  function scan(dd, field, lead){
+    var DD = kthDay(dd); if (!DD) return;
+    DD.st.forEach(function(st){
+      var bn = kplBoardNum(st[2]), tags = st[3] || [];
+      for (var k = 0; k < tags.length; k++){
+        var t = DD.th[tags[k]]; if (!t) continue;
+        var o = get(t); o[field] += 1;
+        if (lead){
+          o.boards[bn] = (o.boards[bn] || 0) + 1;
+          var ts = +st[4] || 0;
+          if (!o.lead || bn > o.lead[0] || (bn === o.lead[0] && ts && ts < o.lead[1])) o.lead = [bn, ts, st[1], st[0], String(st[2] || "")];
+        }
+      }
+    });
+  }
+  scan(ds, "n", true);
+  if (prev) scan(prev, "prev", false);
+  for (var i = 0; i < d3.length; i++) scan(d3[i], "d3", false);
+  var arr = [], t, b;
+  for (t in map){
+    var o = map[t]; if (!o.n) continue;
+    var maxB = 0;
+    for (b in o.boards) if (+b > maxB) maxB = +b;
+    arr.push({ t: t, n: o.n, prev: o.prev, d3: o.d3, maxB: maxB, boards: o.boards, lead: o.lead });
+  }
+  arr.sort(function(a, c){ return c.n - a.n || c.maxB - a.maxB || c.d3 - a.d3 || (a.t < c.t ? -1 : 1); });
+  return (TBCACHE[ds] = { ds: ds, rows: arr });
+}
+function renderTB(){
+  var el = $("tbCard"); if (!el) return;
+  var ds = tbDay(); if (!ds){ el.hidden = true; return; }
+  var A = tbAgg(ds);
+  if (!A || !A.rows.length){ el.hidden = true; return; }
+  el.hidden = false;
+  if ($("tbDate")) $("tbDate").textContent = tbFmtDay(ds) + "（用于 " + STATE.day + " 9:25）";
+  var maxN = A.rows[0].n || 1;
+  var h = '<thead><tr><th>#</th><th>题材（开盘啦）</th><th>今日涨停</th><th>昨日涨停</th><th>近3日合计</th><th>最高板</th><th>连板梯队</th><th>龙头</th></tr></thead><tbody>';
+  h += A.rows.map(function(r, i){
+    var rcls = i === 0 ? "r1" : i === 1 ? "r2" : i === 2 ? "r3" : "";
+    var bs = Object.keys(r.boards).map(Number).sort(function(a, c){ return c - a; });
+    var grad = bs.map(function(b){
+      var cls = b >= 3 ? "hi" : (b === 2 ? "mid" : "lo");
+      return '<span class="tbTag ' + cls + '" title="' + b + '板 ' + r.boards[b] + ' 只">' + b + '板×' + r.boards[b] + '</span>';
+    }).join("");
+    var tr = r.prev ? (r.n > r.prev ? '<span class="up">▲</span>' : (r.n < r.prev ? '<span class="down">▼</span>' : '')) : '';
+    var lead = r.lead
+      ? ('<a class="stk" href="https://stockpage.10jqka.com.cn/' + r.lead[3] + '/" target="_blank" rel="noopener">' + esc(r.lead[2]) + '</a>'
+         + (r.lead[4] ? '<span class="tbTag mid" style="margin-left:5px">' + esc(r.lead[4]) + '</span>' : '')
+         + '<a class="kbtn" data-kc="' + r.lead[3] + '" data-kn="' + esc(r.lead[2]) + '">K线</a>')
+      : '—';
+    return '<tr class="' + (i === 0 ? 'top' : '') + '">'
+      + '<td><span class="tbRank ' + rcls + '">' + (i + 1) + '</span></td>'
+      + '<td class="left tbName"><a class="thlink" data-th="' + esc(r.t) + '" data-ztd="' + ds + '" href="#" title="点开看这个题材当天的连板梯队">' + esc(r.t) + '</a></td>'
+      + '<td class="up"><b>' + r.n + '</b><span class="vbar" style="width:56px"><i style="width:' + Math.round(r.n / maxN * 100) + '%;background:#c02c2c"></i></span></td>'
+      + '<td>' + (r.prev ? (r.prev + ' ' + tr) : '—') + '</td>'
+      + '<td>' + r.d3 + '</td>'
+      + '<td class="' + (r.maxB >= 3 ? 'up' : '') + '">' + r.maxB + ' 板</td>'
+      + '<td class="left">' + (grad || '—') + '</td>'
+      + '<td class="left">' + lead + '</td></tr>';
+  }).join('');
+  $("tbTbl").innerHTML = h + '</tbody>';
+  if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
+}
 function render(){ ndPaint(); renderCore(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
@@ -5407,6 +5495,7 @@ function renderCore(){
   renderBoardHot();
   renderBN();
   renderNode();
+  renderTB();
   boardAdvice();
   if (!$("wlTbl").dataset.loaded) { $("wlTbl").dataset.loaded = "1"; renderWatch(); }
   if (!LDC) soon(loadLeaders, 2200);          // 逐日涨停池不急：首屏后 2.2 秒再开始，且下面的 step 会分批让出主线程
