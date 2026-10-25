@@ -519,6 +519,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 <script src="teamdata.js"></script>
 <script src="sbzdata.js"></script>
 <script src="ztrsdata.js"></script>
+<script src="kplthdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
 <script src="kpl_data.js"></script>
@@ -1141,7 +1142,7 @@ function thIdx(){
   }
   return THIDX;
 }
-function themeThick(code){
+function themeThickEm(code){
   // 返回该股所有「昨天有 ≥2 只主板成分股涨停」的题材，按涨停家数从多到少排序
   if (!DZTSET) return null;
   var idx = thIdx(), bks = idx[code];
@@ -1156,17 +1157,44 @@ function themeThick(code){
   arr.sort(function(a, b){ return b.k - a.k || b.tot - a.tot; });
   return arr;
 }
-// ===== 主流题材（同花顺涨停原因题材）+ 题材连板梯队 =====
+function themeThick(code){
+  // 开盘啦口径：该股当天每个题材里，同题材一起涨停的主板家数（按家数从多到少）
+  var ds = ztDayOf(STATE.day), pool = kplPool(ds);
+  if (pool){
+    var cnt = {};
+    pool.forEach(function(a){ String(a[2] || "").split("+").forEach(function(t){ t = t.trim(); if (t) cnt[t] = (cnt[t] || 0) + 1; }); });
+    var mine = ztTags(code, STATE.day), arr = [];
+    for (var i = 0; i < mine.length; i++){ var k = cnt[mine[i]] || 0; if (k >= 2) arr.push({ k: k, n: mine[i], tot: k, bk: "" }); }
+    arr.sort(function(a, b){ return b.k - a.k; });
+    return arr;
+  }
+  return themeThickEm(code);
+}
+// ===== 开盘啦「涨停原因」题材（主口径）+ 同题材连板梯队 =====
 function ztDayOf(day){ var p = (typeof lhbPrevDay === "function") ? lhbPrevDay(day) : ""; return p ? p.replace(/-/g,"") : ""; }
-function ztPoolOf(day){ if (typeof ZTRS === "undefined" || !ZTRS || !ZTRS.d) return null; return ZTRS.d[ztDayOf(day)] || null; }
+// KPLTH＝开盘啦题材（当天每只票挂的题材，主板口径）；某天缺开盘啦数据时自动退回同花顺
+function kthDay(ds){ return (typeof KPLTH !== "undefined" && KPLTH && KPLTH.d) ? (KPLTH.d[ds] || null) : null; }
+function kplBoardNum(b){ b = String(b || ""); var m = b.match(/(\d+)天(\d+)板/); if (m) return +m[2]; m = b.match(/(\d+)连板/); if (m) return +m[1]; return 1; }
+var KPLPOOL = {};
+function kplPool(ds){
+  if (KPLPOOL[ds] !== undefined) return KPLPOOL[ds];
+  var D = kthDay(ds); if (!D) return (KPLPOOL[ds] = null);
+  return (KPLPOOL[ds] = D.st.map(function(s){
+    var tags = (s[3] || []).map(function(i){ return D.th[i]; }).filter(Boolean);
+    return [s[0], s[1], tags.join("+"), "", kplBoardNum(s[2]), String(s[2] || ""), +s[4] || 0];
+  }));
+}
+function poolOfDs(ds){ if (kthDay(ds)) return kplPool(ds); if (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d) return ZTRS.d[ds] || []; return []; }
+function ztPoolOf(day){ var p = poolOfDs(ztDayOf(day)); return p && p.length ? p : null; }
 function ztRec(code, day){ var pl = ztPoolOf(day); if (!pl) return null; for (var i=0;i<pl.length;i++){ if (pl[i][0] === code) return pl[i]; } return null; }
 function ztTags(code, day){ var r = ztRec(code, day); if (!r) return []; return String(r[2]).split("+").map(function(x){ return x.trim(); }).filter(Boolean); }
 function ztHHMM(t){ if (!t) return ""; try { return new Date(t*1000).toLocaleTimeString("zh-CN",{timeZone:"Asia/Shanghai",hour12:false,hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
 function maintCell(code){
   var tags = ztTags(code, STATE.day);
   if (!tags.length) return "";
-  var d = ztDayOf(STATE.day), n = Math.min(tags.length, 6), h = '<div class="thmain"><span class="thlab">主流</span>';
-  for (var i=0;i<n;i++) h += '<a class="mth' + (i===0?" m1":"") + '" data-th="' + esc(tags[i]) + '" data-ztd="' + d + '" title="同花顺涨停原因题材（' + d + '）：点开看这个题材的连板梯队">' + esc(tags[i]) + '</a>';
+  var kplOn = !!kthDay(ztDayOf(STATE.day));
+  var d = ztDayOf(STATE.day), n = Math.min(tags.length, 6), h = '<div class="thmain"><span class="thlab">' + (kplOn ? "开盘啦" : "主流") + '</span>';
+  for (var i=0;i<n;i++) h += '<a class="mth' + (i===0?" m1":"") + '" data-th="' + esc(tags[i]) + '" data-ztd="' + d + '" title="' + (kplOn ? "开盘啦" : "同花顺") + '涨停原因题材（' + d + '）：点开看这个题材的连板梯队">' + esc(tags[i]) + '</a>';
   if (tags.length > n) h += '<span class="tth2">+' + (tags.length-n) + '</span>';
   return h + '</div>';
 }
@@ -2179,7 +2207,7 @@ function thCoreOf(tag, dstr){
   if (thFamName(tag)) return "";
   var cache = THCORE[dstr] || (THCORE[dstr] = {});
   if (cache[tag] !== undefined) return cache[tag];
-  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
+  var pool = poolOfDs(dstr);
   if (pool.length < 2 || tag.length < 2) return (cache[tag] = "");
   var rowTags = pool.map(function(a){ return thTagsOf(a); });
   var best = "";
@@ -2198,29 +2226,28 @@ function thCoreOf(tag, dstr){
 }
 function thGroups(dstr){
   if (THDIR[dstr]) return THDIR[dstr];
-  var pool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
+  var pool = poolOfDs(dstr);
   var byCode = {}; pool.forEach(function(a){ byCode[a[0]] = a; });
-  var list = [];
-  DIRS.forEach(function(d){
-    var hit = {}, tags = {};
-    pool.forEach(function(a){
-      var ts = thTagsOf(a);
-      for (var i=0;i<ts.length;i++){
-        var f = false;
-        for (var j=0;j<d[1].length;j++){ if (ts[i].indexOf(d[1][j]) >= 0){ f = true; break; } }
-        if (f){ hit[a[0]] = 1; tags[ts[i]] = 1; }
-      }
-    });
-    var codes = Object.keys(hit);
-    if (codes.length) list.push({ n: d[0], kw: d[1], codes: codes, tags: Object.keys(tags), kind: "dir" });
+  // 同花顺涨停原因池子：只用来做「XX字辈」人气归类 + 开盘啦缺那天的兜底
+  var zpool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
+  zpool.forEach(function(a){ if (!byCode[a[0]]) byCode[a[0]] = a; });
+  var list = [], _thm = {};
+  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ (_thm[t] || (_thm[t] = [])).push(a[0]); }); });
+  Object.keys(_thm).forEach(function(t){
+    var u = {}; _thm[t].forEach(function(c){ u[c] = 1; });
+    var codes = Object.keys(u);
+    if (codes.length >= 2) list.push({ n: t, kw: [], codes: codes, tags: [t], kind: "kpl" });
   });
+  list.sort(function(x, y){ return y.codes.length - x.codes.length; });
+  if (list.length > 26) list = list.slice(0, 26);
   var fams = {};
+  zpool.forEach(function(a){ thTagsOf(a).forEach(function(t){ var f = thFamName(t); if (f){ (fams[f] || (fams[f] = [])).push(a[0]); } }); });
   pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ var f = thFamName(t); if (f){ (fams[f] || (fams[f] = [])).push(a[0]); } }); });
   Object.keys(fams).forEach(function(f){
     var u = {}; fams[f].forEach(function(c){ u[c] = 1; });
     list.push({ n: f, kw: [], codes: Object.keys(u), tags: [f], kind: "fam" });
   });
-  list.sort(function(x,y){ return y.codes.length - x.codes.length || (x.kind === "dir" ? 0 : 1) - (y.kind === "dir" ? 0 : 1); });
+  list.sort(function(x,y){ return ((x.kind === "kpl") ? 0 : 1) - ((y.kind === "kpl") ? 0 : 1) || y.codes.length - x.codes.length; });
   THDIR[dstr] = { list: list, byCode: byCode, pool: pool };
   return THDIR[dstr];
 }
@@ -2251,13 +2278,16 @@ function openThLadder(name, bkKey, dstr){
   var card = $("thCard"); if (!card) return;
   dstr = dstr || ztDayOf(STATE.day);
   var lbcM = (dstr === ztDayOf(STATE.day)) ? lbcMap() : {};
+  var srcLab = kthDay(dstr) ? "开盘啦" : "同花顺";
   var G = thGroups(dstr), recBy = G.byCode;
   var hit = {}, srcs = [], nTag = 0, tgt = null, core = "";
   G.list.forEach(function(x){ if (!tgt && x.n === name) tgt = x; });
   if (!tgt){ var dn = dirOfTag(name); if (dn) G.list.forEach(function(x){ if (!tgt && x.n === dn) tgt = x; }); }
   if (tgt){
     tgt.codes.forEach(function(c){ hit[c] = 1; nTag++; });
-    if (tgt.kind === "dir"){
+    if (tgt.kind === "kpl"){
+      srcs.push("开盘啦题材「" + tgt.n + "」＝当天涨停股里挂了「" + tgt.n + "」这个题材的全部（" + tgt.codes.length + " 只）");
+    } else if (tgt.kind === "dir"){
       srcs.push("方向「" + tgt.n + "」＝同花顺涨停原因或东财概念命中关键词（" + tgt.kw.slice(0, 8).join("/") + (tgt.kw.length > 8 ? " 等" : "") + "）的票" + (name !== tgt.n ? "；由标签「" + name + "」展开" : ""));
     } else {
       srcs.push("字辈「" + tgt.n + "」＝同花顺涨停原因里的「XX字辈」人气归类");
@@ -2276,19 +2306,20 @@ function openThLadder(name, bkKey, dstr){
     BMEM[bkKey].split(",").forEach(function(c){ if (DZTSET && DZTSET[c] && !hit[c]){ hit[c] = 1; added++; } });
     srcs.push("东财「" + ((typeof BNAME !== "undefined" && BNAME[bkKey]) || bkKey) + "」成分股里当日也涨停的 " + added + " 只");
   }
+  var colLab = (tgt && tgt.kind === "fam") ? "同花顺" : srcLab;   // 字辈那堆用的是同花顺涨停原因，表头跟着换
   var members = Object.keys(hit).map(function(c){
     var a = recBy[c]; if (a) return a.slice();
     return [c, (typeof NAMEMAP !== "undefined" && NAMEMAP[c]) || c, "", "", 1, "", 0];
   });
-  var src = srcs.length ? srcs.join(" ＋ ") : "同花顺涨停原因（该题材当天没有成分股）";
+  var src = srcs.length ? srcs.join(" ＋ ") : (srcLab + "涨停原因（该题材当天没有成分股）");
   members.forEach(function(a){ var b = lbcM[String(a[0])]; a[4] = b || a[4] || 1; });
   members = members.slice().sort(function(a,b){ return (b[4]||0)-(a[4]||0) || (a[6]||0)-(b[6]||0); });
   card.hidden = false;
   thDragBind(card);
   var de = $("thDirs");
-  if (de) de.innerHTML = '<span class="dlab">自动归类</span>' + G.list.map(function(x){
+  if (de) de.innerHTML = '<span class="dlab">题材</span>' + G.list.map(function(x){
     var on = tgt ? (x.n === tgt.n) : false;
-    return '<span class="dchip' + (on ? " on" : "") + (x.kind === "fam" ? " fam" : "") + '" data-dn="' + esc(x.n) + '" data-ztd="' + dstr + '" title="' + esc((x.kind === "fam" ? "字辈 " : "方向 ") + x.n + "：" + x.codes.length + " 只") + '">' + esc(x.n) + '<b>' + x.codes.length + '</b></span>';
+    return '<span class="dchip' + (on ? " on" : "") + (x.kind === "fam" ? " fam" : "") + '" data-dn="' + esc(x.n) + '" data-ztd="' + dstr + '" title="' + esc((x.kind === "fam" ? "字辈 " : "题材 ") + x.n + "：" + x.codes.length + " 只") + '">' + esc(x.n) + '<b>' + x.codes.length + '</b></span>';
   }).join("");
   var dd = dstr.slice(0,4)+"-"+dstr.slice(4,6)+"-"+dstr.slice(6,8);
   var tf = tgt ? (name === tgt.n ? tgt.n : name + "（" + tgt.n + "）") : name + ((core && core !== name) ? "（" + core + "）" : "");
@@ -2298,7 +2329,7 @@ function openThLadder(name, bkKey, dstr){
     $("thNote").textContent = "口径：" + src + "。";
     return;
   }
-  var h = '<thead><tr><th>#</th><th>板位</th><th>股票</th><th>板型</th><th>首封</th><th>当日涨停原因（同花顺）</th></tr></thead><tbody>';
+  var h = '<thead><tr><th>#</th><th>板位</th><th>股票</th><th>板型</th><th>首封</th><th>当日涨停原因（' + colLab + '）</th></tr></thead><tbody>';
   h += members.map(function(a,i){
     var nm = a[1] || ((typeof NAMEMAP!=="undefined"&&NAMEMAP[a[0]])||a[0]); var bd = a[4]||1;
     var hs = String(a[3]||""), hsm = hs.match(/(\d+)板/), hsx = (hsm && +hsm[1] !== bd) ? hs : "";
@@ -2313,7 +2344,7 @@ function openThLadder(name, bkKey, dstr){
   $("thTbl").innerHTML = h + '</tbody>';
   var tp = members[0];
   var famExtra = (tgt && tgt.kind === "fam") ? thFamRecent(tgt.n, dstr, members) : "";
-  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「自动归类」条＝当天涨停股按主流方向（机器人／军工／家电／低空经济…）和「XX字辈」自动归堆，点一下就换一个方向看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；板位右边小字＝同花顺「N天M板」；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。" + famExtra;
+  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「题材」条＝当天涨停股按开盘啦的题材精确归堆（同一题材一只不落，如「机器人概念」「军工」「存储」）＋「XX字辈」，点一下就换一个题材看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；「板型」列＝开盘啦的板型（如「5天3板」「6连板」）；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。" + famExtra;
 }
 // 连板梯队改成右下角浮动面板（可拖动标题栏移动），不再把页面滚到下面
 function thDragBind(card){
@@ -5359,11 +5390,11 @@ function renderCore(){
       : ((top.at === null || !(top.at > 0)) ? "—" : top.at.toFixed(2) + "%") + ' 实际换手率') + '</div>'
     + '<div>竞价日<b>' + STATE.day + '</b>' + STATE.src + '</div>'
     + '<div>入选只数<b>' + list.length + '</b>' + (useBase ? "全部昨日涨停股" : "实际换手前5") + (STATE.noLimit ? "（剔一字，名次按剔除后重算）" : "") + '</div>';
-  $("note").textContent = "「主流题材」＝同花顺涨停池的当日「涨停原因」标签（网上当前对这只票的属性，例：九阳股份＝机器人投资+厨房小家电+豆浆机+「‘羊’字辈」）；点任意题材标签可展开该题材当天的连板梯队（按板位从高到低，含板型与首封时间）。" +
+  $("note").textContent = "「题材」＝开盘啦（涨停原因）当天给这只票挂的题材（网上当前对这只票的属性，例：大业股份＝机器人概念、海洋王＝军工+羊年概念）；点任意题材标签可展开该题材当天的连板梯队（同一题材精确聚成员，按板位从高到低，含板型与首封时间）。" +
     "「近10日N次」＝最近 10 个交易日里它进过几次「实际换手前5」（含今天）；" + "「前N天也进过榜」＝这只票 N 个交易日前也进过「实际换手前5」；「前N天涨停过」＝它 N 个交易日前也在涨停名单里（但中间断过板）。鼠标悬停能看到具体是哪一天。\n" +
     ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
-    "「题材厚度」＝该股所属概念题材里，前一交易日一起涨停的主板家数（已剔除昨日涨停/最近多板这类伪题材）。一只票通常挂十几个题材，这里按家数排序显示：大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只），后面的小标签是其他并列题材，鼠标悬停可看全部；所有题材都不足 2 只时显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
+    "「题材厚度」＝该股当天每个题材里，同题材一起涨停的主板家数（开盘啦口径，已剔除昨日涨停/最近多板这类伪题材）。一只票通常挂十几个题材，这里按家数排序显示：大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只），后面的小标签是其他并列题材，鼠标悬停可看全部；所有题材都不足 2 只时显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
     "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行左边是席位、右边是净额，鼠标悬停看样本数。颜色：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中即标红，如果它昨天净卖→逐票竞价建议一票否决），橙＝33~44%（该席位历史上净卖出后次日大面率），蓝＝昨天净买入，灰＝昨天净卖出（历史大面率不高）。没上龙虎榜就显示「无龙虎榜」。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
