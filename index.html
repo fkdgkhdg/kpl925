@@ -534,6 +534,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 <script src="sbzdata.js"></script>
 <script src="ztrsdata.js"></script>
 <script src="kplthdata.js"></script>
+    <script src="kplhotdata.js"></script>
 <script src="gann-square-widget.js"></script>
 <script src="gann-nodes.js"></script>
 <script src="kpl_data.js"></script>
@@ -1171,18 +1172,26 @@ function themeThickEm(code){
   arr.sort(function(a, b){ return b.k - a.k || b.tot - a.tot; });
   return arr;
 }
+// 「开盘啦人气版」题材（逐票的题材列表，用于主榜单的题材列）
+function hotThemeTags(code){
+  try{
+    if (typeof KPLHOT === "undefined" || !KPLHOT || !KPLHOT.d) return [];
+    var key = String(STATE.day || "").replace(/-/g, "");
+    var dd = KPLHOT.d[key]; if (!dd || !dd.rows) return [];
+    var r = dd.rows[code]; if (!r) return [];
+    var str = String(r[5] || ""); if (!str) return [];
+    return str.split(/[\u3001,\uFF0C]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  }catch(e){ return []; }
+}
 function themeThick(code){
-  // 开盘啦口径：该股当天每个题材里，同题材一起涨停的主板家数（按家数从多到少）
+  // 开盘啦口径：优先用「开盘啦人气版」题材（缺失时退回涨停原因题材/东财），再标注该股每个题材在前一交易日同题材一起涨停的主板家数
   var ds = ztDayOf(STATE.day), pool = kplPool(ds);
-  if (pool){
-    var cnt = {};
-    pool.forEach(function(a){ String(a[2] || "").split("+").forEach(function(t){ t = t.trim(); if (t) cnt[t] = (cnt[t] || 0) + 1; }); });
-    var mine = ztTags(code, STATE.day), arr = [];
-    for (var i = 0; i < mine.length; i++){ var k = cnt[mine[i]] || 0; if (k >= 2) arr.push({ k: k, n: mine[i], tot: k, bk: "" }); }
-    arr.sort(function(a, b){ return b.k - a.k; });
-    return arr;
-  }
-  return themeThickEm(code);
+  var cnt = {};
+  if (pool) pool.forEach(function(a){ String(a[2] || "").split("+").forEach(function(t){ t = t.trim(); if (t) cnt[t] = (cnt[t] || 0) + 1; }); });
+  var themes = hotThemeTags(code);
+  if (!themes.length) themes = ztTags(code, STATE.day);
+  if (!themes.length) return pool ? [] : themeThickEm(code);
+  return themes.map(function(t){ return { k: cnt[t] || 0, n: t, tot: cnt[t] || 0, bk: "" }; });
 }
 // ===== 开盘啦「涨停原因」题材（主口径）+ 同题材连板梯队 =====
 function ztDayOf(day){ var p = (typeof lhbPrevDay === "function") ? lhbPrevDay(day) : ""; return p ? p.replace(/-/g,"") : ""; }
@@ -1204,7 +1213,8 @@ function ztRec(code, day){ var pl = ztPoolOf(day); if (!pl) return null; for (va
 function ztTags(code, day){ var r = ztRec(code, day); if (!r) return []; return String(r[2]).split("+").map(function(x){ return x.trim(); }).filter(Boolean); }
 function ztHHMM(t){ if (!t) return ""; try { return new Date(t*1000).toLocaleTimeString("zh-CN",{timeZone:"Asia/Shanghai",hour12:false,hour:"2-digit",minute:"2-digit"}); } catch(e){ return ""; } }
 function maintCell(code){
-  var tags = ztTags(code, STATE.day);
+  var tags = hotThemeTags(code);
+  if (!tags.length) tags = ztTags(code, STATE.day);
   if (!tags.length) return "";
   var kplOn = !!kthDay(ztDayOf(STATE.day));
   var d = ztDayOf(STATE.day), n = Math.min(tags.length, 6), h = '<div class="thmain"><span class="thlab">' + (kplOn ? "开盘啦" : "主流") + '</span>';
@@ -1217,11 +1227,11 @@ function thCell(code){
   var list = themeThick(code);
   if (list === undefined) return mth || '<span class="tag">—</span>';
   if (list === null || !list.length) return (mth || "") + '<span class="tag">独苗</span>';
-  var all = list.map(function(t){ return t.n + " " + t.k + "只/" + t.tot + "只"; }).join("；");
+  var all = list.map(function(t){ return t.n + (t.k > 0 ? " " + t.k + "只" : ""); }).join("；");
   var top = list[0];
-  var html = '<span class="' + (top.k >= 5 ? "tth w5" : "tth w2") + ' thlink" data-bk="' + esc(top.bk || "") + '" data-th="' + esc(top.n) + '" title="' + esc("昨天一起涨停的题材（按家数）：" + all + "；点开看该题材的连板梯队") + '">' + esc(top.n) + " " + top.k + "只</span>";
+  var html = '<span class="' + (top.k >= 5 ? "tth w5" : (top.k >= 2 ? "tth w2" : "tth")) + ' thlink" data-bk="' + esc(top.bk || "") + '" data-th="' + esc(top.n) + '" title="' + esc("该股开盘啦题材 + 昨天同题材一起涨停的家数：" + all + "；点开看该题材的连板梯队") + '">' + esc(top.n) + (top.k > 0 ? " " + top.k + "只" : "") + '</span>';
   for (var i = 1; i < list.length && i < 3; i++){
-    html += '<span class="tth2 thlink" data-bk="' + esc(list[i].bk || "") + '" data-th="' + esc(list[i].n) + '" title="' + esc("昨天一起涨停的题材（按家数）：" + all + "；点开看该题材的连板梯队") + '">' + esc(list[i].n) + list[i].k + '</span>';
+    html += '<span class="tth2 thlink" data-bk="' + esc(list[i].bk || "") + '" data-th="' + esc(list[i].n) + '" title="' + esc("该股开盘啦题材 + 昨天同题材一起涨停的家数：" + all + "；点开看该题材的连板梯队") + '">' + esc(list[i].n) + (list[i].k > 0 ? list[i].k : "") + '</span>';
   }
   if (list.length > 3) html += '<span class="tth2">+' + (list.length - 3) + '</span>';
   return (mth || "") + '<div class="thk">' + html + '</div>';
@@ -5429,7 +5439,7 @@ function renderCore(){
 
   var arch = STATE.archived;
   var TI2 = topInInfo();
-  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝概念题材里昨天一起涨停的主板家数（红≥5只，蓝2-4只，小标签是其他并列题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
+  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
            + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。鼠标悬停看每笔净额、以及该席位历史上净卖出后次日大面（≤-5%）的概率：红＝在你自选的爆头席位名单里、橙＝33~44%、蓝＝净买入、灰＝净卖出">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>成交量</th><th>市值</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
@@ -5483,7 +5493,7 @@ function renderCore(){
     "「近10日N次」＝最近 10 个交易日里它进过几次「实际换手前5」（含今天）；" + "「前N天也进过榜」＝这只票 N 个交易日前也进过「实际换手前5」；「前N天涨停过」＝它 N 个交易日前也在涨停名单里（但中间断过板）。鼠标悬停能看到具体是哪一天。\n" +
     ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
-    "「题材厚度」＝该股当天每个题材里，同题材一起涨停的主板家数（开盘啦口径，已剔除昨日涨停/最近多板这类伪题材）。一只票通常挂十几个题材，这里按家数排序显示：大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只），后面的小标签是其他并列题材，鼠标悬停可看全部；所有题材都不足 2 只时显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
+    "「题材厚度」＝该股按「开盘啦人气版」题材逐条列出，并标注每个题材在前一交易日同题材一起涨停的主板家数（开盘啦口径）。大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只，灰＝≤1 只），后面的小标签是它的其他题材，鼠标悬停可看全部；没有任何题材数据时才显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
     "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行左边是席位、右边是净额，鼠标悬停看样本数。颜色：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中即标红，如果它昨天净卖→逐票竞价建议一票否决），橙＝33~44%（该席位历史上净卖出后次日大面率），蓝＝昨天净买入，灰＝昨天净卖出（历史大面率不高）。没上龙虎榜就显示「无龙虎榜」。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
@@ -6425,7 +6435,7 @@ function advRuleTbl(order, ev){
     { k:"榜内名次≤3", f:function(r){ return (r._rankAT >= 1 && r._rankAT <= 3) ? 1 : ((r._rankAT === 4 || r._rankAT === 5) ? -1 : 0); }, v:function(r){ return r._rankAT ? "第" + r._rankAT : "-"; } },
     { k:"同身位热度前3（≥2只才比）", f:function(r){ if ((bdsN[r.board] || 0) < 2) return 0; var hr = hotRankAny(r.code); if (!hr) return 0; return hr.rank <= 3 ? 1 : (hr.rank >= 21 ? -1 : 0); }, v:function(r){ var hr = hotRankAny(r.code); if (!hr) return "-"; return hr.name + " #" + (hr.rank >= 21 ? "榜外" : hr.rank); } },
     { k:"无爆头席位在卖", f:function(r){ return (typeof lhbBoom === "function" && lhbBoom(r.code, ev.day)) ? -1 : 1; }, v:function(r){ return (typeof lhbBoom === "function" && lhbBoom(r.code, ev.day)) ? "爆头" : "干净"; } },
-    { k:"题材厚度≥5只（爆发档）", f:function(r){ var t = themeThick(r.code); if (t === undefined || t === null || !t.length) return -1; return t[0].k >= 5 ? 1 : 0; }, v:function(r){ var t = themeThick(r.code); if (t === undefined) return "-"; if (!t || !t.length) return "独苗"; return t[0].n + " " + t[0].k + "只"; } },
+    { k:"题材厚度≥5只（爆发档）", f:function(r){ var t = themeThick(r.code); if (t === undefined || t === null || !t.length) return -1; var m = 0; t.forEach(function(x){ if (x.k > m) m = x.k; }); return m >= 5 ? 1 : 0; }, v:function(r){ var t = themeThick(r.code); if (t === undefined) return "-"; if (!t || !t.length) return "独苗"; var b = t[0]; t.forEach(function(x){ if (x.k > b.k) b = x; }); return b.n + " " + b.k + "只"; } },
     { k:"环境分≥0", f:function(r){ return eSc > 0 ? 1 : (eSc < 0 ? -1 : 0); }, v:function(r){ return (eSc > 0 ? "+" : "") + eSc; } }
   ];
   var mark = function(v){ return v === 1 ? '<span style="color:#1f7a3d;font-weight:700">✓</span>' : (v === -1 ? '<span style="color:#c02c2c;font-weight:700">✗</span>' : '<span style="color:#9aa0a6">—</span>'); };
