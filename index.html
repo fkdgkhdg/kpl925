@@ -339,7 +339,7 @@
   </div>
 
   <div class="card" id="nvCard" hidden>
-    <h2>昨日未涨停 · 今日竞价实际换手前 5（全市场主板，<span id="nvDate"></span>）<button class="mini" id="nvRefresh" style="float:right">重新扫描</button></h2>
+    <h2>昨日未涨停 · 今日竞价实际换手前 5（全市场主板，<span id="nvDate"></span>）<button class="mini" id="nvRefresh" style="float:right">重新扫描</button><button class="mini" id="nvView" style="float:right;margin-right:6px" title="在「简洁」和「跟主榜单一样的完整列」之间切换">榜单同款</button></h2>
     <div class="chips" id="nvTop"></div>
     <div class="tablewrap"><table id="nvTbl"></table></div>
     <p class="note" id="nvNote"></p>
@@ -5093,7 +5093,7 @@ function nvParse(m, zt){
       at = hs; approx = true;
     }
     cand.push({ code:c, name:nm, pre:pre, open:open, chg:(open / pre - 1) * 100,
-                amt:amt, at:at, approx:approx, bid:(q.bid || 0), mc:(q.mc || 0) });
+                amt:amt, at:at, approx:approx, bid:(q.bid || 0), ask:(q.ask || 0), mc:(q.mc || 0) });
   });
   return cand;
 }
@@ -5164,6 +5164,21 @@ function renderNewTop5(){
       renderNewTop5();
     };
   }
+
+  // 视图切换：简洁 8 列 ↔ 主榜单同款完整列（默认完整列）
+  if (NV.view === undefined) NV.view = (function(){ try { return localStorage.getItem("kpl_nv_view") === "mini" ? "mini" : "full"; } catch(e){ return "full"; } })();
+  var _vb = $("nvView");
+  if (_vb){
+    _vb.textContent = (NV.view === "full") ? "简洁视图" : "榜单同款";
+    if (!_vb.dataset.bound){
+      _vb.dataset.bound = "1";
+      _vb.onclick = function(){
+        NV.view = (NV.view === "full") ? "mini" : "full";
+        try { localStorage.setItem("kpl_nv_view", NV.view); } catch(e){}
+        renderNewTop5();
+      };
+    }
+  }
   if (NV.day !== STATE.day && !NV.force){
     NV.rows = null; NV.ts = 0; NV.err = "";
     var c0 = nvLoadCache(STATE.day);
@@ -5221,6 +5236,7 @@ function renderNewTop5(){
   var rows = NV.rows.slice();
   rows.forEach(function(x){
     x.sector = (typeof HY !== "undefined" && HY[x.code]) || "其他";
+    x.px = x.open || 0;
     x._hot = hotRankOf(x.code);
     x._boom = (typeof lhbBoom === "function") ? lhbBoom(x.code) : "";
   });
@@ -5230,6 +5246,53 @@ function renderNewTop5(){
       '<span class="chip">候选中 ' + (NV.candN || 0) + ' 只，取实际换手前 5</span>' +
       '<span class="chip">扫描时间 ' + new Date(NV.ts).toLocaleTimeString("zh-CN", { hour12:false }) + '</span>' +
       (inWin ? '<span class="chip">竞价时点每 5 分钟自动重扫</span>' : '');
+  }
+  // —— 主榜单同款视图（列、配色、单元格渲染与 5 只榜单一致）——
+  if (NV.view !== "mini"){
+    var _d0 = NV.day || STATE.day;
+    var _mxAt = 1; rows.forEach(function(r){ if ((r.at || 0) > _mxAt) _mxAt = r.at; });
+    var hf = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th>'
+      + '<th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th>'
+      + '<th title="本栏股票昨日未涨停，没有「昨日涨停板数」这一项，显示 —">连板</th>'
+      + '<th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线上的日数＝节点；起算日须自行设定，仅历史统计，非投资建议。">节点</th>'
+      + '<th>竞价涨幅</th>'
+      + '<th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%。鼠标悬停看每档样本数 / 封板率 / 收益与胜率。">开盘档位</th>'
+      + '<th title="价格＝9:25 竞价价（当日开盘价）">价格</th>'
+      + '<th>实际换手</th>'
+      + '<th title="昨日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率；红条/橙条＝爆头或高概率席位">昨日席位' + (lhbDate(_d0) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(_d0) + '</span>' : '') + '</th>'
+      + '<th>委比</th><th>成交量</th><th>市值</th>'
+      + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">断板卖出(A均值)</th>'
+      + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">A胜率</th>'
+      + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">断板卖出(A中位)</th>'
+      + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">样本</th>'
+      + '</tr></thead><tbody>';
+    hf += rows.map(function(x, i){
+      var _hr = hotRankOf(x.code);
+      var c2 = (x.chg === null || x.chg === undefined || isNaN(x.chg)) ? '—' : ((x.chg > 0 ? '+' : '') + x.chg.toFixed(2) + '%');
+      var a2 = (x.at === null || x.at === undefined || isNaN(x.at)) ? '—'
+        : ('<b>' + x.at.toFixed(2) + '%</b>' + (x.approx ? '<span class="tag">≈</span>' : '')
+           + '<span class="minbar" style="width:58px"><i style="width:' + Math.min(100, x.at / _mxAt * 100).toFixed(0) + '%"></i></span>');
+      return '<tr class="' + (i === 0 ? 'top ' : '') + (_hr ? 'hot' : '') + '">'
+        + '<td>' + (i + 1) + '</td>'
+        + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + x.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(x.name) + '</a><a class="kbtn" data-kc="' + x.code + '" data-kn="' + esc(x.name) + '">K线</a><span class="tag">' + x.code + '</span>' + appBadge(x.code, _d0) + lhbBoom(x.code, _d0) + '</td>'
+        + '<td class="left">' + esc(x.sector || '—') + (_hr ? '<span class="' + (_hr.rank <= 5 ? 'hotb' : 'hotb2') + '" title="' + esc(_hr.name + '：板块热度榜第 ' + _hr.rank + ' 名（截至 ' + _hr.d + '）｜行业 ' + _hr.n + ' 只、近3日涨停 ' + _hr.z3 + ' 家、近3日涨幅 ' + (_hr.r3 > 0 ? '+' : '') + _hr.r3 + '%、放量 ' + _hr.vol + '×') + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
+        + '<td class="left">' + thCell(x.code) + '</td>'
+        + '<td>—</td>'
+        + ndCell()
+        + '<td class="' + ((x.chg > 0) ? 'up' : 'down') + '">' + c2 + '</td>'
+        + '<td style="white-space:nowrap">' + gkCell(x) + '</td>'
+        + '<td style="white-space:nowrap">' + pxCell(x) + '</td>'
+        + '<td>' + a2 + '</td>'
+        + '<td class="seat">' + lhbCell(x.code, _d0) + '</td>'
+        + '<td class="' + ((x.bid || x.ask) ? ((x.bid - x.ask) > 0 ? 'up' : 'down') : '') + '">' + ((x.bid || x.ask) ? (((x.bid - x.ask) / (x.bid + x.ask) * 100).toFixed(0) + '%') + '<span class="tag">' + (x.bid >= x.ask ? '买>卖' : '卖>买') + '</span>' : '—') + '</td>'
+        + '<td><b>' + yzMoney(x.amt) + '</b></td>'
+        + '<td><b>' + (x.mc > 0 ? yzMoney(x.mc) : '—') + '</b></td>'
+        + '<td>—</td><td>—</td><td>—</td><td>—</td>'
+        + '</tr>';
+    }).join('');
+    tb.innerHTML = hf + '</tbody>';
+    if (nt) nt.textContent = "口径：全市场主板（剔 ST／退）剔除昨日涨停股后，按今天 9:25 竞价成交额 ÷ 实际流通股数 算「实际换手」，取前 5；候选中前 12 名再用分时首根校正一次。列与主榜单一致；「连板 / 断板卖出(A均值) / A胜率 / 断板卖出(A中位) / 样本」属「昨日涨停股」的回测口径，本栏股票昨日未涨停，显示 —。行情源 " + (NV.src || "东财") + "，扫描时间 " + new Date(NV.ts).toLocaleTimeString("zh-CN", { hour12:false }) + "，共扫 " + (NV.n || 0) + " 只、剔除昨日涨停 " + (NV.ztn || 0) + " 只。历史存档里只有「昨日涨停股」，这一栏无法回看过去的日子。";
+    return;
   }
   var h = '<thead><tr><th>#</th><th>板块</th><th>股票</th><th>竞价涨幅</th><th>竞价成交额</th><th>实际换手</th><th>总市值</th><th>昨日席位</th></tr></thead><tbody>';
   h += rows.map(function(x, i){
