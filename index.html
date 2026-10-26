@@ -315,7 +315,9 @@
     </div>
     <div class="plBody"><p class="note">输入股票名或代码，点「分析」。</p></div>
   </div>
-  <div class="card">
+  <div class="card" id="mbCard">
+    <div class="optgrp" id="mbBar" style="margin:4px 0 8px"><span>名单</span><button id="mbZT" class="active">涨停前5</button><button id="mbNV">未涨停前5</button></div>
+    <div id="mbMain">
     <div class="opts" id="ndBar" style="margin:4px 0 8px;align-items:center"><span style="color:var(--muted)">节点起算日</span><input id="ndAnchor" type="date" style="width:150px"><button id="ndClear">清除</button><button id="ndHelp">节点口径</button><span class="note" id="ndHint" style="margin:0"></span></div>
     <div class="kpi" id="kpi"></div>
     <div class="tablewrap"><table id="tbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
@@ -323,6 +325,13 @@
     <div id="advBox"></div>
     <div id="bmBox"></div>
     <p class="note" id="note"></p>
+    </div><!-- /mbMain -->
+    <div id="nvCard" hidden>
+      <h2>昨日未涨停 · 今日竞价实际换手前 5（全市场主板，<span id="nvDate"></span>）<button class="mini" id="nvRefresh" style="float:right">重新扫描</button><button class="mini" id="nvView" style="float:right;margin-right:6px" title="在「简洁」和「跟主榜单一样的完整列」之间切换">榜单同款</button></h2>
+      <div class="chips" id="nvTop"></div>
+      <div class="tablewrap"><table id="nvTbl"></table></div>
+      <p class="note" id="nvNote"></p>
+    </div>
   </div>
 
   <div class="card" id="famCard" hidden>
@@ -336,13 +345,6 @@
     <div class="chips" id="yzTop"></div>
     <div class="tablewrap"><table id="yzTbl"></table></div>
     <p class="note" id="yzNote"></p>
-  </div>
-
-  <div class="card" id="nvCard" hidden>
-    <h2>昨日未涨停 · 今日竞价实际换手前 5（全市场主板，<span id="nvDate"></span>）<button class="mini" id="nvRefresh" style="float:right">重新扫描</button><button class="mini" id="nvView" style="float:right;margin-right:6px" title="在「简洁」和「跟主榜单一样的完整列」之间切换">榜单同款</button></h2>
-    <div class="chips" id="nvTop"></div>
-    <div class="tablewrap"><table id="nvTbl"></table></div>
-    <p class="note" id="nvNote"></p>
   </div>
 
   <div class="card" id="ndCard" hidden>
@@ -5041,6 +5043,26 @@ function renderPB(){
 }
 // ===== 昨日未涨停 · 今日竞价实际换手前 5（全市场主板实时扫）=====
 var NV = { day:"", rows:null, loading:false, ts:0, err:"", src:"", n:0, candN:0, ztn:0, force:false };
+// ===== 榜单视图切换：涨停前5 ↔ 未涨停前5（同一张卡内切换）=====
+var MB = { view: (function(){ try { return localStorage.getItem("kpl_mb_view") === "nv" ? "nv" : "zt"; } catch(e){ return "zt"; } })() };
+function mbSync(){
+  var bz = $("mbZT"), bn = $("mbNV");
+  if (!bz || !bn) return;
+  var arch = !!(typeof STATE !== "undefined" && STATE && STATE.archived);
+  if (arch && MB.view === "nv") MB.view = "zt";      // 历史存档没有当天全市场扫描，强制回「涨停前5」
+  bz.classList.toggle("active", MB.view === "zt");
+  bn.classList.toggle("active", MB.view === "nv");
+  bn.disabled = arch;
+  bn.title = arch ? "历史存档里只有「昨日涨停股」，没有当天全市场扫描，这一栏无法回看过去的日子" : "昨日未涨停股 · 今日竞价实际换手前 5（全市场主板）";
+  var main = $("mbMain"); if (main) main.style.display = (MB.view === "nv") ? "none" : "";
+  var nvB = $("nvCard"); if (nvB) nvB.hidden = (MB.view !== "nv");
+}
+function mbApply(v){
+  MB.view = (v === "nv") ? "nv" : "zt";
+  try { localStorage.setItem("kpl_mb_view", MB.view); } catch(e){}
+  mbSync();
+  if (MB.view === "nv" && typeof renderNewTop5 === "function"){ try { renderNewTop5(); } catch(e){} }
+}
 var NVZT = null;
 function nvKeyOf(d){ return "kpl_nv1_" + d; }
 function nvLoadCache(d){
@@ -5155,6 +5177,7 @@ function renderNewTop5(){
   var card = $("nvCard"), tb = $("nvTbl");
   if (!card || !tb || !STATE || !STATE.day) return;
   if (STATE.archived){ card.hidden = true; return; }        // 历史存档只有「昨日涨停股」，无法回溯全市场
+  if (typeof MB !== "undefined" && MB.view !== "nv") return;   // 只在「未涨停前5」视图下才渲染
   card.hidden = false;
   var el = $("nvTop"), nt = $("nvNote"), dt = $("nvDate");
   if ($("nvRefresh") && !$("nvRefresh").dataset.bound){
@@ -5463,7 +5486,7 @@ function renderTB(){
   $("tbTbl").innerHTML = h + '</tbody>';
   if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
 }
-function render(){ ndPaint(); renderCore(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
+function render(){ ndPaint(); renderCore(); if (typeof mbSync === "function") mbSync(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
 var ND_KEY = "NODE_ANCHOR";
@@ -7472,6 +7495,9 @@ $("sAt").addEventListener("click", function(){ STATE.sort="at"; $("sAt").classLi
 $("sRet").addEventListener("click", function(){ STATE.sort="ret"; $("sRet").classList.add("active"); $("sAt").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
 $("fNL").addEventListener("click", function(){ STATE.noLimit = !STATE.noLimit; $("fNL").classList.toggle("active", STATE.noLimit); render(); });
 $("fNL").classList.toggle("active", !!STATE.noLimit);   // 默认就是剔一字池，按钮初始态同步
+if ($("mbZT")) $("mbZT").addEventListener("click", function(){ mbApply("zt"); });
+if ($("mbNV")) $("mbNV").addEventListener("click", function(){ mbApply("nv"); });
+mbSync();   // 初值：默认涨停前5；若上次停在「未涨停前5」则沿用
   $("klClose").addEventListener("click", function(){ $("klCard").hidden = true; });
   $("bkClose").addEventListener("click", function(){ $("bkCard").hidden = true; });
   $("bkPool").addEventListener("click", function(){
