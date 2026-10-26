@@ -4213,9 +4213,36 @@ function lhbCls(x){
   if (x.big !== null && x.big >= 33) return "warn2";
   return "";
 }
+// ----- 散户通道（拉萨天团 + 国信浙江互联网）净买标记 -----
+var _lhbRsMap = {};
+function lhbRetail(code, day){
+  if (!lhbReady() || !LHBSEAT.rs) return null;
+  if (!_lhbIdx){ _lhbIdx = {}; LHBSEAT.days.forEach(function(d, i){ _lhbIdx[d.replace(/-/g, "")] = i; }); }
+  var p = lhbPrevDay(day); if (!p) return null;
+  var di = _lhbIdx[p.replace(/-/g, "")]; if (di === undefined) return null;
+  var map = _lhbRsMap[di];
+  if (!map){
+    map = _lhbRsMap[di] = {};
+    (LHBSEAT.rs[di] || "").split(";").forEach(function(seg){
+      var a = seg.split(","); if (a.length < 3) return;
+      map[a[0]] = { r: +a[1], h: +a[2] };                 // 万元，正=净买
+    });
+  }
+  return map[code] || null;
+}
+function lhbRetailChip(code, day){
+  var g = lhbRetail(code, day);
+  if (!g || !(g.r >= 500)) return "";                      // 只标「散户通道明显净买」（≥500万）
+  var hot = g.r >= 1000;
+  var tip = "散户通道净买 " + lhbMoney(g.r) + "（拉萨天团 + 国信浙江互联网；同日非散户席位合计 " + (g.h > 0 ? "净买 " : "净卖 ") + lhbMoney(g.h) + "）\n"
+    + "历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 60.9%（全体上榜股基率 51.7%），次日平均 -1.5%，次日跌超 5% 的概率 33.6%（基率 23.9%）。\n"
+    + "若当天本身就跌停/放量下跌、被散户接盘，次日下跌概率升到 73%、平均 -3.4%。";
+  return '<span class="rtchip" style="display:inline-block;margin:0 0 3px;padding:1px 6px;border-radius:5px;background:' + (hot ? "#c02c2c" : "#c8791a") + ';color:#fff;font-size:10.5px;font-weight:700" title="' + esc(tip) + '">散户接盘 +' + lhbMoney(g.r) + '</span>';
+}
 function lhbCell(code, day){
   var r = lhbSeats(code, day);
-  if (!r) return '<span style="opacity:.35">无龙虎榜</span>';
+  var chip = lhbRetailChip(code, day);
+  if (!r) return chip || '<span style="opacity:.35">无龙虎榜</span>';
   var show = r.items.slice(0, 3), html = show.map(function(x){
     var inList = bmSetName(x.name), cls = lhbCls(x);
     var tip = x.name + "　净" + (x.net >= 0 ? "买 " : "卖 ") + lhbMoney(x.net) +
@@ -4224,7 +4251,7 @@ function lhbCell(code, day){
     return '<span class="lseat ' + cls + '" title="' + esc(tip) + '"><i>' + esc(x.name) + '</i><b>' + (x.net > 0 ? "+" : "-") + lhbMoney(x.net) + '</b></span>';
   }).join("");
   if (r.items.length > show.length) html += '<span class="lseat more">＋' + (r.items.length - show.length) + ' 席未显示</span>';
-  return html;
+  return chip + html;
 }
 function lhbBoom(code, day){
   var r = lhbSeats(code, day);
@@ -5506,7 +5533,7 @@ function renderCore(){
     ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
     "「题材厚度」＝该股按「开盘啦人气版」题材逐条列出，并标注每个题材在前一交易日同题材一起涨停的主板家数（开盘啦口径）。大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只，灰＝≤1 只），后面的小标签是它的其他题材，鼠标悬停可看全部；没有任何题材数据时才显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
-    "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行左边是席位、右边是净额，鼠标悬停看样本数。颜色：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中即标红，如果它昨天净卖→逐票竞价建议一票否决），橙＝33~44%（该席位历史上净卖出后次日大面率），蓝＝昨天净买入，灰＝昨天净卖出（历史大面率不高）。没上龙虎榜就显示「无龙虎榜」。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
+    "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行左边是席位、右边是净额，鼠标悬停看样本数。颜色：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中即标红，如果它昨天净卖→逐票竞价建议一票否决），橙＝33~44%（该席位历史上净卖出后次日大面率），蓝＝昨天净买入，灰＝昨天净卖出（历史大面率不高）。没上龙虎榜就显示「无龙虎榜」。席位列最上方出现红/橙「散户接盘 +X万」标签＝该股涨停（或上榜）那天，龙虎榜上「散户通道」（拉萨天团：东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网）合计净买 ≥500 万（红＝≥1000 万），同日非散户席位净额在悬停提示里。历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 61%（全体上榜股基率 52%）、次日平均 -1.5%、次日跌超 5% 的概率 34%（基率 24%）；若当天本身就跌停被散户接盘，次日下跌概率 73%、平均 -3.4%。读法＝散户大额接盘，次日基本没有溢价。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
