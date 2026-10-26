@@ -1174,13 +1174,25 @@ function themeThickEm(code){
 }
 // 「开盘啦人气版」题材（逐票的题材列表，用于主榜单的题材列）
 function hotThemeTags(code){
+  // 关键：KPLHOT 快照是「上一交易日」，不能直接用今天 STATE.day 取
   try{
     if (typeof KPLHOT === "undefined" || !KPLHOT || !KPLHOT.d) return [];
-    var key = String(STATE.day || "").replace(/-/g, "");
-    var dd = KPLHOT.d[key]; if (!dd || !dd.rows) return [];
-    var r = dd.rows[code]; if (!r) return [];
-    var str = String(r[5] || ""); if (!str) return [];
-    return str.split(/[\u3001,\uFF0C]/).map(function(x){ return x.trim(); }).filter(Boolean);
+    var ymd = String(STATE.day || "").replace(/-/g, "");
+    var cand = [];
+    try { var z = (typeof ztDayOf === "function") ? ztDayOf(STATE.day) : ""; if (z) cand.push(z); } catch(e){}
+    try { var t = (typeof prevTradeDay === "function") ? prevTradeDay(ymd.slice(0,4) + "-" + ymd.slice(4,6) + "-" + ymd.slice(6,8)) : ""; if (t) cand.push(String(t).replace(/-/g, "")); } catch(e){}
+    try { (KPLHOT.days || []).filter(function(x){ return x < ymd; }).sort().reverse().forEach(function(x){ cand.push(x); }); } catch(e){}
+    cand.push(ymd);
+    var seen = {}, ordered = [];
+    for (var ci = 0; ci < cand.length; ci++){ var kk = cand[ci]; if (kk && !seen[kk]){ seen[kk] = 1; ordered.push(kk); } }
+    for (var cj = 0; cj < ordered.length; cj++){
+      var dd = KPLHOT.d[ordered[cj]]; if (!dd || !dd.rows) continue;
+      var r = dd.rows[code]; if (!r) continue;
+      var str = String(r[5] || ""); if (!str) continue;
+      var arr = str.split(/[\u3001,\uFF0C]/).map(function(x){ return x.trim(); }).filter(Boolean);
+      if (arr.length) return arr;
+    }
+    return [];
   }catch(e){ return []; }
 }
 function themeThick(code){
