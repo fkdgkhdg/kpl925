@@ -33,6 +33,16 @@ tr.hl{background:var(--hl)}
 .chip.o{border-color:#f0c98a;background:#fdf3e3;color:#a15c00}
 .chip.g{border-color:#cbe9d6;background:#eaf7ee;color:#1f7a3d}
 .chip.v{border-color:#cfdefb;background:#eef4ff;color:#2352a0}
+.stt{display:inline-block;width:12px;height:12px;line-height:12px;text-align:center;border-radius:3px;font-size:9px;font-weight:700;margin-right:3px;color:#fff;vertical-align:middle}
+.stt[data-k="retail"]{background:#e0902a}.stt[data-k="youzi"]{background:#c02c2c}.stt[data-k="inst"]{background:#2f7ad1}.stt[data-k="north"]{background:#8246c8}
+.stc{display:inline-block;min-width:12px;height:12px;line-height:12px;text-align:center;border-radius:3px;font-size:9px;font-weight:700;margin-right:3px;color:#fff;vertical-align:middle}
+.stc[data-k="retail"]{background:#e0902a}.stc[data-k="youzi"]{background:#c02c2c}.stc[data-k="inst"]{background:#2f7ad1}.stc[data-k="north"]{background:#8246c8}
+.chip.st-retail{border-color:#f0c98a;background:#fdf6ec;color:#8a4d05}
+.chip.st-youzi{border-color:#e8c2c2;background:#fdf3f3;color:#8f1d1d}
+.chip.st-inst{border-color:#c9dcf5;background:#f2f7fd;color:#17518c}
+.chip.st-north{border-color:#ded0f2;background:#f8f4fd;color:#5f2b9b}
+.chip.st-retail.r,.chip.st-youzi.r,.chip.st-inst.r,.chip.st-north.r{border-color:#dd8080;background:#fdeeee}
+.legend2{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px;color:var(--mut);margin:6px 0 2px}
 .small{font-size:11px;color:var(--mut)}
 table.cmp{max-width:960px}
 .hlbox{background:#fff;border:1px solid #f0c98a;border-left:4px solid #e29b3c;border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0}
@@ -49,6 +59,7 @@ table.cmp{max-width:960px}
 <b>买一占成交</b> = 榜内买入第一大席位的买入额 ÷ 上榜区间成交额（三日榜算三日累计）；成交额用日K「量×均价」估算，非官方值，看量级别用。<br>
 <b>卖方机构/北向</b> = 卖方榜里是否出现机构专用 / 沪股通·深股通席位。<br>
 <b>次日</b> = 上榜日的下一个交易日收盘对比上榜日收盘；<b>涨停</b>=次日涨幅≥9.7% 且收盘=当日最高；<b>大面</b>=次日收盘≤-5%；<b>跌停</b>=≤-9.5%；<b>天地板</b>=次日最高≥9.7% 且最低≤-9.5%。
+<br><b>席位配色（与主页面「昨日席位」列同一套）</b>：<span class="stt" data-k="retail">散</span>散户通道（东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网，橙底）、<span class="stt" data-k="youzi">游</span>游资/营业部（红底）、<span class="stt" data-k="inst">机</span>机构专用（蓝底）、<span class="stt" data-k="north">北</span>北向·沪深股通（紫底）。净额：<b class="up">红=净买</b>、<b class="dn">绿=净卖</b>（本页沿用红涨绿跌）；席位边框红＝该席位历史净卖出后次日大面率≥45%、橙＝33~44%。
 </div>
 <div class="hlbox" id="hlbox"></div>
 <h2>A. 榜单日 → 主板涨停股的席位结构 <span class="small" id="aDay"></span></h2>
@@ -82,7 +93,7 @@ table.cmp{max-width:960px}
 <div class="note">读法：买一占比是<b>放大器</b>，不是方向。<b>小盘缩量</b>时它=筹码锁死（利好）；<b>高位 + 大成交</b>时它=一票兑现就崩（警报）。龙渊阁说的「超两成放弃」，前提正是<b>高位连板 + 区间成交大</b>。样本 n&lt;100 的档位只作参考。</div>
 <h2>E. 最近高连板股活跃席位（<span id="eDay">-</span>）</h2>
 <div class="small">取最近 N 个交易日里「当日涨停且 ≥3 板」的主板股，汇总其上榜席位。<b>点任意席位行 → 展开它参与过哪些票。</b><br>
-板数 = 当日往前连续涨停数；性质：游资 / 机构专用 / 北向（沪股通·深股通）/ 拉萨系。<b>历史大面率</b> = 该席位历史<b>净卖出后</b>次日收盘 ≤-5% 的占比（红 ≥45%、橙 33~44%）；「净卖后次日均」= 同样口径的平均次日涨跌幅，n 为样本数。</div>
+板数 = 当日往前连续涨停数；性质（配色同主页面）：散户通道（拉萨天团 + 国信浙江互联网）/ 游资·营业部 / 机构专用 / 北向（沪深股通）。<b>历史大面率</b> = 该席位历史<b>净卖出后</b>次日收盘 ≤-5% 的占比（红 ≥45%、橙 33~44%）；「净卖后次日均」= 同样口径的平均次日涨跌幅，n 为样本数。</div>
 <div class="bar">
   <label>窗口 <select id="eDaySel"><option value="20">近 20 日</option><option value="40">近 40 日</option></select></label>
   <label>排序 <select id="eSort"><option value="cnt">上榜次数</option><option value="sc">涉及只数</option><option value="net">净买额</option><option value="netsell">净卖额</option><option value="big">历史大面率</option></select></label>
@@ -118,7 +129,22 @@ function yi(v){ var a=Math.abs(v); return a>=1e8 ? (v/1e8).toFixed(2)+"亿" : (v
 function pc(v,d){ if(v==null||!isFinite(v)) return "-"; return (v>=0?"+":"")+(v*100).toFixed(d==null?1:d)+"%"; }
 function p2(v){ if(v==null||!isFinite(v)) return "-"; return (v>=0?"+":"")+v.toFixed(2)+"%"; }
 function cls(v){ return v>0?"up":(v<0?"dn":"mut"); }
-function kindTag(k){ var m={"游资":"you","北向":"bei","机构":"jg","拉萨系":"ls"}; return "<span class='k "+(m[k]||"ls")+"'>"+(k||"-")+"</span>"; }
+/* 席位类型统一配色（与主页面「昨日席位」列一致）：散=散户通道 橙 / 游=游资营业部 红 / 机=机构专用 蓝 / 北=沪深股通 紫 */
+var SEAT_RETAIL_RE = /东方财富.*(拉萨|昌都|山南|林芝|日喀则|达孜)|浙江互联网|拉萨/;
+var SEAT_TN = { retail:"散户通道", youzi:"游资/营业部", inst:"机构专用", north:"北向（沪深股通）" };
+var SEAT_SHORT = { retail:"散户", youzi:"游资", inst:"机构", north:"北向" };
+function seatType(nm){ nm=String(nm==null?"":nm); if(SEAT_RETAIL_RE.test(nm)) return "retail"; if(/机构专用/.test(nm)) return "inst"; if(/股通|香港中央结算/.test(nm)) return "north"; return "youzi"; }
+function seatChar(k){ return k==="retail"?"散":(k==="inst"?"机":(k==="north"?"北":"游")); }
+function seatKindKey(k){ var m={"游资":"youzi","北向":"north","机构":"inst","拉萨系":"retail","散户":"retail",retail:"retail",youzi:"youzi",inst:"inst",north:"north"}; return m[k]||seatType(k); }
+function seatKSquare(kk){ return "<span class='stc' data-k='"+kk+"' title='"+SEAT_TN[kk]+"'>"+seatChar(kk)+"</span>"; }
+function seatTag(nm){ var kk=(nm&&SEAT_TN[nm])?nm:seatType(nm); return "<span class='stt' data-k='"+kk+"' title='"+SEAT_TN[kk]+"'>"+seatChar(kk)+"</span>"; }
+function seatBigTxt(v){ if(v==null) return ""; return "<span class='small'>·</span>"+(v>=45?("<span class='warn'>"+v+"%</span>"):(v>=33?("<span style='color:#a15c00'>"+v+"%</span>"):("<span class='mut'>"+v+"%</span>"))); }
+function seatChip1(nm, net, big){
+  var kk=seatType(nm), r=(big!=null&&big>=45)?" r":"";
+  var tip="【"+SEAT_TN[kk]+"】"+nm+" · 净额 "+(net>=0?"+":"")+net+"万"+(big==null?"":" · 历史净卖出后次日大面率 "+big+"%");
+  return "<span class='chip st-"+kk+r+"' title='"+tip+"'>"+seatTag(nm)+nm+" <b class='"+(net>0?"up":(net<0?"dn":"mut"))+"'>"+(net>=0?"+":"")+net+"万</b>"+seatBigTxt(big)+"</span>";
+}
+function kindTag(k){ var kk=seatKindKey(k); return seatKSquare(kk)+"<span class='small mut'>"+SEAT_SHORT[kk]+"</span>"; }
 function statRow(r){
   if(!r.n) return "<tr><td class='sec' colspan='9'>"+r.label+"</td></tr>";
   var ztCls = r.zt>=45?"up":(r.zt<=25?"mut":"");
@@ -179,12 +205,7 @@ function verCell(m,lbc){
 }
 function seatChipsOf(m){
   if(!m) return "-";
-  var s=(m.seats||[]).map(function(x){
-    var nm2=x[0], net=x[1], big=x[2];
-    var cl=(big!=null && big>=45)?"r":"";
-    var btag=(big!=null)?("<span class='small'>·</span>"+(big>=45?"<span class='warn'>"+big+"%</span>":"<span class='mut'>"+big+"%</span>")):"";
-    return "<span class='chip "+cl+"'>"+nm2+" "+(net>=0?"+":"")+net+"万"+btag+"</span>";
-  }).join("");
+  var s=(m.seats||[]).map(function(x){ return seatChip1(x[0], x[1], x[2]); }).join("");
   return s || "-";
 }
 function renderA(){
@@ -270,7 +291,7 @@ function hlboxBuild(){
 /* ===== E 节：最近高连板股活跃席位 ===== */
 var EH = window.SEATHOT || null;
 var eOpen = null;
-function seatKind(nm){ if(/机构专用/.test(nm)) return "机构"; if(/(深股通|沪股通|陆股通|港股通)/.test(nm)) return "北向"; if(/拉萨/.test(nm)) return "拉萨系"; return "游资"; }
+function seatKind(nm){ return seatType(nm); }
 function shortSeat(nm){ return String(nm)
   .replace(/证券股份有限公司/g,"").replace(/证券有限责任公司/g,"").replace(/证券有限公司/g,"")
   .replace(/股份有限公司/g,"").replace(/有限责任公司/g,"").replace(/有限公司/g,"")
@@ -284,7 +305,7 @@ function eAgg(){
     for(var si=0;si<ss.length;si++){
       var sp=ss[si], idx=sp[0], info=EH.seats[idx]||[], nm=info[0]||("席位#"+idx), kd=seatKind(nm);
       if(/投资者分类|其他席位|机构专用合计/.test(nm)) continue;
-      if(only && kd!=="游资") continue;
+      if(only && kd!=="youzi") continue;
       var o=M[idx];
       if(!o){ o=M[idx]={idx:idx,nm:nm,short:shortSeat(nm),kd:kd,big:info[1],avg:info[2],ns:info[3],cnt:0,codes:{},buy:0,sell:0,net:0,ev:[]}; }
       o.cnt++; o.codes[r[1]]=1; o.buy+=sp[2]; o.sell+=sp[3]; o.net+=sp[1];
@@ -303,7 +324,7 @@ function eAgg(){
   return arr;
 }
 function eBig(v){ if(v==null) return "<span class='mut'>-</span>"; if(v>=45) return "<span class='warn'>"+v+"%</span>"; if(v>=33) return "<span style='color:#a15c00'>"+v+"%</span>"; return "<span class='mut'>"+v+"%</span>"; }
-function eKind(kd){ var c = kd==="机构"?"jg":(kd==="北向"?"bei":(kd==="拉萨系"?"ls":"you")); return "<span class='k "+c+"'>"+kd+"</span>"; }
+function eKind(kd){ return kindTag(kd); }
 function eNum(v){ return (v>=0?"+":"-")+yi(Math.abs(v)); }
 function eAmt(v){ if(!v) return "-"; if(Math.abs(v)<1e4) return "<1万"; return yi(v); }
 function renderE(){
@@ -376,7 +397,6 @@ function renderD(){
     var bk=[]; if(m.buyKinds){ for(var k in m.buyKinds){ bk.push((m.buyKinds[k]||0)+kindTag(k)); } }
     var sk = (m.orgSell?"<span class='k jg'>机构</span>":"")+(m.northSell?"<span class='k bei'>北向</span>":"") || "<span class='small'>纯游资</span>";
     var seatCell = seatChipsOf(m);
-    var seatCell = (m.seats||[]).map(function(s){ var cl=(s[2]!=null&&s[2]>=45)?"r":""; var btag=(s[2]!=null)?("<span class='small'>·</span>"+(s[2]>=45?"<span class='warn'>"+s[2]+"%</span>":"<span class='mut'>"+s[2]+"%</span>")):""; return "<span class='chip "+cl+"'>"+s[0]+" "+(s[1]>=0?"+":"")+s[1]+"万"+btag+"</span>"; }).join("");
     h += "<tr>"+
       "<td>"+(i+1)+"</td>"+
       "<td class='nm'>"+nm+"</td>"+
@@ -425,7 +445,7 @@ el("gen").textContent = "生成 "+X.gen+" · 统计样本 n="+X.B.n+"（主板�
   var EM = "https://datacenter-web.eastmoney.com/api/data/v1/get";
   function note(t){ var n=document.getElementById("sxNote"); if(n) n.textContent=t; }
   function jget(u){ return fetch(u,{cache:"no-store"}).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }); }
-  function seatKind(n){ if(/机构专用/.test(n)) return "机构"; if(/(深股通|沪股通|陆股通|港股通)/.test(n)) return "北向"; if(/拉萨/.test(n)) return "拉萨系"; return "游资"; }
+  function seatKind(n){ n=String(n==null?"":n); if(/东方财富.*(拉萨|昌都|山南|林芝|日喀则|达孜)|浙江互联网|拉萨/.test(n)) return "retail"; if(/机构专用/.test(n)) return "inst"; if(/股通|香港中央结算/.test(n)) return "north"; return "youzi"; }
   function shortSeat(n){ return String(n).replace("股份有限公司","").replace("证券有限责任公司","").replace("有限责任公司","").replace("有限公司","").replace(/证券营业部$/,"").replace(/营业部$/,"").replace(/分公司$/,"").replace("证券","").trim(); }
   function spanOf(exp){ return /连续三个交易日/.test(exp)?3:1; }
   var seatStat=null;
@@ -526,7 +546,7 @@ function buildGroups(rows){
     return { buy5:b.buy5, sell5:b.sell5, net:net, span:span, amt:amt,
       top1:shortSeat(t1.name), top1kind:seatKind(t1.name), top1amt:t1.amt, share:t1.amt/b.buy5,
       shareAmt: amt?t1.amt/amt:null, netAmt: amt?net/amt:null,
-      buyKinds:bk, orgSell:!!sk["机构"], northSell:!!sk["北向"], seatOrg:+(sk["机构"]||0), seats:seats };
+      buyKinds:bk, orgSell:!!sk.inst, northSell:!!sk.north, seatOrg:+(sk.inst||0), seats:seats };
   }
   var busy=false;
   window.__sxRefresh=function(){
