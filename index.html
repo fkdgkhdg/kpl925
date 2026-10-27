@@ -5241,6 +5241,7 @@ function renderNewTop5(){
     return;
   }
   if (!NV.rows){
+    if (!inWin && nvArchDay(STATE.day)){ return renderNewTop5Archive(STATE.day); }   // 非竞价时点：退回当天 9:25 存档（nvdata.js）
     var tips = "";
     if (inWin) tips = "扫描失败：" + (NV.err || "取不到行情") + "。点右上「重新扫描」重试。";
     else tips = "这一栏看的是「今天 9:25 的竞价实际换手」，只有 9:15~9:45 打开本页才会自动抓取并定格；" +
