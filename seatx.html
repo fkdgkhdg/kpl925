@@ -48,6 +48,11 @@ table.cmp{max-width:960px}
 .hlbox{background:#fff;border:1px solid #f0c98a;border-left:4px solid #e29b3c;border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0}
 .sec{background:#fdf3e3;color:#a15c00;text-align:left;font-weight:600}
 .thchip{display:inline-block;padding:0 4px;border-radius:3px;font-size:11px;margin-left:3px;border:1px solid #bfe0cb;background:#eef8f1;color:#1f7a3d;cursor:help}
+#tF .fth{color:#1f7a3d;border-bottom:1px dashed #bfe0cb;cursor:pointer}
+#tF tr.fd>td{background:#f6faf7;padding:6px 8px;text-align:left}
+#tF td.nm{white-space:normal}
+#tF .fsub{color:#6b7280;font-size:11px}
+#tF .fbig{font-weight:700}
 </style>
 </head>
 <body>
@@ -75,6 +80,19 @@ table.cmp{max-width:960px}
   <span class="small">黄底行 = 工具按「实际换手」选出的 5 只</span>
 </div>
 <div style="overflow:auto"><table id="tA"></table></div>
+<h2>F. 龙虎榜板块活跃（题材口径＝同花顺涨停原因）<span class="small" id="fDay"></span></h2>
+<div class="small">把每个交易日上龙虎榜的主板股，按<b>同花顺涨停原因</b>归类 —— 就是上面 A/D 表里那些绿色题材 chip 的名字。看哪个板块在<b>扎堆上榜 / 净买最多</b>。<br>
+同一只票有多个原因会计入多个题材（如「机器人轴承 + 汽车轴承」），所以各题材只数相加大于上榜股数。<b>点题材名 → 展开该题材当天的上榜个股。</b></div>
+<div class="bar">
+  <label>榜单日 <select id="fDaySel"></select></label>
+  <label>窗口 <select id="fWin"><option value="1">当日</option><option value="3">近 3 日</option><option value="5">近 5 日</option><option value="10">近 10 日</option><option value="20">近 20 日</option></select></label>
+  <label>排序 <select id="fSort"><option value="cnt">上榜只数</option><option value="net">净买额</option><option value="amt">买卖总额</option><option value="chg">平均涨幅</option></select></label>
+  <button id="fReload" title="重新拉取同目录 sxbd_data.js（每晚 15:10 / 17:30 自动重写），不用整页刷新">重载数据</button>
+  <span class="small" id="fNote"></span>
+</div>
+<div style="overflow:auto"><table id="tF"></table></div>
+<div class="note">读法：<b>上榜只数多 + 净买为正</b> = 板块里资金在抢（接力题材）；<b>只数多但净卖</b> = 板块高位出货（分歧/退潮）。净买＝当日龙虎榜买五合计−卖五合计，只算<b>主板非 ST</b>。窗口 &gt;1 日时同一只票多次上榜会重复计入，看的是「上榜频次」；末列个股按净买绝对值取前 3。</div>
+
 <h2>B. 席位特征 × 次日表现（历史全量 · 底稿）</h2>
 <div class="small">A 表「档位判读」列已内联本表分档结论；下面四张是完整底稿。</div>
 <div class="small" id="bmeta"></div>
@@ -107,6 +125,7 @@ table.cmp{max-width:960px}
 </div>
 <script src="seatx_hot.js"></script>
 <script src="ztrsdata.js"></script>
+<script src="sxbd_data.js"></script>
 <script src="seatx_data.js"></script>
 <script>
 var X = window.SEATX || null;
@@ -116,13 +135,17 @@ var TH = (function(){ var byDay={}, latest={}, Z=(typeof window.ZTRS!=="undefine
     pl.forEach(function(r){ var tags=String(r[2]||"").split("+").map(function(x){return x.trim();}).filter(Boolean);
       if(!tags.length) return; m[r[0]]=tags; latest[r[0]]={tags:tags, day:d}; }); });
   return {byDay:byDay, latest:latest}; })();
-function themeChip(code, day){
+function themeChip(code, day, maxN){
   if(!code) return ""; var d=String(day||""), tags=null;
-  if(TH.byDay[d] && TH.byDay[d][code]) tags=TH.byDay[d][code];
-  else if(TH.latest[code]){ tags=TH.latest[code].tags; d=TH.latest[code].day; }
+  if(TH && TH.byDay[d] && TH.byDay[d][code]) tags=TH.byDay[d][code];
+  else if(TH && TH.latest[code]){ tags=TH.latest[code].tags; d=TH.latest[code].day; }
   if(!tags||!tags.length) return "";
   var tip=(d?("同花顺涨停原因（"+d+"）："):"")+tags.join(" + ");
-  return '<span class="thchip" title="'+tip+'">'+tags[0]+'</span>';
+  tip=String(tip).replace(/'/g,"&#39;");
+  var n=(maxN==null?1:maxN), h="";
+  for(var i=0;i<tags.length && i<n;i++) h+="<span class='thchip' title='"+tip+"'>"+tags[i]+"</span>";
+  if(tags.length>n) h+="<span class='small' title='"+tip+"'>+"+(tags.length-n)+"</span>";
+  return h;
 }
 function el(id){ return document.getElementById(id); }
 function yi(v){ var a=Math.abs(v); return a>=1e8 ? (v/1e8).toFixed(2)+"亿" : (v/1e4).toFixed(0)+"万"; }
@@ -591,6 +614,164 @@ function buildGroups(rows){
   var btn=document.getElementById("sxRefresh");
   if(btn) btn.addEventListener("click", function(){ window.__sxRefresh(); });
 })();
+</script>
+
+<script>
+/* ===== F. 龙虎榜板块活跃：SXBD（东财龙虎榜日榜 × 同花顺涨停原因）===== */
+(function(){
+  var tbl = document.getElementById("tF");
+  if(!tbl) return;
+  var BD = window.SXBD;
+  if(!BD || !BD.days || !BD.days.length){
+    tbl.innerHTML = "<tr><td class='mut'>sxbd_data.js 没加载到（检查同目录 sxbd_data.js）</td></tr>";
+    return;
+  }
+  var THN = BD.th || [];
+  var DAYS = BD.days.slice().sort();
+  var sel = document.getElementById("fDaySel"), winSel = document.getElementById("fWin"),
+      sortSel = document.getElementById("fSort"), note = document.getElementById("fNote"),
+      lab = document.getElementById("fDay");
+  var opened = {};
+  function tn(i){ return i < 0 ? "未标注题材" : (THN[i] || "?"); }
+  function money(v){ var a = Math.abs(v); return a >= 10000 ? (v/10000).toFixed(2) + "亿" : v.toFixed(0) + "万"; }
+  function ccls(v){ return v > 0 ? "up" : (v < 0 ? "dn" : "mut"); }
+  function dd(d){ return d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6); }
+  function fillDays(){
+    sel.innerHTML = DAYS.slice().reverse().map(function(d){ return "<option value='" + d + "'>" + dd(d) + "</option>"; }).join("");
+    sel.value = DAYS[DAYS.length-1];
+  }
+  fillDays();
+
+  function agg(){
+    var day = sel.value, win = +winSel.value, i1 = DAYS.indexOf(day);
+    var use = DAYS.slice(Math.max(0, i1 - win + 1), i1 + 1);
+    var map = {}, nStock = 0;
+    use.forEach(function(d){
+      (BD.d[d] || []).forEach(function(r){
+        nStock++;
+        var idxs = (r[7] && r[7].length) ? r[7] : [-1];
+        idxs.forEach(function(ti){
+          var k = tn(ti);
+          var o = map[k] || (map[k] = { t:k, cnt:0, b:0, s:0, chg:0, n:0, lb:{}, list:[] });
+          o.cnt++; o.b += r[3]; o.s += r[4];
+          if(r[2] != null){ o.chg += r[2]; o.n++; }
+          var L = r[6] || 0; o.lb[L] = (o.lb[L] || 0) + 1;
+          o.list.push({ code:r[0], name:r[1], chg:r[2], b:r[3], s:r[4], net:r[5], lbc:L, day:d });
+        });
+      });
+    });
+    var arr = []; for(var k in map) arr.push(map[k]);
+    var srt = sortSel.value;
+    arr.sort(function(a,b){
+      if(srt === "net") return (b.b-b.s) - (a.b-a.s);
+      if(srt === "amt") return (b.b+b.s) - (a.b+a.s);
+      if(srt === "chg") return (b.n?b.chg/b.n:-99) - (a.n?a.chg/a.n:-99);
+      return (b.cnt - a.cnt) || ((b.b-b.s) - (a.b-a.s));
+    });
+    return { arr:arr, use:use, nStock:nStock };
+  }
+
+  function tagsOf(code, day){
+    var d = String(day || "");
+    if(window.TH && TH.byDay[d] && TH.byDay[d][code]) return { tags:TH.byDay[d][code], day:d };
+    if(window.TH && TH.latest[code]) return { tags:TH.latest[code].tags, day:TH.latest[code].day };
+    return null;
+  }
+  // 代表个股的绿色题材 chip：把「本行题材」排第一个，其余折叠成 +N
+  function chipOf(code, day, first){
+    var o = tagsOf(code, day);
+    if(!o || !o.tags.length) return "";
+    var tags = o.tags.slice();
+    var i = tags.indexOf(first);
+    if(i > 0){ tags.splice(i,1); tags.unshift(first); }
+    var tip = "同花顺涨停原因（" + o.day + "）：" + tags.join(" + ");
+    tip = String(tip).replace(/'/g, "&#39;");
+    var h = "<span class='thchip' title='" + tip + "'>" + tags[0] + "</span>";
+    if(tags.length > 1) h += "<span class='small' title='" + tip + "'>+" + (tags.length - 1) + "</span>";
+    return h;
+  }
+  function lbTxt(lb){
+    var ks = []; for(var k in lb) ks.push(+k);
+    ks.sort(function(a,b){ return b - a; });
+    var out = [];
+    ks.forEach(function(k){ out.push((k >= 2 ? k + "板" : "首板") + "×" + lb[k]); });
+    return out.join(" ");
+  }
+
+  function detailRow(o){
+    var list = o.list.slice().sort(function(a,b){ return Math.abs(b.net) - Math.abs(a.net); });
+    var sub = "<table style='width:auto;min-width:560px'><tr><th>日期</th><th>代码</th><th>股票</th><th>题材</th><th>涨幅</th><th>买入</th><th>卖出</th><th>净买</th><th>板位</th></tr>";
+    list.forEach(function(r){
+      var t = (typeof themeChip === "function") ? themeChip(r.code, r.day, 3) : "";
+      sub += "<tr><td>" + dd(r.day) + "</td><td>" + r.code + "</td><td class='nm'>" + r.name + "</td>" +
+        "<td style='text-align:left'>" + (t || "<span class='mut'>-</span>") + "</td>" +
+        "<td class='" + ccls(r.chg) + "'>" + (r.chg == null ? "-" : (r.chg >= 0 ? "+" : "") + r.chg.toFixed(2) + "%") + "</td>" +
+        "<td>" + money(r.b) + "</td><td>" + money(r.s) + "</td>" +
+        "<td class='" + ccls(r.net) + "'>" + money(r.net) + "</td>" +
+        "<td>" + (r.lbc >= 2 ? r.lbc + "板" : "首板") + "</td></tr>";
+    });
+    sub += "</table>";
+    return "<tr class='fd'><td colspan='8'>" + sub + "</td></tr>";
+  }
+
+  function rowOf(o){
+    var net = o.b - o.s, avg = o.n ? o.chg / o.n : null;
+    var rep = o.list.slice().sort(function(a,b){ return Math.abs(b.net) - Math.abs(a.net); }).slice(0, 3).map(function(r){
+      var bt = "<span class='tag'>" + (r.lbc >= 2 ? r.lbc + "板" : "首板") + "</span>";
+      return "<span class='fsub'>" + r.name + chipOf(r.code, r.day, o.t) + bt + "</span>";
+    }).join("&nbsp; ");
+    var h = "<tr data-fth='" + encodeURIComponent(o.t) + "'>" +
+      "<td style='text-align:left'><span class='fth'>" + o.t + "</span></td>" +
+      "<td class='fbig'>" + o.cnt + "</td>" +
+      "<td class='" + ccls(net) + " fbig'>" + money(net) + "</td>" +
+      "<td>" + money(o.b) + "</td><td>" + money(o.s) + "</td>" +
+      "<td class='" + ccls(avg) + "'>" + (avg == null ? "-" : (avg >= 0 ? "+" : "") + avg.toFixed(2) + "%") + "</td>" +
+      "<td class='fsub' style='text-align:left'>" + lbTxt(o.lb) + "</td>" +
+      "<td style='text-align:left'>" + rep + "</td>" +
+      "</tr>";
+    if(opened[o.t]) h += detailRow(o);
+    return h;
+  }
+
+  function render(){
+    var g = agg();
+    lab.textContent = " · " + dd(sel.value) + (g.use.length > 1 ? "（近 " + g.use.length + " 日）" : "");
+    note.textContent = "上榜股 " + g.nStock + " 只次 · 题材 " + g.arr.length + " 个" + (BD.gen ? " · 数据 " + BD.gen : "");
+    var h = "<tr><th>题材</th><th>上榜只数</th><th>净买</th><th>总买</th><th>总卖</th><th>平均涨幅</th><th>板位分布</th><th>代表个股（点题材展开全部）</th></tr>";
+    if(!g.arr.length) h += "<tr><td colspan='8' class='mut'>这一天没有龙虎榜数据</td></tr>";
+    g.arr.forEach(function(o){ h += rowOf(o); });
+    tbl.innerHTML = h;
+  }
+
+  tbl.addEventListener("click", function(e){
+    var sp = (e.target && e.target.closest) ? e.target.closest(".fth") : null;
+    if(!sp) return;
+    var tr = sp.closest("tr"); if(!tr) return;
+    var name = decodeURIComponent(tr.getAttribute("data-fth") || "");
+    if(!name) return;
+    if(opened[name]) delete opened[name]; else opened[name] = 1;
+    render();
+  });
+  sel.addEventListener("change", render);
+  winSel.addEventListener("change", render);
+  sortSel.addEventListener("change", render);
+  // 重载数据：sxbd_data.js 每晚 15:10/17:30 由 sxbd_build.js 重写，点一下就拿最新的（带时间戳防缓存）
+  var rb = document.getElementById("fReload");
+  if(rb) rb.addEventListener("click", function(){
+    rb.disabled = true; var old = rb.textContent; rb.textContent = "重载中…";
+    var sc = document.createElement("script");
+    sc.src = "sxbd_data.js?t=" + Date.now();
+    sc.onload = function(){
+      rb.disabled = false; rb.textContent = old;
+      BD = window.SXBD; THN = BD.th || []; DAYS = BD.days.slice().sort();
+      fillDays(); render();
+    };
+    sc.onerror = function(){ rb.disabled = false; rb.textContent = "重载失败"; };
+    document.body.appendChild(sc);
+  });
+  render();
+})();
+
 </script>
 
 </body>
