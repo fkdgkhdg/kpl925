@@ -5466,8 +5466,8 @@ function cvWarm(){
   })();
 }
 /* ===== 龙虎榜 · 板块活跃（东财龙虎榜日榜 → 板块聚合） ===== */
-var LHBTAB = { kind: "hy", days: 1 }, LHBRALL = null, LHBLOAD = 0;
-function lhbStartDay(){
+var LHBZTAB = { kind: "hy", days: 1 }, LHBZROWS = null, LHBZLOAD = 0;
+function lhbzStartDay(){
   var ds = [], i, d;
   if (typeof CYCDATA !== "undefined" && CYCDATA && CYCDATA.length){
     for (i = CYCDATA.length - 1; i >= 0 && ds.length < 5; i--){
@@ -5479,37 +5479,37 @@ function lhbStartDay(){
   var t = new Date(Date.now() - 10 * 86400000);
   return t.getFullYear() + "-" + ("0" + (t.getMonth() + 1)).slice(-2) + "-" + ("0" + t.getDate()).slice(-2);
 }
-function lhbUrl(p, from){
+function lhbzUrl(p, from){
   var qq = String.fromCharCode(39);
   return "https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_DAILYBILLBOARD_DETAILSNEW"
     + "&columns=SECURITY_CODE,SECURITY_NAME_ABBR,TRADE_DATE,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_NET_AMT,CHANGE_RATE"
     + "&pageSize=500&sortColumns=TRADE_DATE&sortTypes=-1&pageNumber=" + p
     + "&filter=" + encodeURIComponent("(TRADE_DATE>=" + qq + from + qq + ")");
 }
-function lhbLoad(force){
-  if (LHBLOAD) return;
-  if (LHBRALL && !force){ renderLhbCard(); return; }
-  if (force) LHBRALL = null;
-  var from = lhbStartDay(), n = $("lhbNote"), acc = [];
-  LHBLOAD = 1;
+function lhbzLoad(force){
+  if (LHBZLOAD) return;
+  if (LHBZROWS && !force){ lhbzRender(); return; }
+  if (force) LHBZROWS = null;
+  var from = lhbzStartDay(), n = $("lhbNote"), acc = [];
+  LHBZLOAD = 1;
   if (n) n.textContent = "正在取东财龙虎榜（近 5 个交易日）…";
   function page(p){
-    fetch(lhbUrl(p, from), { cache: "no-store" }).then(function(r){ return r.json(); }).then(function(j){
+    fetch(lhbzUrl(p, from), { cache: "no-store" }).then(function(r){ return r.json(); }).then(function(j){
       var res = j && j.result;
       if (res && res.data && res.data.length) acc = acc.concat(res.data);
       var pages = (res && res.pages) || 1;
       if (p < pages && p < 3){ page(p + 1); return; }
-      LHBLOAD = 0; LHBRALL = acc;
+      LHBZLOAD = 0; LHBZROWS = acc;
       if (!acc.length){ if (n) n.textContent = "东财龙虎榜没返回数据（可能休市），点「刷新」重试。"; return; }
-      renderLhbCard();
+      lhbzRender();
     }).catch(function(e){
-      LHBLOAD = 0;
+      LHBZLOAD = 0;
       if (n) n.textContent = "取数失败：" + String((e && e.message) || "网络错误") + "，点「刷新」重试。";
     });
   }
   page(1);
 }
-function lhbAgg(rows){
+function lhbzAgg(rows){
   var seen = {}, recs = [], i, j, r, k;
   for (i = 0; i < rows.length; i++){
     r = rows[i];
@@ -5525,7 +5525,7 @@ function lhbAgg(rows){
     recs.push({ code: code, nm: nm, day: day, buy: (+r.BILLBOARD_BUY_AMT) || 0, sell: (+r.BILLBOARD_SELL_AMT) || 0, net: (+r.BILLBOARD_NET_AMT) || 0, chg: (+r.CHANGE_RATE) || 0 });
   }
   var g = {}, ord = [], idx = null;
-  if (LHBTAB.kind === "th"){ try { idx = thIdx(); } catch(e){ idx = {}; } }
+  if (LHBZTAB.kind === "th"){ try { idx = thIdx(); } catch(e){ idx = {}; } }
   for (i = 0; i < recs.length; i++){
     var rc = recs[i], keys;
     if (idx){ keys = idx[rc.code] || []; }
@@ -5552,61 +5552,61 @@ function lhbAgg(rows){
   arr.sort(function(x, y){ return y.cnt - x.cnt || y.net - x.net; });
   return arr;
 }
-function lhbCell(tag, txt, cls){
+function lhbzCell(tag, txt, cls){
   var e = document.createElement(tag);
   if (txt !== undefined && txt !== null) e.textContent = txt;
   if (cls) e.className = cls;
   return e;
 }
-function lhbYi(v){ return (v >= 0 ? "+" : "-") + (Math.abs(v) / 1e8).toFixed(2); }
-function renderLhbCard(){
+function lhbzYi(v){ return (v >= 0 ? "+" : "-") + (Math.abs(v) / 1e8).toFixed(2); }
+function lhbzRender(){
   var card = $("lhbCard"); if (!card) return;
   card.hidden = false;
-  if (!LHBRALL){ lhbLoad(false); return; }
+  if (!LHBZROWS){ lhbzLoad(false); return; }
   var box = $("lhbTbl"); if (!box) return;
-  var rows = LHBRALL, ds = [], m = {}, i;
+  var rows = LHBZROWS, ds = [], m = {}, i;
   for (i = 0; i < rows.length; i++){
     var d = String(rows[i].TRADE_DATE || "").slice(0, 10);
     if (d && !m[d]){ m[d] = 1; ds.push(d); }
   }
   ds.sort();
-  var use = ds.slice(-Math.max(1, LHBTAB.days || 1)), um = {};
+  var use = ds.slice(-Math.max(1, LHBZTAB.days || 1)), um = {};
   for (i = 0; i < use.length; i++) um[use[i]] = 1;
   var sel = [];
   for (i = 0; i < rows.length; i++){ if (um[String(rows[i].TRADE_DATE || "").slice(0, 10)]) sel.push(rows[i]); }
   var d1 = use[0] || "", d2 = use[use.length - 1] || "—";
   $("lhbDate").textContent = (use.length > 1 ? d1 + " ~ " + d2 : d2);
-  var arr = lhbAgg(sel);
+  var arr = lhbzAgg(sel);
   while (box.firstChild) box.removeChild(box.firstChild);
   var thead = document.createElement("thead"), htr = document.createElement("tr");
-  var cols = ["#", "板块", "上榜" + (LHBTAB.days > 1 ? "股次" : "股数"), "净买(亿)", "买入/卖出(亿)", "均涨幅", "代表个股（净买亿）"];
+  var cols = ["#", "板块", "上榜" + (LHBZTAB.days > 1 ? "股次" : "股数"), "净买(亿)", "买入/卖出(亿)", "均涨幅", "代表个股（净买亿）"];
   for (i = 0; i < cols.length; i++){
-    var th = lhbCell("th", cols[i]);
+    var th = lhbzCell("th", cols[i]);
     if (i === 1 || i === 6) th.style.textAlign = "left";
     htr.appendChild(th);
   }
   thead.appendChild(htr); box.appendChild(thead);
   var tb = document.createElement("tbody");
   if (!arr.length){
-    var er = document.createElement("tr"), ec = lhbCell("td", "这一天没有可归类的板块上榜", "empty");
+    var er = document.createElement("tr"), ec = lhbzCell("td", "这一天没有可归类的板块上榜", "empty");
     ec.colSpan = 7; er.appendChild(ec); tb.appendChild(er);
   }
   for (i = 0; i < arr.length && i < 25; i++){
     var g = arr[i], tr2 = document.createElement("tr");
     if (i === 0) tr2.className = "top";
-    tr2.appendChild(lhbCell("td", String(i + 1)));
-    var tdn = lhbCell("td", null, "name"), a = document.createElement("a");
+    tr2.appendChild(lhbzCell("td", String(i + 1)));
+    var tdn = lhbzCell("td", null, "name"), a = document.createElement("a");
     a.className = "seclink"; a.href = "#";
-    if (LHBTAB.kind === "th"){ a.setAttribute("data-bk", g.key); a.title = "点开看这个题材的主板成分股"; }
+    if (LHBZTAB.kind === "th"){ a.setAttribute("data-bk", g.key); a.title = "点开看这个题材的主板成分股"; }
     else { a.setAttribute("data-hy", g.name); a.title = "点开看这个行业的主板成分股"; }
     a.textContent = g.name;
     tdn.appendChild(a); tr2.appendChild(tdn);
-    var c2 = lhbCell("td", String(g.cnt)); c2.style.fontWeight = "700"; tr2.appendChild(c2);
-    tr2.appendChild(lhbCell("td", lhbYi(g.net), g.net >= 0 ? "up" : "down"));
-    var c4 = lhbCell("td", (g.buy / 1e8).toFixed(1) + " / " + (g.sell / 1e8).toFixed(1));
+    var c2 = lhbzCell("td", String(g.cnt)); c2.style.fontWeight = "700"; tr2.appendChild(c2);
+    tr2.appendChild(lhbzCell("td", lhbzYi(g.net), g.net >= 0 ? "up" : "down"));
+    var c4 = lhbzCell("td", (g.buy / 1e8).toFixed(1) + " / " + (g.sell / 1e8).toFixed(1));
     c4.style.fontSize = "12px"; tr2.appendChild(c4);
-    tr2.appendChild(lhbCell("td", (g.avg >= 0 ? "+" : "") + g.avg.toFixed(2) + "%", g.avg >= 0 ? "up" : "down"));
-    var c6 = lhbCell("td", null, "name"); c6.style.fontSize = "12px";
+    tr2.appendChild(lhbzCell("td", (g.avg >= 0 ? "+" : "") + g.avg.toFixed(2) + "%", g.avg >= 0 ? "up" : "down"));
+    var c6 = lhbzCell("td", null, "name"); c6.style.fontSize = "12px";
     for (var t = 0; t < g.stk.length && t < 3; t++){
       var sp = document.createElement("span");
       sp.style.display = "inline-block"; sp.style.marginRight = "8px";
@@ -5614,7 +5614,7 @@ function renderLhbCard(){
       var bb = document.createElement("b");
       bb.className = g.stk[t].net >= 0 ? "up" : "down";
       bb.style.marginLeft = "3px";
-      bb.textContent = lhbYi(g.stk[t].net);
+      bb.textContent = lhbzYi(g.stk[t].net);
       sp.appendChild(bb); c6.appendChild(sp);
     }
     if (g.stk.length > 3){
@@ -5626,7 +5626,7 @@ function renderLhbCard(){
   }
   box.appendChild(tb);
   var note = "口径：东财龙虎榜日榜，只算主板（剔 ST/退）的上榜股；同一只票同一天多条上榜原因只算一次。上榜股数＝当天上榜家数，上榜股次＝这几天累计上榜次数（同一只票上两天算两次）。净买＝榜上席位合计净买入，均涨幅＝这些票当天涨跌幅均值。";
-  if (LHBTAB.kind === "th") note += " 概念题材用页面题材库反查，一只票会同时算进它所属的多个题材，所以各行相加会大于上榜股数。";
+  if (LHBZTAB.kind === "th") note += " 概念题材用页面题材库反查，一只票会同时算进它所属的多个题材，所以各行相加会大于上榜股数。";
   else note += " 行业按东财行业分类，一股一行。";
   note += " 点板块名可看它的主板成分股。";
   $("lhbNote").textContent = note;
@@ -5634,15 +5634,15 @@ function renderLhbCard(){
 document.addEventListener("click", function(e){
   var t = e.target; if (!t || !t.id) return;
   var id = t.id;
-  if (id === "lhbHy"){ LHBTAB.kind = "hy"; $("lhbHy").classList.add("active"); $("lhbTh").classList.remove("active"); renderLhbCard(); }
-  else if (id === "lhbTh"){ LHBTAB.kind = "th"; $("lhbTh").classList.add("active"); $("lhbHy").classList.remove("active"); renderLhbCard(); }
-  else if (id === "lhbM1"){ LHBTAB.days = 1; $("lhbM1").classList.add("active"); $("lhbM5").classList.remove("active"); renderLhbCard(); }
-  else if (id === "lhbM5"){ LHBTAB.days = 5; $("lhbM5").classList.add("active"); $("lhbM1").classList.remove("active"); renderLhbCard(); }
-  else if (id === "lhbRefresh"){ lhbLoad(true); }
+  if (id === "lhbHy"){ LHBZTAB.kind = "hy"; $("lhbHy").classList.add("active"); $("lhbTh").classList.remove("active"); lhbzRender(); }
+  else if (id === "lhbTh"){ LHBZTAB.kind = "th"; $("lhbTh").classList.add("active"); $("lhbHy").classList.remove("active"); lhbzRender(); }
+  else if (id === "lhbM1"){ LHBZTAB.days = 1; $("lhbM1").classList.add("active"); $("lhbM5").classList.remove("active"); lhbzRender(); }
+  else if (id === "lhbM5"){ LHBZTAB.days = 5; $("lhbM5").classList.add("active"); $("lhbM1").classList.remove("active"); lhbzRender(); }
+  else if (id === "lhbRefresh"){ lhbzLoad(true); }
 });
 (function(){
-  function lhbBoot(){ setTimeout(function(){ try { renderLhbCard(); } catch(e){} }, 1200); }
-  if (document.readyState === "complete") lhbBoot(); else window.addEventListener("load", lhbBoot);
+  function lhbzBoot(){ setTimeout(function(){ try { lhbzRender(); } catch(e){} }, 1200); }
+  if (document.readyState === "complete") lhbzBoot(); else window.addEventListener("load", lhbzBoot);
 })();
 function renderTail(){                        // 每张卡之间让出一帧，长任务就不会叠成一个大冻结
   RTAILAGAIN = false;
