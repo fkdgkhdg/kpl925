@@ -4199,7 +4199,7 @@ function lhbBoomRec(di, code){
 function lhbMoney(v){ v = Math.abs(v); return v >= 10000 ? (v / 10000).toFixed(2) + "亿" : v.toFixed(0) + "万"; }
 function lhbDate(day){ var p = lhbPrevDay(day); return p ? p.slice(5) : ""; }
 // ===== 爆头席位名单：自己填写/增删（存在本机浏览器）=====
-var BMKEY = "kpl_boomseats";
+var BMKEY = "kpl_boomseats_v2";      // v2＝买入口径重算后的名单；旧键（净卖出口径）不再读取
 var BM_DEFAULT = ["中信建投北京鸿翼分公司","平安深圳香蜜湖","华泰镇江黄山南路","华福南京胜太路",
   "国泰海通上海宝山区牡丹江路","财通绍兴袍江袍中北路","华泰舟山体育路","中国银河成都益州大道",
   "华福上海徐汇区宛平南路","国泰海通广州琶洲","广发广州寺右新马路","财通杭州上塘路","湘财上海陆家嘴"];
@@ -4237,7 +4237,7 @@ function seatType(name){
 function seatTypeChar(k){ return k === "retail" ? "散" : k === "inst" ? "机" : k === "north" ? "北" : "游"; }
 function lhbCls(x){
   var t = "st-" + seatType(x.name);
-  if (bmSetName(x.name) || (x.big !== null && x.big >= 45)) return t + " boom";   // 买入后次日大面率 ≥45%，或在自选名单里 → 红条
+  if ((x.big !== null && x.big >= 45) || (x.net >= 0 && bmSetName(x.name))) return t + " boom";  // 买入后次日大面率 ≥45%，或自选名单里且今天在净买 → 红条
   if (x.big !== null && x.big >= 33) return t + " warn2";                        // 33~44% → 橙条
   return t;
 }
