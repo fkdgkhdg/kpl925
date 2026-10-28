@@ -4151,7 +4151,7 @@ function zTipBind(){
   document.addEventListener("scroll", function(){ var b = $("zTip"); if (b) b.style.display = "none"; }, true);
 }
 // ===== 昨日龙虎榜席位（数据来自同目录 lhbdata.js）=====
-var _lhbIdx = null, _lhbBody = {}, _lhbPrev = {};
+var _lhbIdx = null, _lhbBody = {}, _lhbPrev = {}, _lhbBB = {};
 function lhbReady(){ return typeof LHBSEAT !== "undefined" && LHBSEAT && LHBSEAT.days && LHBSEAT.days.length; }
 function lhbPrevDay(day){
   if (_lhbPrev[day] !== undefined) return _lhbPrev[day];
@@ -4180,17 +4180,29 @@ function lhbSeats(code, day){
     });
   }
   var items = map[code];
-  return items && items.length ? { day: p, items: items } : null;
+  if (!items || !items.length) return null;
+  return { day: p, items: items, bb: lhbBoomRec(di, code) };
+}
+// 昨日上榜席位里「净买入、且该席位历史买入后次日大面率≥40%」的最高那个（供 ⚠爆头席位 用）
+function lhbBoomRec(di, code){
+  var m = _lhbBB[di];
+  if (!m){
+    m = _lhbBB[di] = {};
+    ((LHBSEAT.bb && LHBSEAT.bb[di]) || "").split(";").forEach(function(seg){
+      var a = seg.split(","); if (a.length < 4) return;
+      var s = LHBSEAT.seats[+a[2]] || ["?", null, null, 0];
+      m[a[0]] = { pct: +a[1], name: s[0], n: s[3], net: +a[3] };
+    });
+  }
+  return m[code] || null;
 }
 function lhbMoney(v){ v = Math.abs(v); return v >= 10000 ? (v / 10000).toFixed(2) + "亿" : v.toFixed(0) + "万"; }
 function lhbDate(day){ var p = lhbPrevDay(day); return p ? p.slice(5) : ""; }
 // ===== 爆头席位名单：自己填写/增删（存在本机浏览器）=====
 var BMKEY = "kpl_boomseats";
-var BM_DEFAULT = ["华鑫上海源深路","中国银河苏州月亮湾路","东北绍兴金柯桥大道","东方上海浦东新区银城中路",
-  "万联深圳分公司","国投云南分公司","国泰海通深圳益田路","甬兴安徽分公司","中信福州湖东路","华鑫杭州分公司",
-  "华鑫西安分公司","山西浙江分公司","恒泰杭州民和路","东莞成都高升桥路","东莞湖北分公司","甬兴杭州金城路",
-  "财通杭州新业路","中银国际广东分公司","国泰海通广州珠江新城","华鑫南昌分公司","甬兴宁波和源路",
-  "申港深圳深南东路","上海上海分公司","东海常州劳动西路","中信建投北京朝外大街","东兴深圳金田路"];
+var BM_DEFAULT = ["中信建投北京鸿翼分公司","平安深圳香蜜湖","华泰镇江黄山南路","华福南京胜太路",
+  "国泰海通上海宝山区牡丹江路","财通绍兴袍江袍中北路","华泰舟山体育路","中国银河成都益州大道",
+  "华福上海徐汇区宛平南路","国泰海通广州琶洲","广发广州寺右新马路","财通杭州上塘路","湘财上海陆家嘴"];
 var _BMLIST = null;
 function bmLoad(){
   try {
@@ -4225,8 +4237,8 @@ function seatType(name){
 function seatTypeChar(k){ return k === "retail" ? "散" : k === "inst" ? "机" : k === "north" ? "北" : "游"; }
 function lhbCls(x){
   var t = "st-" + seatType(x.name);
-  if (bmSetName(x.name)) return t + " boom";                   // 在你自选的爆头名单里 → 左侧红条
-  if (x.big !== null && x.big >= 33) return t + " warn2";      // 该席位历史大面率 ≥33% → 左侧橙条
+  if (bmSetName(x.name) || (x.big !== null && x.big >= 45)) return t + " boom";   // 买入后次日大面率 ≥45%，或在自选名单里 → 红条
+  if (x.big !== null && x.big >= 33) return t + " warn2";                        // 33~44% → 橙条
   return t;
 }
 // ----- 散户通道（拉萨天团 + 国信浙江互联网）净买标记 -----
@@ -4264,7 +4276,7 @@ function lhbCell(code, day){
     var inList = bmSetName(x.name), cls = lhbCls(x), tk = seatType(x.name);
     var tip = "【" + (TN[tk] || "游资/营业部") + "】" + x.name + "　净" + (x.net >= 0 ? "买 " : "卖 ") + lhbMoney(x.net) +
       (inList ? "　★在你的爆头席位名单里（由「" + inList + "」匹配）" : "") +
-      (x.big === null ? "　（该席位样本不足）" : "　该席位净卖出后次日大面率 " + x.big + "%（样本 " + x.n + "）");
+      (x.big === null ? "　（该席位净买入样本不足 20 笔）" : "　该席位买入后次日大面率 " + x.big + "%（净买入样本 " + x.n + " 笔，次日收盘≤-5% 算大面）");
     return '<span class="lseat ' + cls + '" data-seat="' + esc(x.name) + '" title="' + esc(tip) + '">' +
       '<i><span class="stt">' + seatTypeChar(tk) + '</span>' + esc(x.name) + '</i>' +
       '<b class="' + (x.net >= 0 ? "pos" : "neg") + '">' + (x.net > 0 ? "+" : "-") + lhbMoney(x.net) + '</b></span>';
@@ -4275,9 +4287,16 @@ function lhbCell(code, day){
 function lhbBoom(code, day){
   var r = lhbSeats(code, day);
   if (!r) return "";
-  var hit = r.items.filter(function(x){ return x.net < 0 && bmSetName(x.name); });
-  if (!hit.length) return "";
-  return '<span class="hotstar" style="background:#a11" title="' + esc("⚠ 爆头席位在卖（按你自己填的名单）：" + hit.map(function(x){ return x.name + " 净卖 " + lhbMoney(x.net); }).join("、") + "　名单在榜单下方「爆头席位名单」处可以自己增删") + '">⚠爆头席位</span>';
+  var B = (r.bb && r.bb.pct >= 45) ? r.bb : null;
+  var hit = r.items.filter(function(x){ return x.net >= 0 && (bmSetName(x.name) || (x.big !== null && x.big >= 45)); });
+  if (!B && !hit.length) return "";
+  var ts = [];
+  if (B) ts.push(B.name + " 净买 " + lhbMoney(B.net) + "，买入后次日大面率 " + B.pct + "%");
+  hit.forEach(function(x){
+    if (B && x.name === B.name) return;
+    ts.push(x.name + " 净买 " + lhbMoney(x.net) + "，买入后次日大面率 " + (x.big === null ? "样本不足" : x.big + "%") + (bmSetName(x.name) ? "（自选名单）" : ""));
+  });
+  return '<span class="hotstar" style="background:#a11" title="' + esc("⚠ 爆头席位今天在买：" + ts.join("；") + "\n口径＝该席位历史上每次「净买入上榜」，下一交易日收盘跌幅≤-5% 的比例（样本≥20 笔才给数），≥45% 触发；全席位基准 24.5%。\n名单在榜单下方「爆头席位名单」处可以自己增删") + '">⚠爆头席位</span>';
 }
 function teamTag(code, day){
   if (typeof TEAMSEAT === "undefined" || !TEAMSEAT || !TEAMSEAT.d || !TEAMSEAT.t) return "";
@@ -4317,7 +4336,7 @@ function renderBoomSet(){
   var L = bmList();
   var h = '<div class="chips" style="margin:12px 0 4px">' +
     '<span class="chip big" style="background:#a11;color:#fff">爆头席位名单 ' + L.length + ' 个（可自己增删）</span>' +
-    '<span class="chip">名单里的席位 → 昨日席位列左侧显红条；若它在卖 → 逐票竞价建议一票否决</span></div>';
+    '<span class="chip">名单里的席位 → 昨日席位列左侧显红条；若它在买 → 逐票竞价建议一票否决</span></div>';
   if (typeof TEAMSEAT !== "undefined" && TEAMSEAT && TEAMSEAT.t) h += '<div class="chips" style="margin:2px 0 8px">' +
     '<span class="chip big" style="background:#c60;color:#fff">⚑三班组 ' + TEAMSEAT.t.length + ' 个组合</span>' +
     '<span class="chip">股票名后出现「⚑三班组」＝这只票涨停那天，龙虎榜买入席位里同时出现了某个已知 3 席组合（共现 ≥5 次）。鼠标停在其上看是哪 3 个营业部 + 历史 T+1 收益。</span></div>';
@@ -4334,7 +4353,7 @@ function renderBoomSet(){
     '<button class="mini" id="bmAdd">添加</button>' +
     '<button class="mini" id="bmReset">恢复默认名单</button>' +
     '<button class="mini" id="bmClear">清空</button></div>';
-  h += '<div class="chartnote" style="margin:6px 0 0">默认名单＝历史统计里「净卖出后次日大面率 ≥45%、样本 ≥20」的 26 个席位。关键词匹配：填「源深路」会把该营业部一起算上。改完立即生效，存在本机浏览器（手机、电脑各自保存）。</div>';
+  h += '<div class="chartnote" style="margin:6px 0 0">默认名单＝历史统计里「净买入后次日大面率 ≥45%、样本 ≥20」的 13 个席位（2026-10-28 重算；全席位基准 24.5%）。红条也按「买入后次日大面率 ≥45%」自动标，不必非得在名单里。关键词匹配：填「源深路」会把该营业部一起算上。改完立即生效，存在本机浏览器（手机、电脑各自保存）。</div>';
   el.innerHTML = h;
   var apply = function(fn, keep){
     var a = bmList().slice();
@@ -5282,7 +5301,7 @@ function renderNewTop5(){
       + '<th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%。鼠标悬停看每档样本数 / 封板率 / 收益与胜率。">开盘档位</th>'
       + '<th title="价格＝9:25 竞价价（当日开盘价）">价格</th>'
       + '<th>实际换手</th>'
-      + '<th title="昨日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率；红条/橙条＝爆头或高概率席位">昨日席位' + (lhbDate(_d0) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(_d0) + '</span>' : '') + '</th>'
+      + '<th title="昨日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率；红条＝该席位买入后次日大面率≥45%、橙条＝33~44%">昨日席位' + (lhbDate(_d0) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(_d0) + '</span>' : '') + '</th>'
       + '<th>委比</th><th>成交量</th><th>市值</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">断板卖出(A均值)</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">A胜率</th>'
@@ -5642,7 +5661,7 @@ function renderCore(){
   var arch = STATE.archived;
   var TI2 = topInInfo();
   var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线（上下左右 0/90/180/270° + 4 对角 45/135/225/315°）上的日数＝节点。◆＝当天正是节点（后随角度）；非节点显示「第 N 个交易日 + 距下个节点几天」。起算日作者未公开，须自行设定；仅历史统计，非投资建议。">节点</th><th>竞价涨幅</th><th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%。封板率随高开一路升（低开 8.7% → 高开 7~9.5% 52.0%），中间档最亏（7~9.5% A 均值 -1.75%）。鼠标悬停看每档样本数 / 封板率 / 断板卖出收益与胜率。">开盘档位</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>实际换手</th>'
-           + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝在你自选的爆头席位名单里、橙条＝该席位历史大面率≥33%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
+           + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝该席位买入后次日大面率≥45%（或在自选名单里）、橙条＝33~44%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>成交量</th><th>市值</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
   // 条形量纲：每一列用自己的绝对值最大值（不能用排序键）
@@ -5696,7 +5715,7 @@ function renderCore(){
     ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
     "「题材厚度」＝该股按「开盘啦人气版」题材逐条列出，并标注每个题材在前一交易日同题材一起涨停的主板家数（开盘啦口径）。大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只，灰＝≤1 只），后面的小标签是它的其他题材，鼠标悬停可看全部；没有任何题材数据时才显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
-    "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行开头一个字标、右边是净额，鼠标悬停看席位全称与样本数。席位底色＝类型：散＝散户通道（东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网，橙底）、游＝游资/营业部（红底）、机＝机构专用（蓝底）、北＝北向沪深股通（紫底），其余营业部席位都归「游」；净额字色：绿＝净买、红＝净卖。左侧竖条：红＝该席位在你自选的「爆头席位名单」里（名单在下方，可以自己增删；命中且它在卖→逐票竞价建议一票否决），橙＝该席位历史净卖出后次日大面率≥33%。没上龙虎榜就显示「无龙虎榜」。席位列最上方出现红/橙「散户接盘 +X万」标签＝该股涨停（或上榜）那天，龙虎榜上「散户通道」（拉萨天团：东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网）合计净买 ≥500 万（红＝≥1000 万），同日非散户席位净额在悬停提示里。历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 61%（全体上榜股基率 52%）、次日平均 -1.5%、次日跌超 5% 的概率 34%（基率 24%）；若当天本身就跌停被散户接盘，次日下跌概率 73%、平均 -3.4%。读法＝散户大额接盘，次日基本没有溢价。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
+    "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行开头一个字标、右边是净额，鼠标悬停看席位全称与样本数。席位底色＝类型：散＝散户通道（东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网，橙底）、游＝游资/营业部（红底）、机＝机构专用（蓝底）、北＝北向沪深股通（紫底），其余营业部席位都归「游」；净额字色：绿＝净买、红＝净卖。左侧竖条：红＝该席位「买入后次日大面率」≥45%（或在你自选的爆头席位名单里；命中且它当天在买→逐票竞价建议一票否决），橙＝33~44%。口径＝该席位每次净买入上榜后，下一交易日收盘≤-5% 的比例（样本≥20 笔）。没上龙虎榜就显示「无龙虎榜」。席位列最上方出现红/橙「散户接盘 +X万」标签＝该股涨停（或上榜）那天，龙虎榜上「散户通道」（拉萨天团：东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网）合计净买 ≥500 万（红＝≥1000 万），同日非散户席位净额在悬停提示里。历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 61%（全体上榜股基率 52%）、次日平均 -1.5%、次日跌超 5% 的概率 34%（基率 24%）；若当天本身就跌停被散户接盘，次日下跌概率 73%、平均 -3.4%。读法＝散户大额接盘，次日基本没有溢价。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
@@ -6489,7 +6508,7 @@ function vfAdvEval(day){
     var gk = ADVT.gapK(gap), ak = ADVT.atK(at), mk = ADVT.mvK(r.mc);
     var dmb = (mbNow === null) ? null : (mbNow - bd);
     var boom = (typeof lhbBoom === "function") ? lhbBoom(r.code, day) : "";
-    if (boom) vetos.push("⚠ 爆头席位在卖");
+    if (boom) vetos.push("⚠ 爆头席位在买");
     // ---------- ① 否决项（命中即不买）----------
     if (gap < 0) vetos.push("竞价低开 " + gap.toFixed(2) + "%（低开档各板位历史涨停 0~16%，一律否）");
     if (mbNow === 4 && (b === "1" || b === "2" || b === "3")){
@@ -6636,7 +6655,7 @@ function advRuleTbl(order, ev){
     { k:"价格不在≥3板×20~40元坑（4板10~20元为优）", f:function(r){ if (!(r.px > 0)) return 0; if (r.board >= 3 && r.px >= 20 && r.px < 40) return -1; if (r.board === 4 && r.px >= 10 && r.px < 20) return 1; return 0; }, v:function(r){ return (r.px > 0) ? (r.px.toFixed(2) + "元") : "-"; } },
     { k:"榜内名次≤3", f:function(r){ return (r._rankAT >= 1 && r._rankAT <= 3) ? 1 : ((r._rankAT === 4 || r._rankAT === 5) ? -1 : 0); }, v:function(r){ return r._rankAT ? "第" + r._rankAT : "-"; } },
     { k:"同身位热度前3（≥2只才比）", f:function(r){ if ((bdsN[r.board] || 0) < 2) return 0; var hr = hotRankAny(r.code); if (!hr) return 0; return hr.rank <= 3 ? 1 : (hr.rank >= 21 ? -1 : 0); }, v:function(r){ var hr = hotRankAny(r.code); if (!hr) return "-"; return hr.name + " #" + (hr.rank >= 21 ? "榜外" : hr.rank); } },
-    { k:"无爆头席位在卖", f:function(r){ return (typeof lhbBoom === "function" && lhbBoom(r.code, ev.day)) ? -1 : 1; }, v:function(r){ return (typeof lhbBoom === "function" && lhbBoom(r.code, ev.day)) ? "爆头" : "干净"; } },
+    { k:"无爆头席位在买", f:function(r){ return (typeof lhbBoom === "function" && lhbBoom(r.code, ev.day)) ? -1 : 1; }, v:function(r){ return (typeof lhbBoom === "function" && lhbBoom(r.code, ev.day)) ? "爆头" : "干净"; } },
     { k:"题材厚度≥5只（爆发档）", f:function(r){ var t = themeThick(r.code); if (t === undefined || t === null || !t.length) return -1; var m = 0; t.forEach(function(x){ if (x.k > m) m = x.k; }); return m >= 5 ? 1 : 0; }, v:function(r){ var t = themeThick(r.code); if (t === undefined) return "-"; if (!t || !t.length) return "独苗"; var b = t[0]; t.forEach(function(x){ if (x.k > b.k) b = x; }); return b.n + " " + b.k + "只"; } },
     { k:"环境分≥0", f:function(r){ return eSc > 0 ? 1 : (eSc < 0 ? -1 : 0); }, v:function(r){ return (eSc > 0 ? "+" : "") + eSc; } }
   ];
@@ -6688,7 +6707,7 @@ function advRuleTbl(order, ev){
     RULES.forEach(function(R){ var v = R.f(x.r); if (v === 1) ok++; else if (v === -1) no++; });
     H += '<td style="' + cell + '"><b style="color:#1f7a3d">' + ok + '</b> / <b style="color:#c02c2c">' + no + '</b></td>';
   });
-  H += '</tr></tbody></table></div><p class="note" style="margin:2px 0 8px">读法：这一张表就是把你问过的所有规律合在一处 —— ✓ 越多、✗ 越少越该做。<b>历史门槛：✓ ≥5 条才是胜率过半的档（见下方合成回算）。</b><b>硬否决（竞价低开 / 爆头席位在卖）有一个✗就直接不买</b>；其余是加减力度。注意标了「—」的是当天不适用（比如某板位只有一只票，同身位热度就不比较）。</p>';
+  H += '</tr></tbody></table></div><p class="note" style="margin:2px 0 8px">读法：这一张表就是把你问过的所有规律合在一处 —— ✓ 越多、✗ 越少越该做。<b>历史门槛：✓ ≥5 条才是胜率过半的档（见下方合成回算）。</b><b>硬否决（竞价低开 / 爆头席位在买）有一个✗就直接不买</b>；其余是加减力度。注意标了「—」的是当天不适用（比如某板位只有一只票，同身位热度就不比较）。</p>';
   return H;
 }
 function advFoldToggle(b){
@@ -6799,7 +6818,7 @@ function vfAdvice(){
     if (_bds.length) H += advBoards(day, mbNow, mbPrev, ev.tr, _bds.sort(function(a,b){return a-b;}));
   } catch(e){}
   // —— 怎么用 ——
-  H += '<p class="note" style="margin-top:8px">怎么用：① 低开 / 爆头席位在卖 / 昨日最高 4 板却做 1~3 板 / 最高板 5→4 降级 —— 命中任意一条直接不买；' +
+  H += '<p class="note" style="margin-top:8px">怎么用：① 低开 / 爆头席位在买 / 昨日最高 4 板却做 1~3 板 / 最高板 5→4 降级 —— 命中任意一条直接不买；' +
        '② 昨日涨停 55~65 家是最好的出手环境（41.73%），&lt;35 家（29.87%）和 ≥75 家（35.14%）都该降仓；价格也要看 —— 板位 ≥3 且竞价价 20~40 元是唯一过了 BH 校正的坑（22.73% vs 47.53%、p=0.0005、BH=0.013），直接 -8；4 板 10~20 元 +6；' +
        '③ 实际换手不是越低越好 —— 3 板 3~4% 档 48.00%、≥4% 档 55.17%，旧「≥4% 不买」这条已按数据删掉；' +
        '④ 小市值（&lt;30 亿）各板位一律偏弱，2/3/4 板的 A 中位分别 -8.16% / -7.45% / -9.60%，默认减分；' +
@@ -6817,7 +6836,7 @@ function vfAdvice(){
     '⑥ 昨日涨停股自己的表现是第二天的先行指标：前一日涨停股均涨 2~3% 时最好（日级 86.44%），1~2% 时最差（62.90%）；涨停率最高的其实是均涨 0~1% 档（42.36%，144 笔）—— 1~2% ＝「多而不强」。',
     '⑦ 量能：前一日地量（≤20 分位）日子日级只有 61.29%；60~80 分位档最好（日级 73.08% 且涨停 40.41%）；40~60 分位日级 82.81% 但涨停只有 35.27%。地量别当低吸机会，先降仓。',
     '⑧ 题材厚度：题材厚度 ≥5 只的爆发档更依赖板块合力，独苗更依赖单票接力（无 A 口径分层样本，只作定性）；板块热度前 5 名可直接看「热度#N」标签。',
-    '⑨ 席位（砸盘王）：净卖出后次日吃大面（≤-5%）概率 ≥45% 的席位标红、33~44% 标橙；红标席位当天在净卖出 → 股票名后出「⚠爆头席位」，优先级最高，直接不买。',
+    '⑨ 席位（爆头）：按<b>净买入</b>统计 —— 该席位历史每次「净买入上榜」，下一交易日收盘 ≤-5% 的比例 ≥45% 标红、33~44% 标橙（样本 ≥20 笔；全席位基准 24.5%）。红标席位当天<b>在净买入</b> → 股票名后出「⚠爆头席位」，优先级最高，直接不买。（「砸盘王」那套净卖出后次日跌是另一个口径，只在砸盘王卡片看。）',
     '⑩ 涨停家数水平（A 口径，按昨日涨停家数分层）：<b>55~65 家最好</b>（涨停 41.73%、日级 83.78%、A 均值 +0.22%，127 票/37 日）；45~55 家 40.31%（258 票）；35~45 家 38.00%（100 票）；65~75 家 35.78%（109 票）；<b>≥75 家 35.14%</b>（185 票，日级 69.09%）；<b>&lt;35 家 29.87%</b>（77 票，日级 63.64%）。<b>最低涨停率在 &lt;35 家，最高日级在 55~65 家；两头都别重仓，旧「只有 &lt;35 家该降仓」在新口径下不成立。</b>',
     '⑪ 实际换手：不是越低越好 —— 3 板 3~4% 档 48.00%、≥4% 档 55.17%（旧「≥4% 不买」已按数据删掉）；流通市值 &lt;30 亿各板位一律偏弱，2/3/4 板 A 中位 -7%~-10%。',
     '⑫ 高位高开是坑：4 板配 7~9.5% 高开 —— 只有 26.67% 涨停、A 均值 -4.09% / A 中位 -9.56%（15 票/14 日，封板率仅 33.3%）；4 板再叠「昨日涨停股均涨 ≥3%」（高位 + 普涨过头）更差，别在高位接这类组合。',
@@ -6965,7 +6984,7 @@ function vfRenderAn(){
     cn.push(chip('连板段才是肉：持有≥3天 ' + hold3.length + ' 笔均 ' + vfPct(m(hold3)) + '（' + (hold3.filter(function(x){ return x.ret > 0; }).length / hold3.length * 100).toFixed(0) + '% 赚）；只持有 1 天 ' + hold1.length + ' 笔均 ' + vfPct(m(hold1))));
   }
   var cnHtml = '<div class="chips" style="margin-top:8px">' + cn.join("") + '</div>' +
-    '<p class="note" style="margin-top:4px"><b>执行口径：</b>竞价 ≥4% → 身位 2~4 板（优先 3 板）→ 实际换手 2~3% → 昨日涨停家数 &lt;50 家 → 龙虎榜无「⚠爆头席位」在卖。<b>当天没封住 → 受 T+1 限制最早只能次日开盘卖（这也是主口径的一部分）。</b>上面每条都是拿你自己的记录现算的，样本变多会自己更新。</p>';
+    '<p class="note" style="margin-top:4px"><b>执行口径：</b>竞价 ≥4% → 身位 2~4 板（优先 3 板）→ 实际换手 2~3% → 昨日涨停家数 &lt;50 家 → 龙虎榜无「⚠爆头席位」在买。<b>当天没封住 → 受 T+1 限制最早只能次日开盘卖（这也是主口径的一部分）。</b>上面每条都是拿你自己的记录现算的，样本变多会自己更新。</p>';
   el.innerHTML = h + cnHtml;
 }
 function vfStatAll(cb){
