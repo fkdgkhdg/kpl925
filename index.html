@@ -5088,12 +5088,15 @@ function nvLoadCache(d){
     var s = localStorage.getItem(nvKeyOf(d));
     if (!s) return null;
     var o = JSON.parse(s);
-    return (o && o.v === 1 && o.day === d && o.rows) ? o : null;
+    if (!(o && o.v === 1 && o.day === d && o.rows)) return null;
+    var _t0 = new Date(o.ts || 0);
+    if (_t0.getHours() * 100 + _t0.getMinutes() < 925) return null;   // drop pre-9:25 partial auction snapshot
+    return o;
   } catch(e){ return null; }
 }
-function nvSaveCache(o){ if (!nvInWin()) return; try { localStorage.setItem(nvKeyOf(o.day), JSON.stringify(o)); } catch(e){} }
+function nvSaveCache(o){ var _t = new Date((o && o.ts) || Date.now()); var _hm = ("0"+_t.getHours()).slice(-2) + ":" + ("0"+_t.getMinutes()).slice(-2); if (_hm < "09:15" || _hm >= "09:30") return; try { localStorage.setItem(nvKeyOf(o.day), JSON.stringify(o)); } catch(e){} }
 function nvHM(){ var n = new Date(); return ("0"+n.getHours()).slice(-2) + ":" + ("0"+n.getMinutes()).slice(-2); }
-function nvInWin(){ var h = nvHM(); return h >= "09:15" && h <= "09:45"; }
+function nvInWin(){ var h = nvHM(); return h >= "09:15" && h < "09:30"; }
 function nvLastZT(day){                 // 竞价日（STATE.day）的前一个交易日主板涨停股集合（这一栏要剔除的对象）
   if (NVZT && NVZT.day === day) return Promise.resolve(NVZT.set);
   var PZ = day ? new Date(day + "T00:00:00") : new Date();
@@ -5201,7 +5204,13 @@ function renderNewTop5(){
   if ($("nvRefresh") && !$("nvRefresh").dataset.bound){
     $("nvRefresh").dataset.bound = "1";
     $("nvRefresh").onclick = function(){
-      NV.force = true; NV.rows = null; NV.ts = 0; NV.err = ""; NV.loading = false;
+      NV.force = false; NV.loading = false; NV.err = "";
+      if (nvInWin()){ NV.rows = null; NV.ts = 0; NV.src = ""; }
+      else {
+        var c = nvLoadCache(STATE.day);
+        NV.rows = c ? c.rows : null; NV.ts = c ? (c.ts || 0) : 0; NV.src = c ? (c.src || "") : "";
+        if (c) NV.day = c.day;
+      }
       renderNewTop5();
     };
   }
@@ -5232,7 +5241,7 @@ function renderNewTop5(){
     if (_sd && (_t.getHours() * 100 + _t.getMinutes()) < 925 && nvHM() >= "09:25"){ NV.rows = null; NV.ts = 0; NV.src = ""; }
   }
   var inWin = nvInWin(), age = Date.now() - (NV.ts || 0);
-  if (!NV.loading && !NV.rows && (inWin || NV.force)){
+  if (!NV.loading && !NV.rows && inWin){
     NV.loading = true; NV.force = false;
     var scanP = nvScan().then(function(o){
       NV.loading = false;
@@ -5262,17 +5271,19 @@ function renderNewTop5(){
   if (!NV.rows){
     if (!inWin && nvArchDay(STATE.day)){ return renderNewTop5Archive(STATE.day); }   // 非竞价时点：退回当天 9:25 存档（nvdata.js）
     var tips = "";
+    var _hm = nvHM();
     if (inWin) tips = "扫描失败：" + (NV.err || "取不到行情") + "。点右上「重新扫描」重试。";
-    else tips = "这一栏看的是「今天 9:25 的竞价实际换手」，只有 9:15~9:45 打开本页才会自动抓取并定格；" +
-      "9:25 打开会自己扫、不用手工跑脚本。现在不在这个时点，所以没有当天快照可显示。" +
+    else if (_hm < "09:15") tips = "还没到 9:15。9:15 起本页会自动扫全市场竞价，9:25 那一刻定格成当天名单，不用手工跑脚本。";
+    else tips = "已经过了 9:25。这一栏只认当天 9:25 的竞价定格：本机没有留下今天的定格快照，也没有今天的存档，无法用收盘后的全天成交额倒推竞价榜。" +
+      "下一个交易日 9:15~9:25 打开本页，会在 9:25 自动定格。" +
       (NV.err ? "（上次扫描失败：" + NV.err + "）" : "");
-    if (dt) dt.textContent = STATE.day + (inWin ? "（实时扫描失败）" : "（不在竞价时点）");
+    if (dt) dt.textContent = STATE.day + (inWin ? "（实时扫描失败）" : (_hm < "09:15" ? "（未到竞价时点）" : "（已过 9:25）"));
     if (el) el.innerHTML = inWin
       ? '<span class="chip" style="background:#a11;color:#fff">扫描失败</span>'
-      : '<span class="chip">现在不在 9:15~9:45 竞价时点，没有当天快照</span>';
+      : '<span class="chip">' + (_hm < "09:15" ? "还没到 9:15" : "已过 9:25，没有当天定格") + '</span>';
     tb.innerHTML = '<tbody><tr><td class="empty">' + esc(tips) + '</td></tr></tbody>';
-    if (nt) nt.textContent = "扫描完全在网页里自动完成（东财→腾讯→分时校正），扫到的快照按日期存在本机浏览器，当天再看不用重扫。" +
-      "想立刻试一次可以点右上「重新扫描」（非竞价时点扫出来的是全天成交额，不代表 9:25）。";
+    if (nt) nt.textContent = "扫描完全在网页里自动完成（东财→腾讯→分时校正），9:15~9:25 扫到的快照按日期存在本机浏览器，当天再看不用重扫。" +
+      "9:30 之后点「重新扫描」只会读取当天 9:25 的定格或存档，不会拿全天成交额冒充竞价。";
     return;
   }
   var rows = NV.rows.slice();
