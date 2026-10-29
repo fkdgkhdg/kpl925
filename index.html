@@ -284,6 +284,7 @@
       <a class="stk" id="klLink" target="_blank" rel="noopener" href="#">同花顺 ↗</a>
       <button id="klClose" style="float:right">关闭</button><button id="klSize" style="float:right;margin-right:6px">放大</button>
       <span style="float:right;margin-right:8px"><button id="klPrev">← 前一日</button><button id="klNext">后一日 →</button><button id="klSell">以这天为卖出日</button></span></h2>
+    <div class="opts" id="klTabs"><button id="klTabDay" class="active">日K</button><button id="klTabMin">分时</button><button id="klTabMinY">昨日分时</button><span class="tag" id="klMinTag"></span></div>
     <div id="klChart"></div>
     <div class="chartnote" id="klTip"></div>
     <div id="klIdx"></div>
@@ -3241,10 +3242,11 @@ function klIdxDraw(d0, d1, day, day2, stockRet){
       mk + '<polyline points="' + pts + '" fill="none" stroke="#e07a1f" stroke-width="1.6"></polyline>' + tk + '</svg>';
   });
 }
-var KLST = { code: null, name: null, bars: null, day: null, day2: null, buyDay: null, buyPrice: null };
+var KLST = { code: null, name: null, bars: null, day: null, day2: null, buyDay: null, buyPrice: null, mode: "day", dayNote: "", dayTip: "" };
 function klShow(day){                       // 用已取到的K线重画某一天
   if (!KLST.bars) return;
   klDay = day;
+  if (KLST.mode === "min"){ klMinShow(day); return; }
   var rng = klDraw(KLST.bars, day, KLST.day2);
   if (rng) klIdxDraw(rng.d0, rng.d1, day, KLST.day2, (rng.r0 > 0 ? (rng.r1 / rng.r0 - 1) * 100 : null));
   $("klSub").textContent = "停在 " + day + (KLST.day2 ? "（买 " + KLST.day + " → 卖 " + KLST.day2 + "）" : "");
@@ -3286,6 +3288,7 @@ function klStep(dir){                       // 前后翻一个交易日
   if (!KLST.bars || !KLST.bars.length) return;
   var i = -1; for (var k = 0; k < KLST.bars.length; k++) if (KLST.bars[k].d <= klDay) i = k;
   var j = i + dir; if (j < 0 || j > KLST.bars.length - 1) return;
+  if (KLST.minY){ KLST.minY = false; if ($("klTabMinY")) $("klTabMinY").classList.remove("active"); if ($("klTabMin")) $("klTabMin").classList.add("active"); }
   klShow(KLST.bars[j].d);
 }
 function klOpen(code, name, day, day2){
@@ -3323,7 +3326,19 @@ function klOpen(code, name, day, day2){
   $("klNote").textContent = "";
   card.scrollIntoView({ behavior: "smooth", block: "start" });
   KLST.code = code; KLST.name = name; KLST.day = day; KLST.day2 = day2; KLST.bars = null;
+  KLST.mode = "day"; KLST.minY = false; KLST.dayNote = ""; KLST.dayTip = "";
+  if ($("klTabMinY")) $("klTabMinY").classList.remove("active");
+  if ($("klTabMinY")) $("klTabMinY").textContent = "昨日分时";
+  if ($("klTabDay")) $("klTabDay").classList.add("active");
+  if ($("klTabMin")) $("klTabMin").classList.remove("active");
+  if ($("klMinTag")) $("klMinTag").textContent = "";
   if (KLST._bound === undefined) KLST._bound = true;
+  if ($("klTabDay") && !$("klTabDay").dataset.bound){
+    $("klTabDay").dataset.bound = "1";
+    $("klTabDay").addEventListener("click", function(){ klModeSet("day"); });
+    if ($("klTabMin")) $("klTabMin").addEventListener("click", function(){ klModeSet("min"); });
+    if ($("klTabMinY")) $("klTabMinY").addEventListener("click", function(){ klModeSet("miny"); });
+  }
   if (!$("klPrev").dataset.bound){
     $("klPrev").dataset.bound = "1";
     $("klPrev").addEventListener("click", function(){ klStep(-1); });
@@ -3368,7 +3383,396 @@ function klOpen(code, name, day, day2){
     } else {
       $("klNote").textContent = "K 线为不复权日线，虚线是正在看的那天。";
     }
+    KLST.dayNote = $("klNote").textContent; KLST.dayTip = $("klTip").textContent;
   });
+}
+// ===== 分时：点「分时」看这一天（默认正在看的这天＝昨天）每分钟怎么走的 =====
+var KLMIN = {};                                   // 缓存：代码@日期 → 分钟数组
+var KLMINP = {};                                   // 缓存：代码@日期 → 该日昨收（腾讯接口自带 prec）
+function klMinKey(c, d){ return c + "@" + d; }
+function klPrefOf(code){ return /^(6|9)/.test(code) ? "sh" : (/^(0|2|3)/.test(code) ? "sz" : "bj"); }
+function klFmtDate8(v){
+  v = String(v || "");
+  return v.length === 8 ? v.slice(0, 4) + "-" + v.slice(4, 6) + "-" + v.slice(6) : v;
+}
+function klMinLoad(cb){                           // 腾讯：_var 赋值式脚本，带最近 5 个交易日
+  var code = KLST.code; if (!code){ cb(null); return; }
+  var pref = klPrefOf(code), nm = "TXM" + (++KLSEQ), done = false;
+  var sc = document.createElement("script");
+  var tm = setTimeout(function(){ if (sc.parentNode) sc.parentNode.removeChild(sc); fin(null); }, 8000);
+  function fin(v){
+    if (done) return; done = true;
+    try { delete window[nm]; } catch(e){ window[nm] = null; }
+    cb(v);
+  }
+  sc.onload = function(){
+    clearTimeout(tm);
+    var j = null; try { j = window[nm]; } catch(e){}
+    if (sc.parentNode) sc.parentNode.removeChild(sc);
+    fin(j || null);
+  };
+  sc.onerror = function(){ clearTimeout(tm); if (sc.parentNode) sc.parentNode.removeChild(sc); fin(null); };
+  sc.src = "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=" + pref + code + "&_var=" + nm + "&_=" + Date.now();
+  document.body.appendChild(sc);
+}
+function klMinParseTx(j, code){
+  var pref = klPrefOf(code), o = j && j.data && j.data[pref + code];
+  var days = {}, precs = {};
+  if (o && o.data && o.data.length){
+    o.data.forEach(function(dd){
+      var arr = [], pv = 0, pa = 0, seen = {};
+      (dd.data || []).forEach(function(line){
+        var q = String(line).split(" "), tt = +q[0], pr = +q[1];
+        if (!((tt >= 930 && tt <= 1130) || (tt >= 1300 && tt <= 1500))) return;
+        if (!(pr > 0) || seen[tt]) return;
+        seen[tt] = 1;
+        var cv = +q[2] || 0, ca = +q[3] || 0;
+        arr.push({ t: tt, p: pr, v: Math.max(0, cv - pv) * 100, a: Math.max(0, ca - pa) });
+        pv = cv; pa = ca;
+      });
+      var d = klFmtDate8(dd.date);
+      if (arr.length > 1){ days[d] = arr; if (+dd.prec > 0) precs[d] = +dd.prec; }
+    });
+  }
+  if (!Object.keys(days).length) return null;
+  var q2 = (o && o.qt && o.qt[pref + code]) || null, pv0 = q2 ? +q2[4] : null;
+  return { days: days, precs: precs, prev: (pv0 > 0 ? pv0 : null) };
+}
+function klMinLoadSina(cb){                       // 新浪：JSONP 分钟线兜底
+  var code = KLST.code; if (!code){ cb(null); return; }
+  var pref = klPrefOf(code), nm = "SKM" + (++KLSEQ);
+  var url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/" + nm + "/CN_MarketDataService.getKLineData?symbol=" + pref + code + "&scale=1&ma=no&datalen=1210";
+  klLoadScript(url, nm, function(a){
+    if (!a || !a.length){ cb(null); return; }
+    var by = {};
+    a.forEach(function(x){
+      var sv = String(x.day || ""), d = sv.slice(0, 10), hm = sv.slice(11, 16).replace(":", "");
+      if (d.length !== 10 || !hm) return;
+      var tt = +hm;
+      if (!((tt >= 930 && tt <= 1130) || (tt >= 1300 && tt <= 1500))) return;
+      (by[d] = by[d] || []).push({ t: tt, p: +x.close, v: +x.volume || 0, a: +x.amount || 0 });
+    });
+    Object.keys(by).forEach(function(d){ by[d].sort(function(p1, q1){ return p1.t - q1.t; }); });
+    var ds = Object.keys(by).sort(), precs = {};
+    ds.forEach(function(d, k){
+      if (k > 0){ var pb = by[ds[k - 1]]; if (pb && pb.length) precs[d] = pb[pb.length - 1].p; }
+    });
+    cb(ds.length ? { days: by, precs: precs, prev: null } : null);
+  }, 9000);
+}
+function klMinFetch(cb){
+  klMinLoad(function(r){
+    if (r && r.days){ cb(r); return; }
+    klMinLoadSina(function(r2){ cb(r2 || null); });
+  });
+}
+var KLPREV = {};                                  // 代码 -> [[日期, 收盘], ...]（腾讯不复权日线，用来算分时昨收）
+function klMinPrevFetch(code, cb){
+  if (KLPREV[code]){ cb(KLPREV[code]); return; }
+  var pref = klPrefOf(code), nm = "KP" + (++KLSEQ);
+  var url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=" + pref + code + ",day,,,30,&_var=" + nm + "&_=" + Date.now();
+  klLoadScript(url, nm, function(j){
+    var o = j && j.data && j.data[pref + code], arr = (o && (o.day || o.qfqday)) || [], out = [];
+    for (var i = 0; i < arr.length; i++) if (arr[i] && arr[i][0] && +arr[i][2] > 0) out.push([arr[i][0], +arr[i][2], +arr[i][1]]);
+    KLPREV[code] = out;
+    cb(out);
+  }, 9000);
+}
+function klMinOpenOf(code, date){                  // 这一天的开盘价（腾讯日线，和分时同口径）
+  var a = KLPREV[code] || [];
+  for (var i = 0; i < a.length; i++) if (a[i][0] === date && a[i][2] > 0) return a[i][2];
+  return null;
+}
+function klMinPrevOf(code, date){                  // 严格早于这一天的最后一个收盘价
+  var a = KLPREV[code] || [], best = null;
+  for (var i = 0; i < a.length; i++) if (a[i][0] < date && a[i][1] > 0) best = a[i][1];
+  return best;
+}
+function klMinPrevClose(date, hint){              // 兜底：日K里找前一天收盘（日K可能还没今天这根）
+  var bars = KLST.bars || [];
+  for (var i = 0; i < bars.length; i++){
+    if (bars[i].d === date) return (i > 0 && bars[i - 1].c > 0) ? bars[i - 1].c : null;
+  }
+  return hint || null;
+}
+
+function klMinPrevTrade(date){
+  var bars = KLST.bars || [], i = -1, k;
+  for (k = 0; k < bars.length; k++){ if (bars[k].d <= date) i = k; }
+  if (i > 0) return bars[i - 1].d;
+  if (i === 0) return null;
+  var d = new Date(String(date).replace(/-/g, "/") + " 00:00:00");
+  if (isNaN(d.getTime())) return null;
+  for (k = 0; k < 12; k++){
+    d.setDate(d.getDate() - 1);
+    var wd = d.getDay();
+    if (wd !== 0 && wd !== 6){ return klFmtDate8("" + d.getFullYear() + ("0" + (d.getMonth() + 1)).slice(-2) + ("0" + d.getDate()).slice(-2)); }
+  }
+  return null;
+}
+function klMinShow(date){
+  if (!KLST.code) return;
+  if (!date) date = klDay || KLST.day;
+  klDay = date;
+  var key = klMinKey(KLST.code, date);
+  var t0 = new Date(), t8 = "" + t0.getFullYear() + ("0" + (t0.getMonth() + 1)).slice(-2) + ("0" + t0.getDate()).slice(-2);
+  var isToday = date === klFmtDate8(t8);
+  var box = $("klChart"); if (!box) return;
+  if (KLMIN[key] && !isToday){ klMinPaint(date, KLMIN[key], KLMINP[key]); return; }
+  box.innerHTML = '<p class="note">正在取 ' + date + ' 的分时…</p>';
+  $("klIdx").innerHTML = "";
+  var code0 = KLST.code;
+  klMinFetch(function(r){
+    if (KLST.mode !== "min" || KLST.code !== code0) return;
+    if (!r || !r.days){ box.innerHTML = '<p class="note">分时没取到（腾讯、新浪都没回），稍等一下再点「分时」。</p>'; return; }
+    Object.keys(r.days).forEach(function(d){ KLMIN[klMinKey(code0, d)] = r.days[d]; if (r.precs && r.precs[d] > 0) KLMINP[klMinKey(code0, d)] = r.precs[d]; });
+    if (r.days[date]){ klMinPaint(date, r.days[date], (r.precs || {})[date]); }
+    else {
+      var have = Object.keys(r.days).sort();
+      box.innerHTML = '<p class="note">分时只保留最近 5 个交易日（' + have.join("、") + '），' + date + ' 这天的分时取不到。点「日K」看这段走势。</p>';
+      $("klSub").textContent = "分时 " + date + "（无数据）";
+      klIdxMinDraw(date);
+    }
+  });
+}
+function klMinPaint(date, bars, prec){
+  var box = $("klChart"); if (!box || !bars || bars.length < 2) return;
+  var n = bars.length, i, rhi = -1e9, rlo = 1e9, SUMV = 0, vsort = [];
+  for (i = 0; i < n; i++){
+    var b = bars[i];
+    if (b.p > rhi) rhi = b.p;
+    if (b.p < rlo) rlo = b.p;
+    vsort.push(b.v); SUMV += b.v;
+  }
+  vsort.sort(function(x1, y1){ return x1 - y1; });
+  var hei = Math.max(1, vsort[Math.floor((n - 1) * 0.97)] || 1);
+  var pv0 = (prec > 0) ? +prec : 0;
+  if (!pv0){ for (i = 1; i < n; i++){ if (bars[i - 1].p > 0){ pv0 = bars[i - 1].p; break; } } }
+  if (!pv0) pv0 = bars[0].p;
+  var prev = Math.round(pv0 * 100) / 100;
+  var code = KLST.code || "";
+  var lim = /^(30|68|92)/.test(code) ? 0.2 : 0.1;
+  var lu = Math.round(prev * (1 + lim) * 100) / 100, ld = Math.round(prev * (1 - lim) * 100) / 100;
+  var hi = lu, lo = ld;
+  if (rhi > hi + 0.004 || rlo < lo - 0.004){ hi = Math.max(rhi, prev) * 1.002; lo = Math.min(rlo, prev) * 0.998; }
+  var w = 980, hp = 224, hv = 62, gp = 12, padL = 52, padR = 64, padT = 12, padB = 18;
+  var H = padT + hp + gp + hv + padB;
+  var yP = function(v){ return padT + (hi - v) / (hi - lo) * hp; };
+  var iw = w - padL - padR, bw = iw / n;
+  var xOf = function(k){ return padL + k * bw + bw / 2; };
+  var sv = 0, sa = 0, px = [], av = [], vol = [], vy0 = padT + hp + gp;
+  for (i = 0; i < n; i++){
+    sv += bars[i].v; sa += bars[i].a;
+    var avp = sv > 0 ? sa / sv : bars[i].p;
+    px.push(xOf(i).toFixed(1) + "," + yP(bars[i].p).toFixed(1));
+    av.push(xOf(i).toFixed(1) + "," + yP(avp).toFixed(1));
+    var up = i === 0 ? bars[i].p >= prev : bars[i].p >= bars[i - 1].p;
+    var bh = Math.min(1, hei > 0 ? bars[i].v / hei : 0) * hv;
+    vol.push('<rect x="' + (padL + i * bw).toFixed(1) + '" y="' + (vy0 + hv - bh).toFixed(1) + '" width="' + Math.max(0.7, bw * 0.66).toFixed(1) + '" height="' + Math.max(0, bh).toFixed(1) + '" fill="' + (up ? "#c02c2c" : "#1f7a3d") + '" opacity="0.7"></rect>');
+  }
+  var grid = "", plab = "";
+  var ticks = [[lu, "涨停", "#c02c2c"], [(lu + prev) / 2, "", ""], [prev, "昨收", "#8a94a6"], [(prev + ld) / 2, "", ""], [ld, "跌停", "#1f7a3d"]];
+  ticks.forEach(function(t){
+    var v = t[0], y = yP(v).toFixed(1), pcs = (v / prev - 1) * 100, isP = (t[1] === "昨收");
+    grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (w - padR) + '" y2="' + y + '" stroke="' + (isP ? "#b9c4d4" : "#e9edf4") + '"' + (isP ? ' stroke-dasharray="4 3"' : '') + '></line>';
+    plab += '<text x="' + (padL - 6) + '" y="' + (+y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="' + (v > prev ? "#c02c2c" : (v < prev ? "#1f7a3d" : "#3a4557")) + '">' + v.toFixed(2) + '</text>';
+    plab += '<text x="' + (w - padR + 6) + '" y="' + (+y + 3.5).toFixed(1) + '" font-size="10" fill="' + (pcs > 0.0001 ? "#c02c2c" : (pcs < -0.0001 ? "#1f7a3d" : "#6b7688")) + '">' + (pcs > 0 ? "+" : "") + pcs.toFixed(2) + '%</text>';
+    if (t[1] === "涨停") plab += '<text x="' + (padL + 5) + '" y="' + (+y + 12).toFixed(1) + '" font-size="10" fill="#c02c2c" opacity="0.85">涨停</text>';
+    if (t[1] === "跌停") plab += '<text x="' + (padL + 5) + '" y="' + (+y - 5).toFixed(1) + '" font-size="10" fill="#1f7a3d" opacity="0.85">跌停</text>';
+  });
+  var tl = "";
+  [[930, "09:30"], [1030, "10:30"], [1130, "11:30/13:00"], [1400, "14:00"], [1500, "15:00"]].forEach(function(m){
+    var k = -1;
+    for (var z = 0; z < n; z++){ if (bars[z].t === m[0]){ k = z; break; } }
+    if (k < 0) return;
+    var xx = xOf(k).toFixed(1);
+    tl += '<line x1="' + xx + '" y1="' + padT + '" x2="' + xx + '" y2="' + (vy0 + hv) + '" stroke="#eff2f7"></line>';
+    if (m[1]) tl += '<text x="' + xx + '" y="' + (H - 4) + '" text-anchor="middle" font-size="10" fill="#8a94a6">' + m[1] + '</text>';
+  });
+  var last = bars[n - 1], op = bars[0].p, pct = (last.p / prev - 1) * 100;
+  var amp = (rhi - rlo) / prev * 100;
+  var col = pct >= 0 ? "#c02c2c" : "#1f7a3d";
+  var cnt = function(v){ return (v > 0 ? "+" : "") + v.toFixed(2) + "%"; };
+  var stat = '<div class="chips"><span class="chip">日期 <b>' + date + '</b></span>' +
+    '<span class="chip">开 <b>' + op.toFixed(2) + '</b></span>' +
+    '<span class="chip">高 <b>' + rhi.toFixed(2) + '</b></span>' +
+    '<span class="chip">低 <b>' + rlo.toFixed(2) + '</b></span>' +
+    '<span class="chip">收 <b>' + last.p.toFixed(2) + '</b></span>' +
+    '<span class="chip">涨跌 <b style="color:' + col + '">' + cnt(pct) + '</b></span>' +
+    '<span class="chip">振幅 <b>' + amp.toFixed(2) + '%</b></span>' +
+    '<span class="chip">量 <b>' + (SUMV / 1000000).toFixed(2) + ' 万手</b></span>' +
+    '<span class="chip">昨收 <b>' + prev.toFixed(2) + '</b></span>' +
+    '<span class="chip">涨停 <b style="color:#c02c2c">' + lu.toFixed(2) + '</b></span>' +
+    '<span class="chip">跌停 <b style="color:#1f7a3d">' + ld.toFixed(2) + '</b></span></div>';
+  box.innerHTML = stat + '<svg id="klMinSvg" viewBox="0 0 ' + w + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:auto;display:block">' +
+    grid + tl + vol.join("") +
+    '<polyline points="' + px.join(" ") + '" fill="none" stroke="' + col + '" stroke-width="1.5"></polyline>' +
+    '<polyline points="' + av.join(" ") + '" fill="none" stroke="#e0a13a" stroke-width="1.1" opacity="0.95"></polyline>' +
+    plab +
+    '<line id="klMinHover" x1="0" y1="' + padT + '" x2="0" y2="' + (vy0 + hv) + '" stroke="#1f3864" stroke-width="1" stroke-dasharray="2 2" visibility="hidden"></line></svg>';
+  $("klSub").textContent = (KLST.minY ? "昨日分时 " : "分时 ") + date + (KLST.day2 ? "（买 " + KLST.day + " → 卖 " + KLST.day2 + "）" : "");
+  $("klTip").textContent = "分时：红绿＝股价，橙＝当日均价，下方柱＝每分钟成交量，灰虚线＝昨收；纵轴上边是涨停价、下边是跌停价。鼠标划过看每一分钟。";
+  $("klNote").textContent = "分时是 " + date + " 09:30–15:00 的 1 分钟走势（腾讯／新浪），不复权；均价＝累计成交额÷累计成交量；纵轴按涨跌停（±" + Math.round(lim * 100) + "%）标准刻度。";
+  klMinHoverBind(bars, prev, xOf);
+  klIdxMinDraw(date);
+}
+function klMinHoverBind(bars, prev, xOf){
+  var svg = $("klMinSvg"); if (!svg) return;
+  svg.addEventListener("mousemove", function(e){
+    var n = bars.length, rc = svg.getBoundingClientRect();
+    var x = (e.clientX - rc.left) / rc.width * 980;
+    var k = Math.round((x - 52) / ((980 - 52 - 62) / n) - 0.5);
+    if (k < 0) k = 0;
+    if (k > n - 1) k = n - 1;
+    var b = bars[k], mk = $("klMinHover");
+    if (mk){ var hx = xOf(k).toFixed(1); mk.setAttribute("x1", hx); mk.setAttribute("x2", hx); mk.setAttribute("visibility", "visible"); }
+    var sv = 0, sa = 0;
+    for (var i = 0; i <= k; i++){ sv += bars[i].v; sa += bars[i].a; }
+    var avg = sv > 0 ? sa / sv : b.p, pcs = (b.p / prev - 1) * 100;
+    var hh = Math.floor(b.t / 100), mm = b.t % 100;
+    $("klTip").textContent = (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm +
+      "　价 " + b.p.toFixed(2) + "　均 " + avg.toFixed(2) + "　" + (pcs > 0 ? "+" : "") + pcs.toFixed(2) + "%" +
+      "　这一分钟 " + Math.round(b.v / 100) + " 手";
+  });
+  svg.addEventListener("mouseleave", function(){ var mk = $("klMinHover"); if (mk) mk.setAttribute("visibility", "hidden"); });
+}
+
+var KLIDXMIN = {}, KLIDXSYM = "sh000001";
+var KLIDXNAME = { sh000001: "上证指数", sz399001: "深证成指", sz399006: "创业板指" };
+function klIdxMinTabs(sym){
+  var h = '<div class="opts" style="margin:2px 0 4px">';
+  Object.keys(KLIDXNAME).forEach(function(k){ h += '<button data-ix="' + k + '"' + (k === sym ? ' class="active"' : '') + '>' + KLIDXNAME[k] + '</button>'; });
+  return h + '</div>';
+}
+function klIdxMinBind(date){
+  var box = $("klIdx"); if (!box) return;
+  var btns = box.querySelectorAll("button[data-ix]");
+  for (var i = 0; i < btns.length; i++){
+    btns[i].onclick = function(){ KLIDXSYM = this.getAttribute("data-ix"); klIdxMinDraw(date); };
+  }
+}
+function klIdxMinLoad(sym, cb){
+  var nm = "IXM" + (++KLSEQ), done = false;
+  var sc = document.createElement("script");
+  var tm = setTimeout(function(){ if (sc.parentNode) sc.parentNode.removeChild(sc); fin(null); }, 8000);
+  function fin(v){
+    if (done) return; done = true;
+    try { delete window[nm]; } catch(e){ window[nm] = null; }
+    cb(v);
+  }
+  sc.onload = function(){
+    clearTimeout(tm);
+    var j = null; try { j = window[nm]; } catch(e){}
+    if (sc.parentNode) sc.parentNode.removeChild(sc);
+    fin(j || null);
+  };
+  sc.onerror = function(){ clearTimeout(tm); if (sc.parentNode) sc.parentNode.removeChild(sc); fin(null); };
+  sc.src = "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=" + sym + "&_var=" + nm + "&_=" + Date.now();
+  document.body.appendChild(sc);
+}
+function klIdxMinFetch(sym, cb){
+  klIdxMinLoad(sym, function(j){
+    var o = j && j.data && j.data[sym];
+    if (!o || !o.data){ cb(null); return; }
+    var days = {}, precs = {};
+    o.data.forEach(function(dd){
+      var arr = [], pv = 0, pa = 0, seen = {};
+      (dd.data || []).forEach(function(line){
+        var q = String(line).split(" "), tt = +q[0], pr = +q[1];
+        if (!((tt >= 930 && tt <= 1130) || (tt >= 1300 && tt <= 1500))) return;
+        if (!(pr > 0) || seen[tt]) return;
+        seen[tt] = 1;
+        var cv = +q[2] || 0, ca = +q[3] || 0;
+        arr.push({ t: tt, p: pr, v: Math.max(0, cv - pv) * 100, a: Math.max(0, ca - pa) });
+        pv = cv; pa = ca;
+      });
+      if (arr.length > 1){ var d = klFmtDate8(dd.date); days[d] = arr; if (+dd.prec > 0) precs[d] = +dd.prec; }
+    });
+    cb({ days: days, precs: precs });
+  });
+}
+function klIdxMinDraw(date){
+  var box = $("klIdx"); if (!box) return;
+  var sym = KLIDXSYM, nm = KLIDXNAME[sym] || sym, key = sym + "@" + date;
+  var got = KLIDXMIN[key];
+  if (got){ klIdxMinPaint(sym, nm, date, got.bars, got.prec); return; }
+  box.innerHTML = klIdxMinTabs(sym) + '<div class="chartnote">大盘（' + nm + '）：正在取 ' + date + ' 的分时…</div>';
+  klIdxMinBind(date);
+  klIdxMinFetch(sym, function(r){
+    if (!r || !r.days[date]){
+      box.innerHTML = klIdxMinTabs(sym) + '<div class="chartnote">大盘（' + nm + '）' + date + ' 的分时没取到（腾讯只留最近 5 个交易日）。</div>';
+      klIdxMinBind(date);
+      return;
+    }
+    KLIDXMIN[key] = { bars: r.days[date], prec: r.precs[date] || null };
+    if (KLST.mode !== "min") return;
+    klIdxMinPaint(sym, nm, date, r.days[date], r.precs[date] || null);
+  });
+}
+function klIdxMinPaint(sym, nm, date, bars, prec){
+  var box = $("klIdx"); if (!box || !bars || bars.length < 2) return;
+  var prev = (prec > 0) ? +prec : bars[0].p;
+  var n = bars.length, i, rhi = -1e9, rlo = 1e9;
+  for (i = 0; i < n; i++){ if (bars[i].p > rhi) rhi = bars[i].p; if (bars[i].p < rlo) rlo = bars[i].p; }
+  var dev = Math.max(Math.abs(rhi / prev - 1), Math.abs(rlo / prev - 1)) * 100;
+  var steps = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5], st = steps[steps.length - 1];
+  for (i = 0; i < steps.length; i++){ if (steps[i] >= dev * 0.55){ st = steps[i]; break; } }
+  var w = 980, hh = 132, padL = 56, padR = 64, padT = 10, padB = 16;
+  var hi = prev * (1 + 2 * st / 100), lo = prev * (1 - 2 * st / 100);
+  var yP = function(v){ return padT + (hi - v) / (hi - lo) * (hh - padT - padB); };
+  var iw = w - padL - padR, bw = iw / n, xOf = function(k){ return padL + k * bw + bw / 2; };
+  var pts = [], grid = "", lab = "";
+  for (i = 0; i < n; i++){ pts.push(xOf(i).toFixed(1) + "," + yP(bars[i].p).toFixed(1)); }
+  for (i = -2; i <= 2; i++){
+    var v = prev * (1 + i * st / 100), y = yP(v).toFixed(1);
+    grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (w - padR) + '" y2="' + y + '" stroke="' + (i === 0 ? "#b9c4d4" : "#e9edf4") + '"' + (i === 0 ? ' stroke-dasharray="4 3"' : '') + '></line>';
+    lab += '<text x="' + (padL - 6) + '" y="' + (+y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#6b7688">' + v.toFixed(2) + '</text>';
+    lab += '<text x="' + (w - padR + 6) + '" y="' + (+y + 3.5).toFixed(1) + '" font-size="10" fill="' + (i > 0 ? "#c02c2c" : (i < 0 ? "#1f7a3d" : "#6b7688")) + '">' + (i > 0 ? "+" : "") + (i * st).toFixed(2) + '%</text>';
+  }
+  var tl = "";
+  [[930, "09:30"], [1030, "10:30"], [1130, "11:30/13:00"], [1400, "14:00"], [1500, "15:00"]].forEach(function(m){
+    var k = -1;
+    for (var z = 0; z < n; z++){ if (bars[z].t === m[0]){ k = z; break; } }
+    if (k < 0) return;
+    var xx = xOf(k).toFixed(1);
+    tl += '<line x1="' + xx + '" y1="' + padT + '" x2="' + xx + '" y2="' + (hh - padB) + '" stroke="#eff2f7"></line>';
+    tl += '<text x="' + xx + '" y="' + (hh - 3) + '" text-anchor="middle" font-size="10" fill="#8a94a6">' + m[1] + '</text>';
+  });
+  var last = bars[n - 1], pct = (last.p / prev - 1) * 100, col = pct >= 0 ? "#c02c2c" : "#1f7a3d";
+  box.innerHTML = klIdxMinTabs(sym) +
+    '<div class="chartnote">大盘（' + nm + '）' + date + ' 分时 · 开 ' + bars[0].p.toFixed(2) + ' · 收 ' + last.p.toFixed(2) +
+    ' · <b style="color:' + col + '">' + (pct > 0 ? "+" : "") + pct.toFixed(2) + '%</b>　昨收 ' + prev.toFixed(2) +
+    '　振幅 ' + ((rhi - rlo) / prev * 100).toFixed(2) + '%</div>' +
+    '<svg viewBox="0 0 ' + w + ' ' + hh + '" preserveAspectRatio="none" style="width:100%;height:132px;display:block">' + grid + tl +
+    '<polyline points="' + pts.join(" ") + '" fill="none" stroke="' + col + '" stroke-width="1.4"></polyline>' + lab + '</svg>';
+  klIdxMinBind(date);
+}
+
+function klModeSet(m){
+  KLST.minY = (m === "miny");
+  KLST.mode = (m === "min" || m === "miny") ? "min" : "day";
+  if ($("klTabDay")) $("klTabDay").classList.toggle("active", KLST.mode === "day");
+  if ($("klTabMin")) $("klTabMin").classList.toggle("active", KLST.mode === "min" && !KLST.minY);
+  if ($("klTabMinY")) $("klTabMinY").classList.toggle("active", KLST.mode === "min" && KLST.minY);
+  if ($("klMinTag")) $("klMinTag").textContent = KLST.mode === "min" ? "1 分钟" : "";
+  if (KLST.mode === "day"){
+    if (KLST.bars){
+      klShow(klDay || KLST.day);
+      $("klNote").textContent = KLST.dayNote || "K 线为不复权日线，虚线是正在看的那天。";
+      $("klTip").textContent = KLST.dayTip || "鼠标在图上划过看每一天的开高低收；「← 前一日 / 后一日 →」可以一天天看持仓过程；「以这天为卖出日」直接按这天重算。";
+    } else {
+      $("klChart").innerHTML = '<p class="note">正在取 K 线…</p>';
+      $("klIdx").innerHTML = "";
+    }
+  } else if (KLST.minY){
+    var pd = klMinPrevTrade(KLST.day || klDay);
+    if (!pd){ $("klChart").innerHTML = '<p class="note">没有更早的交易日可取。</p>'; return; }
+    var keep = klDay;
+    klMinShow(pd);
+    klDay = keep;
+  } else {
+    klMinShow(KLST.day || klDay);
+  }
 }
 function klDraw(bars, day, day2){
   var i = -1;
