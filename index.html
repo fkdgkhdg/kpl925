@@ -6243,14 +6243,38 @@ function renderLDR(){
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
     + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
 }
+var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
+function ldrNextTradeIso(iso){
+  if (typeof ARCDATA === "undefined" || !ARCDATA) return null;
+  var ks = Object.keys(ARCDATA).sort();
+  for (var i = 0; i < ks.length; i++) if (ks[i] > iso) return ks[i];
+  return null;
+}
 function renderLdrTop5(ds){
   var box = document.getElementById("ldrTop5"); if (!box) return;
   var iso = ldrIso(ds);
-  if (typeof ARCDATA === "undefined" || !ARCDATA || !ARCDATA[iso]){
-    box.innerHTML = "<div class=\"note\" style=\"padding:4px 0\">这一天没有 9:25 榜单存档（存档从 2024-09 开始），看不到当天选出的 5 只。</div>";
+  var nxt = ldrNextTradeIso(iso);
+  var tgt = LDRT5NEXT ? nxt : iso;
+  function tabBar(){
+    return '<span style="display:inline-flex;gap:2px;margin-left:2px">'
+      + '<span data-t5m="0" style="cursor:pointer;padding:1px 7px;border-radius:9px;font-size:11.5px;' + (LDRT5NEXT ? 'color:#8a8f98;background:#f2f4f7' : 'color:#fff;background:#3b6fd4') + '">当天</span>'
+      + '<span data-t5m="1" style="cursor:pointer;padding:1px 7px;border-radius:9px;font-size:11.5px;' + (LDRT5NEXT ? 'color:#fff;background:#3b6fd4' : 'color:#8a8f98;background:#f2f4f7') + '">第二天</span>'
+      + '</span>';
+  }
+  function mountTabs(){
+    Array.prototype.forEach.call(box.querySelectorAll("[data-t5m]"), function(el){
+      el.onclick = function(){ LDRT5NEXT = this.getAttribute("data-t5m") === "1"; renderLdrTop5(ds); };
+    });
+  }
+  if (typeof ARCDATA === "undefined" || !ARCDATA || !tgt || !ARCDATA[tgt]){
+    var why = LDRT5NEXT
+      ? "第二天（" + (nxt ? nxt : "下一个交易日") + "）还没有 9:25 榜单存档，只能先看当天。"
+      : "这一天没有 9:25 榜单存档（存档从 2024-09 开始），看不到当天选出的 5 只。";
+    box.innerHTML = '<div class="note" style="padding:4px 0;display:flex;align-items:center;gap:6px">' + why + tabBar() + '</div>';
+    mountTabs();
     return;
   }
-  var rows = buildRows(arcList(iso));
+  var rows = buildRows(arcList(tgt));
   var hasAt = rows.some(function(r){ return !r.approx && r.at > 0; });
   var pick = (typeof pickTopRows === "function" ? pickTopRows(rows).list : rows).slice(0, 5);   // 和主榜单同一选股口径
   function cc(v, d){
@@ -6258,12 +6282,15 @@ function renderLdrTop5(ds){
     var s = (v > 0 ? "+" : "") + (+v).toFixed(d == null ? 2 : d) + "%";
     return "<span style=\"color:" + (v > 0 ? "#c02c2c" : (v < 0 ? "#1a9a5b" : "#888")) + "\">" + s + "</span>";
   }
-  var h = "<div style=\"display:flex;align-items:baseline;gap:8px;margin:2px 0 5px\"><b style=\"font-size:12.5px\">当天 9:25 榜单 · 5 只</b><span style=\"font-size:11.5px;color:#8a8f98\">" + (hasAt ? "按实际换手前 5（和主榜单同口径）" : "这一天没存竞价成交额，按竞价涨幅前 5") + "</span></div>";
+  var label = LDRT5NEXT ? "第二天 9:25 榜单 · 5 只" : "当天 9:25 榜单 · 5 只";
+  var h = "<div style=\"display:flex;align-items:center;gap:8px;margin:2px 0 5px;flex-wrap:wrap\"><b style=\"font-size:12.5px\">" + label + "</b>"
+    + "<span style=\"font-size:11.5px;color:#8a8f98\">" + tgt + " · " + (hasAt ? "按实际换手前 5（和主榜单同口径）" : "这一天没存竞价成交额，按竞价涨幅前 5") + "</span>"
+    + tabBar() + "</div>";
   h += "<div style=\"display:grid;grid-template-columns:20px minmax(104px,1.5fr) 44px 60px 62px 62px 62px 62px;gap:5px 8px;font-size:12px;align-items:center\">";
   h += "<span style=\"color:#8a8f98\">#</span><span style=\"color:#8a8f98\">股票</span><span style=\"color:#8a8f98\">连板</span><span style=\"color:#8a8f98\">竞价</span><span style=\"color:#8a8f98\">实际换手</span><span style=\"color:#8a8f98\">当日</span><span style=\"color:#8a8f98\">T+1开</span><span style=\"color:#8a8f98\">T+1收</span>";
   pick.forEach(function(r, i){
     h += "<span style=\"color:#8a8f98\">" + (i + 1) + "</span>";
-    h += "<a class=\"kbtn\" data-kc=\"" + r.code + "\" data-kn=\"" + esc(r.name) + "\" data-kd=\"" + ds + "\" style=\"font-weight:600;text-decoration:none;color:inherit;cursor:pointer\" title=\"点开看这只票的日K\">" + esc(r.name) + "<span style=\"color:#9aa3b2;font-size:11px\"> " + r.code + "</span></a>";
+    h += "<a class=\"kbtn\" data-kc=\"" + r.code + "\" data-kn=\"" + esc(r.name) + "\" data-kd=\"" + tgt + "\" style=\"font-weight:600;text-decoration:none;color:inherit;cursor:pointer\" title=\"点开看这只票的日K\">" + esc(r.name) + "<span style=\"color:#9aa3b2;font-size:11px\"> " + r.code + "</span></a>";
     h += "<span>" + (r.board > 1 ? (r.board + "板") : "首板") + "</span>";
     h += cc(r.chg, 2);
     h += "<span>" + (r.at ? ((+r.at).toFixed(2) + "%") : "—") + "</span>";
@@ -6273,6 +6300,7 @@ function renderLdrTop5(ds){
   });
   h += "</div>";
   box.innerHTML = h;
+  mountTabs();
 }
 function ldrPaint(){
   var tb = document.getElementById('ldrLv'); if (!tb) return;
