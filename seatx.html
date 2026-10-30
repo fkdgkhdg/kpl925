@@ -123,10 +123,9 @@ table.cmp{max-width:960px}
   <div class="small" id="eCap" style="margin:8px 0 4px"></div>
   <div style="overflow:auto"><table id="tE2"></table></div>
 </div>
-<script src="seatx_hot.js"></script>
-<script src="ztrsdata.js"></script>
-<script src="sxbd_data.js"></script>
-<script src="seatx_data.js"></script>
+<script>
+(function(){var v=Math.floor(Date.now()/6e5);["seatx_hot.js","ztrsdata.js","sxbd_data.js","seatx_data.js"].forEach(function(f){document.write('<script src="'+f+'?v='+v+'"><\/script>');});})();
+</script>
 <script>
 var X = window.SEATX || null;
 var TH = (function(){ var byDay={}, latest={}, Z=(typeof window.ZTRS!=="undefined")?window.ZTRS:null;
