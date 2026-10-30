@@ -2502,6 +2502,7 @@ document.addEventListener("click", function(e){
   var a = (e.target && e.target.closest) ? e.target.closest(".mth,.thlink,.dchip") : null;
   if (!a) return;
   e.preventDefault();
+  if (a.getAttribute('data-ldfx') !== null){ LDRTHX = !LDRTHX; if (typeof renderLDR === 'function') renderLDR(); return; }
   if (a.getAttribute('data-ldf') !== null){ LDRTH = a.getAttribute('data-ldf') || ''; if (typeof renderLDR === 'function') renderLDR(); return; }
   var th = a.getAttribute("data-th") || a.getAttribute("data-dn"); if (!th) return;
   openThLadder(th, a.getAttribute("data-bk") || "", a.getAttribute("data-ztd") || ztDayOf(STATE.day));
@@ -6104,7 +6105,7 @@ function renderTB(){
   if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
 }
 /* ===== 连板梯队 · 当晚复盘（开盘啦题材口径，主板）===== */
-var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '';
+var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '', LDRTHX = false;
 function ldrDays(){                       // 可回看的交易日（早→晚）
   var ks = [], k;
   if (typeof KPLTH !== 'undefined' && KPLTH && KPLTH.days) ks = KPLTH.days.slice();
@@ -6137,11 +6138,17 @@ function ldrDay(){
   if (last === today && bj.getUTCHours() < 15 && ks.length > 1) last = ks[ks.length - 2];
   return last;
 }
+var LDRALIAS = { "白酒": "酿酒", "地产链": "房地产", "旅游(酒店)": "旅游", "酒店": "旅游" };
+var LDREVENT = { "三季报增长":1, "中报增长":1, "年报增长":1, "一季报增长":1, "业绩预增":1, "扭亏为盈":1, "高送转":1, "回购":1, "增持":1, "中标":1, "股权转让":1, "重组":1, "实控人变更":1, "举牌":1 };
+function ldrThNorm(t){                       // 开盘啦常给同一板块起好几个名字，这里并成一个
+  var x = String(t || "").replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+  return LDRALIAS[x] || LDRALIAS[t] || x || String(t || "");
+}
 function ldrAgg(ds){
   if (LDRC[ds]) return LDRC[ds];
   var pool = (typeof poolOfDs === 'function' ? poolOfDs(ds) : null) || [];
   var cnt = {}, rows = [];
-  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ cnt[t] = (cnt[t] || 0) + 1; }); });
+  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ t = ldrThNorm(t); cnt[t] = (cnt[t] || 0) + 1; }); });
   pool.forEach(function(a){
     rows.push({
       c: String(a[0]),
@@ -6149,7 +6156,7 @@ function ldrAgg(ds){
       b: +a[4] || 1,
       ty: String(a[5] || ''),
       ts: +a[6] || 0,
-      tags: thTagsOf(a).map(function(t){ return { t: t, n: cnt[t] || 1 }; })
+      tags: (function(){ var seen = {}, out = []; thTagsOf(a).forEach(function(t){ t = ldrThNorm(t); if (!t || seen[t]) return; seen[t] = 1; out.push({ t: t, n: cnt[t] || 1 }); }); return out.sort(function(x, y){ var ex = LDREVENT[x.t] ? 1 : 0, ey = LDREVENT[y.t] ? 1 : 0; return ex - ey || y.n - x.n || (x.t < y.t ? -1 : 1); }); })()
     });
   });
   rows.sort(function(x, y){ return y.b - x.b || (x.ts || 86400) - (y.ts || 86400) || (x.c < y.c ? -1 : 1); });
@@ -6174,13 +6181,28 @@ function renderLDR(){
     + '<span class="chip">最高 <b>' + A.maxB + '</b> 板' + (topB > 1 ? '（' + topB + ' 只）' : '') + '</span>'
     + '<span class="chip">连板 <b>' + A.lian + '</b> 只</span>'
     + '<span class="chip">首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>'
-    + '<span class="chip">题材 <b>' + A.ths.length + '</b> 个</span>'
+    + '<span class="chip">题材 <b>' + A.ths.length + '</b> 个（≥2只 <b>' + A.ths.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
     + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (A.cnt[LDRTH] || 0) + ' 只）</span>' : '');
   var te = document.getElementById('ldrTh');
-  if (te) te.innerHTML = '<span class="dchip' + (LDRTH ? '' : ' on') + '" data-ldf="">全部<b>' + A.n + '</b></span>'
-    + A.ths.map(function(x){
-        return '<span class="dchip' + (LDRTH === x.t ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：当天涨停 ' + x.n + ' 只，点一下只看这个题材') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
-      }).join('');
+  if (te){
+    var multi = A.ths.filter(function(x){ return x.n >= 2; });
+    var singles = A.ths.filter(function(x){ return x.n < 2; });
+    var showMore = LDRTHX || !!LDRTH;
+    var list = showMore ? A.ths.slice() : multi.slice();
+    if (LDRTH && !list.some(function(x){ return x.t === LDRTH; })){
+      for (var q = 0; q < A.ths.length; q++) if (A.ths[q].t === LDRTH){ list.push(A.ths[q]); break; }
+    }
+    var hch = '<span class="dchip' + (LDRTH ? '' : ' on') + '" data-ldf="">全部<b>' + A.n + '</b></span>'
+      + list.map(function(x){
+          var cls = x.n >= 2 ? '' : ' fam';
+          return '<span class="dchip' + cls + (LDRTH === x.t ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：当天涨停 ' + x.n + ' 只，点一下只看这个题材') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
+        }).join('');
+    if (singles.length){
+      hch += '<span class="dchip' + (LDRTHX ? ' on' : '') + '" data-ldfx="1" title="' + (LDRTHX ? '收起这些只有 1 只涨停的题材' : '展开 ' + singles.length + ' 个只有 1 只涨停的题材') + '">'
+        + (LDRTHX ? '收起单只题材' : '其他 ' + singles.length + ' 个（各1只）') + '</span>';
+    }
+    te.innerHTML = hch;
+  }
   ldrPaint();
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
@@ -6211,7 +6233,7 @@ function ldrPaint(){
         + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n; }).join(' / ') || '—') + '（点开看K线）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" title="' + esc(ttl) + '">'
         + '<b>' + esc(r.n) + '</b><i>' + (ztHHMM(r.ts) || '') + '</i>'
-        + (LDRTS ? '<em>' + esc(r.tags.map(function(x){ return x.t + x.n; }).join('·')) + '</em>' : '') + '</a>';
+        + (LDRTS ? '<em>' + esc(r.tags.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (r.tags.length > 2 ? ' +' + (r.tags.length - 2) : '')) + '</em>' : '') + '</a>';
     });
     h += '</span></div>';
   });
