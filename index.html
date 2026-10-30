@@ -1264,13 +1264,31 @@ function ztDayOf(day){ var p = (typeof lhbPrevDay === "function") ? lhbPrevDay(d
 // KPLTH＝开盘啦题材（当天每只票挂的题材，主板口径）；某天缺开盘啦数据时自动退回同花顺
 function kthDay(ds){ return (typeof KPLTH !== "undefined" && KPLTH && KPLTH.d) ? (KPLTH.d[ds] || null) : null; }
 function kplBoardNum(b){ b = String(b || ""); var m = b.match(/(\d+)天(\d+)板/); if (m) return +m[2]; m = b.match(/(\d+)连板/); if (m) return +m[1]; return 1; }
+var KPLRUN = null;
+function kplRunAll(){                     // 每交易日：代码 → 真实连板数（连续出现在涨停池的天数；断板就从 1 重新数）
+  if (KPLRUN) return KPLRUN;
+  var ks = (typeof ldrDays === "function" ? ldrDays() : ((typeof KPLTH !== "undefined" && KPLTH && KPLTH.days) ? KPLTH.days.slice() : []));
+  var cache = {}, prev = null;
+  ks.forEach(function(ds){
+    var D = kthDay(ds);
+    if (!D || !D.st){ cache[ds] = null; prev = null; return; }
+    var m = {};
+    D.st.forEach(function(s){
+      var c = String(s[0]);
+      m[c] = prev ? ((prev[c] || 0) + 1) : Math.max(1, kplBoardNum(s[2]));
+    });
+    cache[ds] = m; prev = m;
+  });
+  return (KPLRUN = cache);
+}
+function kplRun(ds, code){ var m = kplRunAll()[ds]; return (m && m[String(code)]) || 1; }
 var KPLPOOL = {};
 function kplPool(ds){
   if (KPLPOOL[ds] !== undefined) return KPLPOOL[ds];
   var D = kthDay(ds); if (!D) return (KPLPOOL[ds] = null);
   return (KPLPOOL[ds] = D.st.map(function(s){
     var tags = (s[3] || []).map(function(i){ return D.th[i]; }).filter(Boolean);
-    return [s[0], s[1], tags.join("+"), "", kplBoardNum(s[2]), String(s[2] || ""), +s[4] || 0];
+    return [s[0], s[1], tags.join("+"), "", kplRun(ds, s[0]), String(s[2] || ""), +s[4] || 0];
   }));
 }
 function poolOfDs(ds){ if (kthDay(ds)) return kplPool(ds); if (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d) return ZTRS.d[ds] || []; return []; }
@@ -3195,6 +3213,37 @@ function klLoadScript(url, cbName, cb, timeoutMs){
   s.src = url;
   document.body.appendChild(s);
 }
+function klCleanBars(bars){                     // 脏数据清洗：开/收非正、单日 3 倍以上跳变
+  if (!bars || !bars.length) return [];
+  var out = [], prev = 0;
+  bars.forEach(function(b){
+    if (!b) return;
+    var o = +b.o, h = +b.h, l = +b.l, c = +b.c;
+    if (!(o > 0) || !(c > 0)) return;
+    if (!(h > 0)) h = Math.max(o, c);
+    if (!(l > 0)) l = Math.min(o, c);
+    if (h < Math.max(o, c)) h = Math.max(o, c);
+    if (l > Math.min(o, c)) l = Math.min(o, c);
+    if (prev > 0 && (c / prev < 0.33 || c / prev > 3)) return;
+    prev = c;
+    out.push({ d: String(b.d || ""), o: o, h: h, l: l, c: c, v: (+b.v > 0 ? +b.v : 0) });
+  });
+  return out;
+}
+function klWrap(bars, name){
+  var c = klCleanBars(bars);
+  return c.length ? { bars: c, name: name || "" } : null;
+}
+function klKey(x){ return String(x == null ? "" : x).replace(/[^0-9]/g, ""); }   // 日期统一成 8 位数字再比，兼容 2026-10-30 / 20261030
+function klDayTxt(bars, day){                   // 正在看的那天：开高低收
+  if (!bars || !bars.length) return "";
+  var dk = klKey(day), i = -1; for (var k = 0; k < bars.length; k++) if (klKey(bars[k].d) <= dk) i = k;
+  if (i < 0) return "";
+  var b = bars[i], pv = i > 0 ? bars[i - 1].c : 0;
+  var pct = pv > 0 ? (b.c / pv - 1) * 100 : null;
+  return b.d + (klKey(b.d) === dk ? "" : "（这天还没出K线，最近一根）") + "　开 " + b.o.toFixed(2) + "　高 " + b.h.toFixed(2) + "　低 " + b.l.toFixed(2) + "　收 " + b.c.toFixed(2) +
+    (pct === null ? "" : "　当日 " + (pct > 0 ? "+" : "") + pct.toFixed(2) + "%");
+}
 function klParseAny(j, k){
   if (!j) return null;
   if (k === 0){                                  // 同花顺：列式
@@ -3211,19 +3260,20 @@ function klParseAny(j, k){
       out.push({ d: y + "-" + md.slice(0, 2) + "-" + md.slice(2), o: low + pr[i * 4 + 1] / f,
                  h: low + pr[i * 4 + 2] / f, c: low + pr[i * 4 + 3] / f, l: low, v: (vo[i] || 0) / 100 });
     }
-    return { bars: out, name: j.name || "" };
+    return klWrap(out, j.name || "");
   }
   if (k === 1){                                  // 东财：data.klines
     var arr = (j.data && j.data.klines) || [];
     if (!arr.length) return null;
-    return { bars: arr.map(function(s){
+    var b1 = arr.map(function(s){
       var p = s.split(",");
       return { d: p[0], o: +p[1], c: +p[2], h: +p[3], l: +p[4], v: +p[5] || 0 };
-    }), name: (j.data && j.data.name) || "" };
+    });
+    return klWrap(b1, (j.data && j.data.name) || "");
   }
   var a = Array.isArray(j) ? j : null;           // 新浪：数组
   if (!a || !a.length) return null;
-  return { bars: a.map(function(x){ return { d: x.day, o: +x.open, c: +x.close, h: +x.high, l: +x.low, v: (+x.volume || 0) / 100 }; }), name: "" };
+  return klWrap(a.map(function(x){ return { d: x.day, o: +x.open, c: +x.close, h: +x.high, l: +x.low, v: (+x.volume || 0) / 100 }; }), "");
 }
 function klFetch(code, cb){
   var seq = ++KLSEQ;
@@ -3298,7 +3348,7 @@ function klShow(day){                       // 用已取到的K线重画某一�
   if (KLST.mode === "min"){ klMinShow(day); return; }
   var rng = klDraw(KLST.bars, day, KLST.day2);
   if (rng) klIdxDraw(rng.d0, rng.d1, day, KLST.day2, (rng.r0 > 0 ? (rng.r1 / rng.r0 - 1) * 100 : null));
-  $("klSub").textContent = "停在 " + day + (KLST.day2 ? "（买 " + KLST.day + " → 卖 " + KLST.day2 + "）" : "");
+  $("klSub").textContent = "停在 " + day + (KLST.day2 ? "（买 " + KLST.day + " → 卖 " + KLST.day2 + "）" : "") + "　" + klDayTxt(KLST.bars, day);
   klHoverBind();
 }
 var klDay = null;
@@ -3310,8 +3360,8 @@ function klHoverBind(){
     var rc = svg.getBoundingClientRect();
     var x = (e.clientX - rc.left) / rc.width * n;
     // 回推当前可视区间
-    var i0 = -1; for (var k = 0; k < bars.length; k++) if (bars[k].d <= klDay) i0 = k;
-    var i2 = -1; if (KLST.day2) for (var k2 = 0; k2 < bars.length; k2++) if (bars[k2].d <= KLST.day2) i2 = k2;
+    var i0 = -1; for (var k = 0; k < bars.length; k++) if (klKey(bars[k].d) <= klKey(klDay)) i0 = k;
+    var i2 = -1; if (KLST.day2) for (var k2 = 0; k2 < bars.length; k2++) if (klKey(bars[k2].d) <= klKey(KLST.day2)) i2 = k2;
     var s, e2;
     if (i2 >= 0 && Math.abs(i2 - i0) <= 400){ s = Math.max(0, Math.min(i0, i2) - 6); e2 = Math.min(bars.length - 1, Math.max(i0, i2) + 6); }
     else { s = Math.max(0, i0 - 39); e2 = Math.min(bars.length - 1, i0 + 20); }
@@ -3335,7 +3385,7 @@ function klHoverBind(){
 }
 function klStep(dir){                       // 前后翻一个交易日
   if (!KLST.bars || !KLST.bars.length) return;
-  var i = -1; for (var k = 0; k < KLST.bars.length; k++) if (KLST.bars[k].d <= klDay) i = k;
+  var i = -1; for (var k = 0; k < KLST.bars.length; k++) if (klKey(KLST.bars[k].d) <= klKey(klDay)) i = k;
   var j = i + dir; if (j < 0 || j > KLST.bars.length - 1) return;
   if (KLST.minY){ KLST.minY = false; if ($("klTabMinY")) $("klTabMinY").classList.remove("active"); if ($("klTabMin")) $("klTabMin").classList.add("active"); }
   klShow(KLST.bars[j].d);
@@ -3408,6 +3458,7 @@ function klOpen(code, name, day, day2){
       return;
     }
     KLST.bars = r.bars; KLST.day = day; KLST.day2 = day2; klDay = day;
+    $("klSub").textContent = "停在 " + day + (day2 ? "（买 " + day + " → 卖 " + day2 + "）" : "") + "　" + klDayTxt(r.bars, day);
     var bd = null, bp = null;                       // 最近一次模拟里这只票的买入日/买入价
     if (typeof SIMLAST !== "undefined" && SIMLAST && SIMLAST[code]){ bd = SIMLAST[code].bd; bp = SIMLAST[code].bp; }
     KLST.buyDay = bd; KLST.buyPrice = bp;
@@ -3830,11 +3881,13 @@ function klVolFmt(v){
   return Math.round(v) + "手";
 }
 function klDraw(bars, day, day2){
+  bars = klCleanBars(bars);
+  if (!bars.length) return null;
   var i = -1;
-  for (var k = 0; k < bars.length; k++) if (bars[k].d <= day) i = k;
+  for (var k = 0; k < bars.length; k++) if (klKey(bars[k].d) <= klKey(day)) i = k;
   if (i < 0) i = bars.length - 1;
   var i2 = -1;                                   // 卖出日（模拟交易用）：把"买→卖"整段都显示出来
-  if (day2) for (var k3 = 0; k3 < bars.length; k3++) if (bars[k3].d <= day2) i2 = k3;
+  if (day2) for (var k3 = 0; k3 < bars.length; k3++) if (klKey(bars[k3].d) <= klKey(day2)) i2 = k3;
   var NB = 40, NA = 20;                          // 默认：当天前面 40 根 + 后面 20 根
   var s, e;
   if (i2 >= 0 && Math.abs(i2 - i) <= 400){
@@ -3905,6 +3958,7 @@ function klDraw(bars, day, day2){
   $("klChart").innerHTML = '<svg id="klSvg" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:300px;display:block">' +
     grid + body + line(function(k){ return ma(5, k); }, "#1f3864") + line(function(k){ return ma(10, k); }, "#e07a1f") +
     '<line x1="' + markX + '" y1="' + padT + '" x2="' + markX + '" y2="' + VB + '" stroke="#1f3864" stroke-width="1.5" stroke-dasharray="4 3"></line>' +
+    '<text x="' + markX + '" y="' + (padT + 9) + '" text-anchor="middle" font-size="10" fill="#1f3864">这天 ' + String(arr[kk].d).slice(5) + '</text>' +
     ticks + volLab + dates + markSell + '<line id="klHover" x1="0" y1="' + padT + '" x2="0" y2="' + VB + '" stroke="#e07a1f" stroke-width="1" stroke-dasharray="2 2" visibility="hidden"></line></svg>';
   return { d0: arr[0].d, d1: arr[arr.length - 1].d, r0: arr[0].c, r1: arr[arr.length - 1].c };
 }function renderHot(){
@@ -5989,7 +6043,7 @@ function tbAgg(ds){
   function scan(dd, field, lead){
     var DD = kthDay(dd); if (!DD) return;
     DD.st.forEach(function(st){
-      var bn = kplBoardNum(st[2]), tags = st[3] || [];
+      var bn = kplRun(dd, st[0]), tags = st[3] || [];
       for (var k = 0; k < tags.length; k++){
         var t = DD.th[tags[k]]; if (!t) continue;
         var o = get(t); o[field] += 1;
@@ -6130,7 +6184,7 @@ function renderLDR(){
   ldrPaint();
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
+    + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
 }
 function ldrPaint(){
   var tb = document.getElementById('ldrLv'); if (!tb) return;
@@ -6153,7 +6207,7 @@ function ldrPaint(){
     var arr = lv[b];
     h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + '</span><span class="lvList">';
     arr.forEach(function(r){
-      var ttl = r.n + ' ' + r.c + ' · ' + (r.ty || (b + '板')) + ' · 首封' + (ztHHMM(r.ts) || '—')
+      var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b + '连板') ? '（开盘啦原标 ' + r.ty + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
         + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n; }).join(' / ') || '—') + '（点开看K线）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" title="' + esc(ttl) + '">'
         + '<b>' + esc(r.n) + '</b><i>' + (ztHHMM(r.ts) || '') + '</i>'
