@@ -553,6 +553,13 @@
       <div id="ldrBar" style="padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--chip)">
         <b style="font-size:13px">连板梯队 · 当晚复盘</b>
         <span id="ldrDate" style="font-size:12px;color:var(--muted);white-space:nowrap"></span>
+        <span style="display:inline-flex;align-items:center;gap:4px">
+          <button id="ldrPrev" title="上一个交易日">◀</button>
+          <input type="date" id="ldrPick" title="选一个交易日，看那天的连板梯队" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--fg)">
+          <button id="ldrNext" title="下一个交易日">▶</button>
+          <button id="ldrLast" title="回到最近一个交易日">最新</button>
+        </span>
+        <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span>
         <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
         <button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
@@ -6043,7 +6050,31 @@ function renderTB(){
   if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
 }
 /* ===== 连板梯队 · 当晚复盘（开盘啦题材口径，主板）===== */
-var LDRC = {}, LDRTH = '', LDRTS = false;
+var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '';
+function ldrDays(){                       // 可回看的交易日（早→晚）
+  var ks = [], k;
+  if (typeof KPLTH !== 'undefined' && KPLTH && KPLTH.days) ks = KPLTH.days.slice();
+  if (typeof ZTRS !== 'undefined' && ZTRS && ZTRS.d){ for (k in ZTRS.d) if (ZTRS.d.hasOwnProperty(k) && ks.indexOf(k) < 0) ks.push(k); }
+  ks.sort(); return ks;
+}
+function ldrCur(){ return LDRDS || ldrDay(); }
+function ldrIso(ds){ return ds ? ds.slice(0,4) + '-' + ds.slice(4,6) + '-' + ds.slice(6,8) : ''; }
+function ldrNav(step){                    // step: -1 前一日 / +1 后一日
+  var ks = ldrDays(); if (!ks.length) return;
+  var i = ks.indexOf(ldrCur()); if (i < 0) i = ks.length - 1;
+  i = Math.max(0, Math.min(ks.length - 1, i + step));
+  LDRDS = ks[i]; LDRTH = ''; ldrPaintNav(); renderLDR();
+}
+function ldrPaintNav(){                   // 把当前选的日期写回日期框 + 位置提示
+  var ds = ldrCur(), ks = ldrDays();
+  var inp = document.getElementById('ldrPick');
+  if (inp && ds) inp.value = ldrIso(ds);
+  var m = document.getElementById('ldrPos');
+  if (m && ds){
+    var i = ks.indexOf(ds);
+    m.textContent = i >= 0 ? ('第 ' + (i + 1) + '/' + ks.length + ' 个交易日' + (i === ks.length - 1 ? '（最新）' : '（距最新 ' + (ks.length - 1 - i) + ' 天）')) : '';
+  }
+}
 function ldrDay(){
   if (typeof KPLTH === 'undefined' || !KPLTH || !KPLTH.days || !KPLTH.days.length) return '';
   var ks = KPLTH.days, last = ks[ks.length - 1];
@@ -6075,13 +6106,14 @@ function ldrAgg(ds){
 }
 function renderLDR(){
   var el = document.getElementById('ldrLv'); if (!el) return;
-  var ds = ldrDay();
+  var ds = ldrCur();
   if (!ds){ el.innerHTML = '<div class="empty" style="padding:10px 0">还没有开盘啦题材数据</div>'; return; }
   var A = ldrAgg(ds);
   if (!A || !A.rows.length){ el.innerHTML = '<div class="empty" style="padding:10px 0">这一天没有涨停股</div>'; return; }
   if (LDRTH && !A.cnt[LDRTH]) LDRTH = '';
-  var dd = ds.slice(0,4) + '-' + ds.slice(4,6) + '-' + ds.slice(6,8);
+  var dd = ldrIso(ds);
   var de = document.getElementById('ldrDate'); if (de) de.textContent = dd;
+  ldrPaintNav();
   var topB = A.cntB[A.maxB] || 0;
   var k = document.getElementById('ldrKpi');
   if (k) k.innerHTML = '<span class="chip big" style="background:#c02c2c">涨停 ' + A.n + ' 家</span>'
@@ -6098,11 +6130,11 @@ function renderLDR(){
   ldrPaint();
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。';
+    + '，主板、剔 ST／退市。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
 }
 function ldrPaint(){
   var tb = document.getElementById('ldrLv'); if (!tb) return;
-  var ds = ldrDay(); if (!ds){ tb.innerHTML = ''; return; }
+  var ds = ldrCur(); if (!ds){ tb.innerHTML = ''; return; }
   var A = ldrAgg(ds);
   var rows = A.rows.filter(function(r){
     if (!LDRTH) return true;
@@ -8365,10 +8397,22 @@ vfInit();
     b.style.width = big ? "99vw" : "min(1240px,97vw)";
     b.style.height = big ? "98vh" : "90vh";
   }
+  var pick = $("ldrPick");
+  if (pick) pick.addEventListener("change", function(){
+    var v = String(pick.value || "").replace(/-/g, ""); if (!v || typeof ldrDays !== "function") return;
+    var ks = ldrDays(); if (!ks.length) return;
+    var t = "", i;
+    for (i = 0; i < ks.length; i++) if (ks[i] <= v) t = ks[i];
+    LDRDS = t || ks[0]; LDRTH = "";
+    if (typeof renderLDR === "function") renderLDR();
+  });
   document.addEventListener("click", function(e){
     var t = e.target; if(!t || !t.id) return;
     if(t.id === "ldrBtn"){ open(); e.preventDefault(); return; }
     if(t.id === "ldrClose"){ close(); e.preventDefault(); return; }
+    if(t.id === "ldrPrev"){ if (typeof ldrNav === "function") ldrNav(-1); e.preventDefault(); return; }
+    if(t.id === "ldrNext"){ if (typeof ldrNav === "function") ldrNav(1); e.preventDefault(); return; }
+    if(t.id === "ldrLast"){ LDRDS = ""; LDRTH = ""; if (typeof renderLDR === "function") renderLDR(); e.preventDefault(); return; }
     if(t.id === "ldrBig"){ toggleBig(); e.preventDefault(); return; }
     if(t.id === "ldrTOn"){ LDRTS = !LDRTS; t.classList.toggle("active", LDRTS); t.textContent = LDRTS ? "隐藏题材" : "显示题材"; if (typeof ldrPaint === "function") ldrPaint(); e.preventDefault(); return; }
     if(t.id === "ldrWrap"){ close(); }
