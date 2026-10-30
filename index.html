@@ -6286,11 +6286,33 @@ function renderLdrTop5(ds){
   var h = "<div style=\"display:flex;align-items:center;gap:8px;margin:2px 0 5px;flex-wrap:wrap\"><b style=\"font-size:12.5px\">" + label + "</b>"
     + "<span style=\"font-size:11.5px;color:#8a8f98\">" + tgt + " · " + (hasAt ? "按实际换手前 5（和主榜单同口径）" : "这一天没存竞价成交额，按竞价涨幅前 5") + "</span>"
     + tabBar() + "</div>";
-  h += "<div style=\"display:grid;grid-template-columns:20px minmax(104px,1.5fr) 44px 60px 62px 62px 62px 62px;gap:5px 8px;font-size:12px;align-items:center\">";
+  h += "<div style=\"display:grid;grid-template-columns:20px minmax(170px,1.5fr) 44px 60px 62px 62px 62px 62px;gap:6px 8px;font-size:12px;align-items:center\">";
   h += "<span style=\"color:#8a8f98\">#</span><span style=\"color:#8a8f98\">股票</span><span style=\"color:#8a8f98\">连板</span><span style=\"color:#8a8f98\">竞价</span><span style=\"color:#8a8f98\">实际换手</span><span style=\"color:#8a8f98\">当日</span><span style=\"color:#8a8f98\">T+1开</span><span style=\"color:#8a8f98\">T+1收</span>";
+  var tgtDs = tgt.replace(/-/g, "");
+  function t5Tags(code){                    // 这只票「涨停那天」的题材：取 tgt 之前最近一个梯队列里有它的交易日（最多往前找 4 天，防开盘啦缺数据）
+    var ks = ldrDays(), tried = 0;
+    for (var i = ks.length - 1; i >= 0 && tried < 4; i--){
+      if (ks[i] >= tgtDs) continue;
+      tried++;
+      var A = ldrAgg(ks[i]); if (!A || !A.rows) continue;
+      for (var j = 0; j < A.rows.length; j++) if (A.rows[j].c === code) return { tags: A.rows[j].tags || [], ds: ks[i] };
+    }
+    return null;
+  }
   pick.forEach(function(r, i){
     h += "<span style=\"color:#8a8f98\">" + (i + 1) + "</span>";
-    h += "<a class=\"kbtn\" data-kc=\"" + r.code + "\" data-kn=\"" + esc(r.name) + "\" data-kd=\"" + tgt + "\" style=\"font-weight:600;text-decoration:none;color:inherit;cursor:pointer\" title=\"点开看这只票的日K\">" + esc(r.name) + "<span style=\"color:#9aa3b2;font-size:11px\"> " + r.code + "</span></a>";
+    var tg = t5Tags(r.code), tn = tg ? tg.tags.map(function(x){ return x.t; }) : [];
+    var thTxt = tn.length ? (tn.slice(0, 3).join("·") + (tn.length > 3 ? " +" + (tn.length - 3) : "")) : (r.sector || "—");
+    var thTip = tn.length ? (ldrIso(tg.ds) + " 涨停题材：" + tg.tags.map(function(x){ return x.t + "(" + x.n + "家)"; }).join(" / "))
+      : (r.sector ? "开盘啦题材缺数据，这里先用所属板块：" + r.sector : "没有题材数据");
+    var pxTxt = (r.px > 0 ? (+r.px).toFixed(2) + "元" : "—");
+    var mcTxt = (r.mc ? yzMoney(r.mc) : "—");
+    h += "<div style=\"min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;line-height:1.5\">"
+      + "<a class=\"kbtn\" data-kc=\"" + r.code + "\" data-kn=\"" + esc(r.name) + "\" data-kd=\"" + tgt + "\" style=\"font-weight:600;text-decoration:none;color:inherit;cursor:pointer;white-space:nowrap\" title=\"点开看这只票的日K\">" + esc(r.name) + "<span style=\"color:#9aa3b2;font-size:11px\"> " + r.code + "</span></a>"
+      + "<span title=\"" + esc(thTip) + "\" style=\"font-size:10.5px;color:#3b6fd4;word-break:break-word\">" + esc(thTxt) + "</span>"
+      + "<span title=\"价格＝这一天 9:25 竞价价（存档价）\" style=\"font-size:10.5px;color:#5f6b7a;white-space:nowrap\">" + pxTxt + "</span>"
+      + "<span title=\"市值＝这一天的存档市值\" style=\"font-size:10.5px;color:#8a8f98;white-space:nowrap\">" + mcTxt + "</span>"
+      + "</div>";
     h += "<span>" + (r.board > 1 ? (r.board + "板") : "首板") + "</span>";
     h += cc(r.chg, 2);
     h += "<span>" + (r.at ? ((+r.at).toFixed(2) + "%") : "—") + "</span>";
