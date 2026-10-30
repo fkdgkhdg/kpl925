@@ -1,28 +1,26 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>seatcheck</title>
-<style>body{font:14px/1.6 system-ui;margin:16px}pre{white-space:pre-wrap;background:#f5f5f5;padding:10px;border-radius:8px}</style></head><body>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>seatcheck</title><style>body{font:14px/1.6 system-ui;margin:12px}pre{white-space:pre-wrap;background:#f5f5f5;padding:10px;border-radius:8px}iframe{width:1240px;height:700px;border:1px solid #ddd}</style></head><body>
 <h3>席位数据自检</h3><pre id="o">loading...</pre>
-<script src="lhbdata.js" onerror="document.getElementById('o').textContent='lhbdata.js 加载失败'"></script>
+<iframe id="f" src="index.html?chk=1793331855951"></iframe>
 <script>
-var out=[];
-out.push("typeof LHBSEAT="+(typeof window.LHBSEAT));
-try{
-  if(window.LHBSEAT){
-    var L=window.LHBSEAT;
-    var i=L.days.indexOf("2026-10-29");
-    out.push("days="+L.days.length+" idx="+i+" seats="+(L.seats&&L.seats.length));
-    var raw=(L.d&&L.d[i])||"";
-    out.push("d478 len="+raw.length);
-    var seg=raw.split("|").filter(function(x){return x.indexOf("000530:")===0})[0];
-    out.push("000530="+(seg||"none"));
-  }
-}catch(e){out.push("ERR "+e.message)}
-document.getElementById("o").textContent=out.join("\n");
-function done(t){document.getElementById("o").textContent+="\n"+t}
-if(navigator.serviceWorker){
-  navigator.serviceWorker.getRegistrations().then(function(rs){
-    return Promise.all(rs.map(function(r){return r.unregister()}));
-  }).then(function(){return caches.keys()}).then(function(ks){
-    return Promise.all(ks.map(function(k){return caches.delete(k)}));
-  }).then(function(){done("SW 已注销 + 缓存已清空")}).catch(function(e){done("SW 清理出错 "+e.message)});
-}else{done("无 serviceWorker")}
+var o=document.getElementById("o"),f=document.getElementById("f");
+var t0=Date.now();
+function once(){
+  var out=[];
+  try{
+    var w=f.contentWindow,d=f.contentDocument;
+    out.push("LHBSEAT="+(typeof w.LHBSEAT)+" days="+(w.LHBSEAT&&w.LHBSEAT.days.length));
+    var none=d.querySelectorAll("span[style*=opacity]").length;
+    var seats=d.querySelectorAll(".lseat").length;
+    var st=d.getElementById("status");
+    out.push("席位chip="+seats+" 无龙虎榜="+none);
+    out.push("status="+(st?st.textContent.slice(0,50):""));
+    var ok=(seats>0);
+    out.push(ok?"结果：正常":"结果：异常");
+  }catch(e){out.push("ERR "+e.message)}
+  out.push("等待 "+(Math.round((Date.now()-t0)/1000))+"s");
+  o.textContent=out.join("\n");
+}
+setTimeout(function(){once();
+  if(navigator.serviceWorker){navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}).then(function(){return caches.keys()}).then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(function(){o.textContent+="\nSW 已注销 + 缓存已清空"});}
+},12000);
 </script></body></html>
