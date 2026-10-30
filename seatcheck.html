@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>seatcheck</title>
+<style>body{font:14px/1.6 system-ui;margin:16px}pre{white-space:pre-wrap;background:#f5f5f5;padding:10px;border-radius:8px}</style></head><body>
+<h3>席位数据自检</h3><pre id="o">loading...</pre>
+<script src="lhbdata.js" onerror="document.getElementById('o').textContent='lhbdata.js 加载失败'"></script>
+<script>
+var out=[];
+out.push("typeof LHBSEAT="+(typeof window.LHBSEAT));
+try{
+  if(window.LHBSEAT){
+    var L=window.LHBSEAT;
+    var i=L.days.indexOf("2026-10-29");
+    out.push("days="+L.days.length+" idx="+i+" seats="+(L.seats&&L.seats.length));
+    var raw=(L.d&&L.d[i])||"";
+    out.push("d478 len="+raw.length);
+    var seg=raw.split("|").filter(function(x){return x.indexOf("000530:")===0})[0];
+    out.push("000530="+(seg||"none"));
+  }
+}catch(e){out.push("ERR "+e.message)}
+document.getElementById("o").textContent=out.join("\n");
+function done(t){document.getElementById("o").textContent+="\n"+t}
+if(navigator.serviceWorker){
+  navigator.serviceWorker.getRegistrations().then(function(rs){
+    return Promise.all(rs.map(function(r){return r.unregister()}));
+  }).then(function(){return caches.keys()}).then(function(ks){
+    return Promise.all(ks.map(function(k){return caches.delete(k)}));
+  }).then(function(){done("SW 已注销 + 缓存已清空")}).catch(function(e){done("SW 清理出错 "+e.message)});
+}else{done("无 serviceWorker")}
+</script></body></html>
