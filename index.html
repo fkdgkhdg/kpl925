@@ -82,9 +82,23 @@
   #thCard.thfloat h2 #thTitle{flex:1 1 auto}
   #thCard.thfloat h2 #thClose{float:none;flex:0 0 auto}
   /* 连板梯队（当晚复盘 · 弹出面板） */
-  #ldrBody .ldtags{margin:0;max-height:none;gap:4px}
-  #ldrBody .ldtags .dchip{padding:1px 7px;font-size:11px;border-radius:9px}
-  #ldrBody .chips{margin:0 0 8px}
+  #ldrBody .chips{margin:0 0 6px}
+  #ldrBody .chips .chip{padding:1px 8px;font-size:11.5px}
+  #ldrTh{gap:4px;margin:0 0 8px}
+  #ldrTh .dchip{padding:1px 7px;font-size:11px;border-radius:9px}
+  #ldrLv .lv{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--border)}
+  #ldrLv .lvTag{flex:0 0 54px;text-align:center;font-weight:700;font-size:12px;color:#fff;border-radius:6px;padding:3px 0;background:#8a8f98;white-space:nowrap}
+  #ldrLv .lvTag.t5{background:#c02c2c}#ldrLv .lvTag.t4{background:#e07a1f}#ldrLv .lvTag.t3{background:#b8860b}#ldrLv .lvTag.t2{background:#5b7bb5}
+  #ldrLv .lvList{flex:1;display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+  #ldrLv .lvS{margin:0;padding:2px 8px;font-size:12.5px;line-height:1.5;background:var(--chip);border:1px solid var(--border);border-radius:8px;color:var(--fg);display:inline-flex;gap:5px;align-items:baseline;cursor:pointer;text-decoration:none}
+  #ldrLv .lvS b{font-weight:600}
+  #ldrLv .lvS i{font-style:normal;font-size:10.5px;color:#8a8f98}
+  #ldrLv .lvS.hot{border-color:#c02c2c;background:rgba(192,44,44,.07);color:#c02c2c}
+  #ldrLv .lvS.hot i{color:#c86}
+  #ldrLv .lvS:hover{background:var(--head);color:#fff}
+  #ldrLv .lvS:hover i{color:#eee}
+  #ldrLv .lvS em{font-style:normal;font-size:10.5px;color:#7d8aa0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #ldrLv .lvS.hot em{color:#c9793f}
   #ldrTh{max-height:none;overflow:visible}
   #ldrTbl tr.ldrgrp td{background:#2b3a55;color:#fff;font-weight:700;font-size:12px;letter-spacing:.4px;padding:4px 9px}
   #ldrTbl tr.ldrgrp td b{color:#ffd9c2}
@@ -540,12 +554,12 @@
         <b style="font-size:13px">连板梯队 · 当晚复盘</b>
         <span id="ldrDate" style="font-size:12px;color:var(--muted);white-space:nowrap"></span>
         <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
-        <button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+        <button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
         <div class="thdirs" id="ldrTh" style="margin-top:10px"></div>
-        <div class="tablewrap"><table id="ldrTbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
+        <div id="ldrLv"><div class="empty" style="padding:10px 0">加载中…</div></div>
         <p class="note" id="ldrNote"></p>
       </div>
     </div>
@@ -6029,7 +6043,7 @@ function renderTB(){
   if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
 }
 /* ===== 连板梯队 · 当晚复盘（开盘啦题材口径，主板）===== */
-var LDRC = {}, LDRTH = '';
+var LDRC = {}, LDRTH = '', LDRTS = false;
 function ldrDay(){
   if (typeof KPLTH === 'undefined' || !KPLTH || !KPLTH.days || !KPLTH.days.length) return '';
   var ks = KPLTH.days, last = ks[ks.length - 1];
@@ -6060,11 +6074,11 @@ function ldrAgg(ds){
   return (LDRC[ds] = { ds: ds, rows: rows, ths: ths, cnt: cnt, cntB: cntB, maxB: maxB, lian: lian, n: rows.length });
 }
 function renderLDR(){
-  var el = document.getElementById('ldrTbl'); if (!el) return;
+  var el = document.getElementById('ldrLv'); if (!el) return;
   var ds = ldrDay();
-  if (!ds){ el.innerHTML = '<tbody><tr><td class="empty">还没有开盘啦题材数据</td></tr></tbody>'; return; }
+  if (!ds){ el.innerHTML = '<div class="empty" style="padding:10px 0">还没有开盘啦题材数据</div>'; return; }
   var A = ldrAgg(ds);
-  if (!A || !A.rows.length){ el.innerHTML = '<tbody><tr><td class="empty">这一天没有涨停股</td></tr></tbody>'; return; }
+  if (!A || !A.rows.length){ el.innerHTML = '<div class="empty" style="padding:10px 0">这一天没有涨停股</div>'; return; }
   if (LDRTH && !A.cnt[LDRTH]) LDRTH = '';
   var dd = ds.slice(0,4) + '-' + ds.slice(4,6) + '-' + ds.slice(6,8);
   var de = document.getElementById('ldrDate'); if (de) de.textContent = dd;
@@ -6084,10 +6098,10 @@ function renderLDR(){
   ldrPaint();
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。「板位」＝开盘啦板型换算的连板数（如「5天3板」＝3 板）；「板型」＝原始标注；「首封」＝当天第一次封板时间，同板位按首封从早到晚排（越早越硬）。点上面的题材条只列该题材的票，再点「全部」回来；点「K线」看这只票的日 K／分时。';
+    + '，主板、剔 ST／退市。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。';
 }
 function ldrPaint(){
-  var tb = document.getElementById('ldrTbl'); if (!tb) return;
+  var tb = document.getElementById('ldrLv'); if (!tb) return;
   var ds = ldrDay(); if (!ds){ tb.innerHTML = ''; return; }
   var A = ldrAgg(ds);
   var rows = A.rows.filter(function(r){
@@ -6095,31 +6109,27 @@ function ldrPaint(){
     for (var i = 0; i < r.tags.length; i++){ if (r.tags[i].t === LDRTH) return true; }
     return false;
   });
-  var h = '<thead><tr><th>#</th><th>股票</th><th>板型</th><th>首封</th><th>题材（当天该题材涨停 N 只）</th></tr></thead><tbody>';
   if (!rows.length){
-    h += '<tr><td class="empty" colspan="5">这一天这个题材没有涨停股</td></tr>';
-  } else {
-    var cur = -1, idx = 0;
-    rows.forEach(function(r){
-      if (r.b !== cur){
-        cur = r.b; idx = 0;
-        var inG = rows.filter(function(z){ return z.b === cur; }).length;
-        h += '<tr class="ldrgrp"><td colspan="5">' + (cur === 1 ? '首板' : cur + ' 板') + ' · <b>' + inG + '</b> 只</td></tr>';
-      }
-      idx++;
-      h += '<tr class="' + (r.b >= 3 ? 'hot' : '') + '">'
-        + '<td>' + idx + '</td>'
-        + '<td class="nm2"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.c + '/" target="_blank" rel="noopener">' + esc(r.n) + '</a>'
-        + '<a class="kbtn" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '">K线</a>'
-        + '<span class="tag">' + r.c + '</span></td>'
-        + '<td>' + esc(r.ty || '—') + '</td>'
-        + '<td>' + (ztHHMM(r.ts) || '—') + '</td>'
-        + '<td class="left"><span class="thdirs ldtags">' + r.tags.map(function(x){
-            return '<span class="dchip' + (LDRTH && x.t === LDRTH ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：当天涨停 ' + x.n + ' 只') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
-          }).join('') + '</span></td></tr>';
-    });
+    tb.innerHTML = '<div class="empty" style="padding:10px 0">这一天这个题材没有涨停股</div>';
+    return;
   }
-  tb.innerHTML = h + '</tbody>';
+  var lv = {};
+  rows.forEach(function(r){ (lv[r.b] = lv[r.b] || []).push(r); });
+  var keys = Object.keys(lv).map(Number).sort(function(a, x){ return x - a; });
+  var h = '';
+  keys.forEach(function(b){
+    var arr = lv[b];
+    h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + '</span><span class="lvList">';
+    arr.forEach(function(r){
+      var ttl = r.n + ' ' + r.c + ' · ' + (r.ty || (b + '板')) + ' · 首封' + (ztHHMM(r.ts) || '—')
+        + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n; }).join(' / ') || '—') + '（点开看K线）';
+      h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" title="' + esc(ttl) + '">'
+        + '<b>' + esc(r.n) + '</b><i>' + (ztHHMM(r.ts) || '') + '</i>'
+        + (LDRTS ? '<em>' + esc(r.tags.map(function(x){ return x.t + x.n; }).join('·')) + '</em>' : '') + '</a>';
+    });
+    h += '</span></div>';
+  });
+  tb.innerHTML = h;
 }
 function render(){ ndPaint(); renderCore(); if (typeof mbSync === "function") mbSync(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
@@ -8360,6 +8370,7 @@ vfInit();
     if(t.id === "ldrBtn"){ open(); e.preventDefault(); return; }
     if(t.id === "ldrClose"){ close(); e.preventDefault(); return; }
     if(t.id === "ldrBig"){ toggleBig(); e.preventDefault(); return; }
+    if(t.id === "ldrTOn"){ LDRTS = !LDRTS; t.classList.toggle("active", LDRTS); t.textContent = LDRTS ? "隐藏题材" : "显示题材"; if (typeof ldrPaint === "function") ldrPaint(); e.preventDefault(); return; }
     if(t.id === "ldrWrap"){ close(); }
   });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
