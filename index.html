@@ -81,6 +81,14 @@
   #thCard.thfloat h2{cursor:move;user-select:none;position:sticky;top:-1px;z-index:2;background:var(--panel);margin:0 0 8px;padding:2px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:10px}
   #thCard.thfloat h2 #thTitle{flex:1 1 auto}
   #thCard.thfloat h2 #thClose{float:none;flex:0 0 auto}
+  /* 连板梯队（当晚复盘） */
+  #ldrCard .ldtags{margin:0;max-height:none;gap:4px}
+  #ldrCard .ldtags .dchip{padding:1px 7px;font-size:11px;border-radius:9px}
+  #ldrTh{max-height:126px}
+  #ldrTbl tr.ldrgrp td{background:#2b3a55;color:#fff;font-weight:700;font-size:12px;letter-spacing:.4px;padding:4px 9px}
+  #ldrTbl tr.ldrgrp td b{color:#ffd9c2}
+  #ldrTbl td.nm2{white-space:nowrap}
+
   @media (max-width:640px){ #thCard.thfloat{left:8px;right:8px;bottom:8px;width:auto;max-height:68vh} }
   .thdirs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;max-height:96px;overflow:auto}
   .thdirs .dlab{font-size:12px;color:#8792a6}
@@ -301,6 +309,14 @@
     <div class="chartnote" id="tpTip">柱＝当日涨停家数（深色＝最高板≥5）　线＝最高连板（右轴）　·　鼠标移到图上可看某一天</div>
     <p class="note" id="tpNote"></p>
 <p class="note" id="tpLive" style="color:#1f7a3d"></p>
+  </div>
+
+  <div class="card" id="ldrCard" hidden>
+    <h2>连板梯队 · 当晚复盘（截至 <span id="ldrDate"></span>，开盘啦题材口径）</h2>
+    <div class="chips" id="ldrKpi"></div>
+    <div class="thdirs" id="ldrTh" style="margin-top:10px"></div>
+    <div class="tablewrap"><table id="ldrTbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
+    <p class="note" id="ldrNote"></p>
   </div>
 
   <div class="card klfloat" id="plCard" hidden>
@@ -2437,6 +2453,7 @@ document.addEventListener("click", function(e){
   var a = (e.target && e.target.closest) ? e.target.closest(".mth,.thlink,.dchip") : null;
   if (!a) return;
   e.preventDefault();
+  if (a.getAttribute('data-ldf') !== null){ LDRTH = a.getAttribute('data-ldf') || ''; if (typeof renderLDR === 'function') renderLDR(); return; }
   var th = a.getAttribute("data-th") || a.getAttribute("data-dn"); if (!th) return;
   openThLadder(th, a.getAttribute("data-bk") || "", a.getAttribute("data-ztd") || ztDayOf(STATE.day));
 });
@@ -6001,6 +6018,98 @@ function renderTB(){
   $("tbTbl").innerHTML = h + '</tbody>';
   if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
 }
+/* ===== 连板梯队 · 当晚复盘（开盘啦题材口径，主板）===== */
+var LDRC = {}, LDRTH = '';
+function ldrDay(){
+  if (typeof KPLTH === 'undefined' || !KPLTH || !KPLTH.days || !KPLTH.days.length) return '';
+  var ks = KPLTH.days, last = ks[ks.length - 1];
+  var bj = new Date(Date.now() + 8 * 3600 * 1000);
+  var today = bj.toISOString().slice(0, 10).split('-').join('');
+  if (last === today && bj.getUTCHours() < 15 && ks.length > 1) last = ks[ks.length - 2];
+  return last;
+}
+function ldrAgg(ds){
+  if (LDRC[ds]) return LDRC[ds];
+  var pool = (typeof poolOfDs === 'function' ? poolOfDs(ds) : null) || [];
+  var cnt = {}, rows = [];
+  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ cnt[t] = (cnt[t] || 0) + 1; }); });
+  pool.forEach(function(a){
+    rows.push({
+      c: String(a[0]),
+      n: a[1] || ((typeof NAMEMAP !== 'undefined' && NAMEMAP[a[0]]) || String(a[0])),
+      b: +a[4] || 1,
+      ty: String(a[5] || ''),
+      ts: +a[6] || 0,
+      tags: thTagsOf(a).map(function(t){ return { t: t, n: cnt[t] || 1 }; })
+    });
+  });
+  rows.sort(function(x, y){ return y.b - x.b || (x.ts || 86400) - (y.ts || 86400) || (x.c < y.c ? -1 : 1); });
+  var cntB = {}, maxB = 0, lian = 0;
+  rows.forEach(function(r){ cntB[r.b] = (cntB[r.b] || 0) + 1; if (r.b > maxB) maxB = r.b; if (r.b >= 2) lian++; });
+  var ths = Object.keys(cnt).map(function(t){ return { t: t, n: cnt[t] }; }).sort(function(x, y){ return y.n - x.n || (x.t < y.t ? -1 : 1); });
+  return (LDRC[ds] = { ds: ds, rows: rows, ths: ths, cnt: cnt, cntB: cntB, maxB: maxB, lian: lian, n: rows.length });
+}
+function renderLDR(){
+  var el = document.getElementById('ldrCard'); if (!el) return;
+  var ds = ldrDay(); if (!ds){ el.hidden = true; return; }
+  var A = ldrAgg(ds); if (!A || !A.rows.length){ el.hidden = true; return; }
+  el.hidden = false;
+  if (LDRTH && !A.cnt[LDRTH]) LDRTH = '';
+  var dd = ds.slice(0,4) + '-' + ds.slice(4,6) + '-' + ds.slice(6,8);
+  var de = document.getElementById('ldrDate'); if (de) de.textContent = dd;
+  var topB = A.cntB[A.maxB] || 0;
+  var k = document.getElementById('ldrKpi');
+  if (k) k.innerHTML = '<span class="chip big" style="background:#c02c2c">涨停 ' + A.n + ' 家</span>'
+    + '<span class="chip">最高 <b>' + A.maxB + '</b> 板' + (topB > 1 ? '（' + topB + ' 只）' : '') + '</span>'
+    + '<span class="chip">连板 <b>' + A.lian + '</b> 只</span>'
+    + '<span class="chip">首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>'
+    + '<span class="chip">题材 <b>' + A.ths.length + '</b> 个</span>'
+    + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (A.cnt[LDRTH] || 0) + ' 只）</span>' : '');
+  var te = document.getElementById('ldrTh');
+  if (te) te.innerHTML = '<span class="dchip' + (LDRTH ? '' : ' on') + '" data-ldf="">全部<b>' + A.n + '</b></span>'
+    + A.ths.map(function(x){
+        return '<span class="dchip' + (LDRTH === x.t ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：当天涨停 ' + x.n + ' 只，点一下只看这个题材') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
+      }).join('');
+  ldrPaint();
+  var note = document.getElementById('ldrNote');
+  if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
+    + '，主板、剔 ST／退市。「板位」＝开盘啦板型换算的连板数（如「5天3板」＝3 板）；「板型」＝原始标注；「首封」＝当天第一次封板时间，同板位按首封从早到晚排（越早越硬）。点上面的题材条只列该题材的票，再点「全部」回来；点「K线」看这只票的日 K／分时。';
+}
+function ldrPaint(){
+  var tb = document.getElementById('ldrTbl'); if (!tb) return;
+  var ds = ldrDay(); if (!ds){ tb.innerHTML = ''; return; }
+  var A = ldrAgg(ds);
+  var rows = A.rows.filter(function(r){
+    if (!LDRTH) return true;
+    for (var i = 0; i < r.tags.length; i++){ if (r.tags[i].t === LDRTH) return true; }
+    return false;
+  });
+  var h = '<thead><tr><th>#</th><th>股票</th><th>板型</th><th>首封</th><th>题材（当天该题材涨停 N 只）</th></tr></thead><tbody>';
+  if (!rows.length){
+    h += '<tr><td class="empty" colspan="5">这一天这个题材没有涨停股</td></tr>';
+  } else {
+    var cur = -1, idx = 0;
+    rows.forEach(function(r){
+      if (r.b !== cur){
+        cur = r.b; idx = 0;
+        var inG = rows.filter(function(z){ return z.b === cur; }).length;
+        h += '<tr class="ldrgrp"><td colspan="5">' + (cur === 1 ? '首板' : cur + ' 板') + ' · <b>' + inG + '</b> 只</td></tr>';
+      }
+      idx++;
+      h += '<tr class="' + (r.b >= 3 ? 'hot' : '') + '">'
+        + '<td>' + idx + '</td>'
+        + '<td class="nm2"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.c + '/" target="_blank" rel="noopener">' + esc(r.n) + '</a>'
+        + '<a class="kbtn" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '">K线</a>'
+        + '<span class="tag">' + r.c + '</span></td>'
+        + '<td>' + esc(r.ty || '—') + '</td>'
+        + '<td>' + (ztHHMM(r.ts) || '—') + '</td>'
+        + '<td class="left"><span class="thdirs ldtags">' + r.tags.map(function(x){
+            return '<span class="dchip' + (LDRTH && x.t === LDRTH ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：当天涨停 ' + x.n + ' 只') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
+          }).join('') + '</span></td></tr>';
+    });
+  }
+  tb.innerHTML = h + '</tbody>';
+}
 function render(){ ndPaint(); renderCore(); if (typeof mbSync === "function") mbSync(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
@@ -6156,7 +6265,8 @@ function renderCore(){
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
   renderFam();
   renderTop();
-  renderTrend();
+  renderTrend();  renderLDR();
+
   renderPB();
   renderBoardHot();
   renderBN();
