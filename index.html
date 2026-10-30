@@ -561,7 +561,7 @@
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span>
         <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
-        <button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+        <button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~15 分钟拉到板、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
@@ -6205,7 +6205,26 @@ function renderLDR(){
   if (!ds){ el.innerHTML = '<div class="empty" style="padding:10px 0">还没有开盘啦题材数据</div>'; return; }
   var A = ldrAgg(ds);
   if (!A || !A.rows.length){ el.innerHTML = '<div class="empty" style="padding:10px 0">这一天没有涨停股</div>'; return; }
-  if (LDRTH && !A.cnt[LDRTH]) LDRTH = '';
+  var AF = null;                            // 开了「只看直线」时，题材条/全部数按筛后重算
+  if (LDRLINE && !LDRLSCANNING[ds]){
+    var fr = A.rows.filter(function(r){ return !!ldrLineHit(ds, r.c); });
+    if (fr.length){
+      var c2 = {}, b2 = {}, max2 = 0, lian2 = 0;
+      fr.forEach(function(r){
+        r.tags.forEach(function(x){ c2[x.t] = (c2[x.t] || 0) + 1; });
+        b2[r.b] = (b2[r.b] || 0) + 1; if (r.b > max2) max2 = r.b; if (r.b >= 2) lian2++;
+      });
+      fr = fr.map(function(r){                     // 悬停描述里的题材家数也跟着筛后走
+        var o = {}; for (var q in r) o[q] = r[q];
+        o.tags = r.tags.map(function(x){ return { t: x.t, n: c2[x.t] || 1, raw: x.raw }; });
+        return o;
+      });
+      AF = { ds: ds, rows: fr, cnt: c2, cntB: b2, maxB: max2, lian: lian2, n: fr.length,
+        ths: Object.keys(c2).map(function(t){ return { t: t, n: c2[t] }; }).sort(function(x, y){ return y.n - x.n || (x.t < y.t ? -1 : 1); }) };
+    }
+  }
+  var CV = AF ? AF.cnt : A.cnt, TV = AF ? AF.ths : A.ths;
+  if (LDRTH && !CV[LDRTH]) LDRTH = '';
   var dd = ldrIso(ds);
   var de = document.getElementById('ldrDate'); if (de) de.textContent = dd;
   ldrPaintNav();
@@ -6215,21 +6234,22 @@ function renderLDR(){
     + '<span class="chip">最高 <b>' + A.maxB + '</b> 板' + (topB > 1 ? '（' + topB + ' 只）' : '') + '</span>'
     + '<span class="chip">连板 <b>' + A.lian + '</b> 只</span>'
     + '<span class="chip">首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>'
-    + '<span class="chip">题材 <b>' + A.ths.length + '</b> 个（≥2只 <b>' + A.ths.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
-    + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (A.cnt[LDRTH] || 0) + ' 只）</span>' : '');
+    + '<span class="chip">题材 <b>' + TV.length + '</b> 个（≥2只 <b>' + TV.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
+    + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (CV[LDRTH] || 0) + ' 只）</span>' : '')
+    + (LDRLINE ? '<span class="chip" style="background:#fff1f0;color:#c02c2c">分时直线 <b>' + ldrLineNum(ds, 'line') + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '');
   var te = document.getElementById('ldrTh');
   if (te){
-    var multi = A.ths.filter(function(x){ return x.n >= 2; });
-    var singles = A.ths.filter(function(x){ return x.n < 2; });
+    var multi = TV.filter(function(x){ return x.n >= 2; });
+    var singles = TV.filter(function(x){ return x.n < 2; });
     var showMore = LDRTHX || !!LDRTH;
-    var list = showMore ? A.ths.slice() : multi.slice();
+    var list = showMore ? TV.slice() : multi.slice();
     if (LDRTH && !list.some(function(x){ return x.t === LDRTH; })){
-      for (var q = 0; q < A.ths.length; q++) if (A.ths[q].t === LDRTH){ list.push(A.ths[q]); break; }
+      for (var q = 0; q < TV.length; q++) if (TV[q].t === LDRTH){ list.push(TV[q]); break; }
     }
-    var hch = '<span class="dchip' + (LDRTH ? '' : ' on') + '" data-ldf="">全部<b>' + A.n + '</b></span>'
+    var hch = '<span class="dchip' + (LDRTH ? '' : ' on') + '" data-ldf="" title="' + (AF ? '当前只看分时直线：' + AF.n + ' 只（当天涨停 ' + A.n + ' 只）' : '全部 ' + A.n + ' 只') + '">全部<b>' + (AF ? AF.n : A.n) + '</b>' + (AF ? '<em style="font-style:normal;opacity:.55;font-size:10px">/' + A.n + '</em>' : '') + '</span>'
       + list.map(function(x){
           var cls = x.n >= 2 ? '' : ' fam';
-          return '<span class="dchip' + cls + (LDRTH === x.t ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：当天涨停 ' + x.n + ' 只，点一下只看这个题材') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
+          return '<span class="dchip' + cls + (LDRTH === x.t ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：' + (AF ? '当前筛选 ' + x.n + ' 只' : '当天涨停 ' + x.n + ' 只') + '，点一下只看这个题材') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
         }).join('');
     if (singles.length){
       hch += '<span class="dchip' + (LDRTHX ? ' on' : '') + '" data-ldfx="1" title="' + (LDRTHX ? '收起这些只有 1 只涨停的题材' : '展开 ' + singles.length + ' 个只有 1 只涨停的题材') + '">'
@@ -6238,6 +6258,7 @@ function renderLDR(){
     te.innerHTML = hch;
   }
   ldrPaint();
+  if (LDRLINE && !LDRLSEEN[ds]) ldrLineScan(ds, function(){ if (ldrCur() === ds) renderLDR(); });
   if (typeof renderLdrTop5 === "function") renderLdrTop5(ds);
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
@@ -6324,6 +6345,169 @@ function renderLdrTop5(ds){
   box.innerHTML = h;
   mountTabs();
 }
+/* ===== 连板梯队 · 分时直线拉板筛选 =====
+   口径：当天分钟线里，股价从横盘位用 2~9 分钟（宽松档 12 分钟）几乎单边拉上涨停价（主板 昨收×1.10）。
+   直线＝严守档：拉升≥3%、起点在 +7.5% 以下、最大回撤≤0.8%、上涨分钟占比≥80%、
+          直线度（净涨幅÷走过的总路程）≥0.80、平均每分钟≥0.6%；不满足再看宽松档。
+   一字／秒板（开盘就封）不算。 */
+var LDRLINE = false, LDRLN = null, LDRLSEEN = {}, LDRLSCANNING = {};
+function ldrLineCache(){
+  if (LDRLN) return LDRLN;
+  LDRLN = {};
+  try {
+    var raw = localStorage.getItem('KPL_LDRLINE_v2');
+    if (raw){ var o = JSON.parse(raw); if (o && typeof o === 'object') LDRLN = o; }
+  } catch(e){}
+  return LDRLN;
+}
+function ldrLineSave(){
+  try {
+    var c = ldrLineCache(), ks = Object.keys(c), out = {}, keep = [];
+    ks.forEach(function(k){ if (c[k] && !c[k].miss) keep.push(k); });
+    keep.sort();
+    if (keep.length > 4000) keep = keep.slice(keep.length - 4000);
+    keep.forEach(function(k){ var v = c[k]; out[k] = { k: v.k, s: v.s, d: v.d, g: v.g, dd: v.dd }; });
+    localStorage.setItem('KPL_LDRLINE_v2', JSON.stringify(out));
+  } catch(e){}
+}
+function ldrLineKey(c, ds){ return c + '@' + ds; }
+function ldrLineHit(ds, code){
+  var v = ldrLineCache()[ldrLineKey(code, ds)];
+  return (v && v.k === 'line') ? v : null;
+}
+function ldrLineNum(ds, mode){
+  var c = ldrLineCache(), n = 0, tail = '@' + ds;
+  for (var k in c) if (c.hasOwnProperty(k) && k.slice(-tail.length) === tail && c[k] && c[k].k === mode) n++;
+  return n;
+}
+function ldrLineMissAll(ds){
+  var c = ldrLineCache(), tail = '@' + ds, any = 0, miss = 0;
+  for (var k in c) if (c.hasOwnProperty(k) && k.slice(-tail.length) === tail){ any++; if (c[k] && c[k].miss) miss++; }
+  return any > 0 && any === miss;
+}
+function ldrHM(t){ t = +t || 0; if (!t) return ''; var h = Math.floor(t / 100), m = t % 100; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+var LDRMIN = {};                                   // code -> {at, days{日期:[{t,p}]}, prec{日期:昨收}}：东财 trends2 一次给最近 5 个交易日
+function ldrMin5(code, cb){
+  var c = LDRMIN[code];
+  if (c && (Date.now() - c.at) < 600000){ cb(c); return; }
+  var nm = 'LDT' + (++KLSEQ), done = false;
+  var to = setTimeout(function(){ if (!done){ done = true; cb(null); } }, 12000);
+  var u = 'https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=' + secid(code)
+        + '&fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=5&iscr=0&iscca=0'
+        + '&cb=' + nm + '&_=' + Date.now();
+  klLoadScript(u, nm, function(j){
+    if (done) return; done = true; clearTimeout(to);
+    var out = null;
+    try {
+      var tr = (j && j.data && j.data.trends) || [];
+      if (tr.length){
+        var days = {}, seen = {};
+        tr.forEach(function(line){
+          var q = String(line).split(','), sv = q[0] || '';
+          var d = klFmtDate8(sv.slice(0, 10)), hm = sv.slice(11, 16).replace(':', '');
+          var tt = +hm, p = +q[1] || +q[2] || 0;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !tt || !(p > 0)) return;
+          if (!((tt >= 930 && tt <= 1130) || (tt >= 1300 && tt <= 1500))) return;
+          var kk = d + tt; if (seen[kk]) return; seen[kk] = 1;
+          (days[d] = days[d] || []).push({ t: tt, p: p });
+        });
+        var ks = Object.keys(days).sort();
+        if (ks.length){
+          var prec = {};
+          ks.forEach(function(d, k){
+            if (k > 0){ var pb = days[ks[k - 1]]; if (pb && pb.length) prec[d] = pb[pb.length - 1].p; }
+          });
+          out = { at: Date.now(), days: days, prec: prec };
+          LDRMIN[code] = out;
+        }
+      }
+    } catch(e){ out = null; }
+    cb(out);
+  }, 12000);
+}
+function ldrMinGet(code, ds, cb){                  // 返回这一天（最近 5 个交易日内）的分钟线 + 昨收
+  ldrMin5(code, function(r){
+    var d8 = klFmtDate8(ds), arr = (r && r.days) ? r.days[d8] : null;
+    if (!arr || arr.length < 12){ cb(null); return; }
+    var prec = (r.prec && r.prec[d8]) || 0;
+    if (prec > 0){ cb({ arr: arr, prec: prec }); return; }
+    klMinPrevFetch(code, function(){ cb({ arr: arr, prec: klMinPrevOf(code, d8) || 0 }); });
+  });
+}
+function ldrLineJudge(arr, prec){
+  if (!arr || arr.length < 12 || !(prec > 0)) return null;
+  var n = arr.length, lim = Math.round(prec * 110) / 100;
+  if (arr[n - 1].p < lim - 0.006) return { k: '' };          // 收盘没封住，不算
+  var i0 = -1;
+  for (var i = 0; i < n; i++){ if (arr[i].p >= lim - 0.006){ i0 = i; break; } }
+  if (i0 <= 2) return { k: '' };                             // 开盘就封死（一字／秒板）
+  function pick(opt){
+    var best = null;
+    for (var s = i0 - 2; s >= Math.max(1, i0 - 14); s--){
+      var p0 = arr[s - 1].p; if (!(p0 > 0)) continue;
+      var dur = i0 - s + 1;
+      if (dur > opt.durMax) continue;
+      var gain = (lim - p0) / p0;
+      if (gain < opt.gainMin) continue;
+      var calmOK = true, b = Math.max(0, s - 1 - opt.calmN);
+      for (var q = b; q < s; q++){ if (Math.abs(arr[q].p / p0 - 1) > opt.calm){ calmOK = false; break; } }
+      if (!calmOK) continue;                                 // 起拉前必须横着走，排除一路慢涨的
+      var up = 0, path = 0, peak = p0, dd = 0, prev = p0, jump = 0;
+      for (var k = s; k <= i0; k++){
+        var p = arr[k].p, st1 = Math.abs(p - prev) / prev;
+        if (p >= prev) up++;
+        if (p > prev && st1 > jump) jump = st1;
+        path += st1;
+        if (p > peak) peak = p;
+        var dr = (peak - p) / peak; if (dr > dd) dd = dr;
+        prev = p;
+      }
+      var steps = i0 - s + 1;
+      var straight = path > 0 ? gain / path : 0;
+      var upr = up / steps, speed = gain / dur, pre = p0 / prec - 1;
+      var rec = { s: arr[s].t, d: dur, g: +(gain * 100).toFixed(2), dd: +(dd * 100).toFixed(2),
+                  st: +straight.toFixed(2), up: +upr.toFixed(2), sp: +(speed * 100).toFixed(2),
+                  pre: +(pre * 100).toFixed(2), jp: +(jump * 100).toFixed(2) };
+      if (dd <= opt.ddMax && straight >= opt.stMin && upr >= opt.upMin && speed >= opt.spMin && pre <= opt.preMax){
+        if (!best || rec.sp > best.sp || (rec.sp === best.sp && rec.g > best.g)) best = rec;
+      }
+    }
+    return best;
+  }
+  var strict = pick({ durMax: 9, gainMin: 0.03, spMin: 0.006, ddMax: 0.008, upMin: 0.80, stMin: 0.80, preMax: 0.075, calm: 0.02, calmN: 8 });
+  if (strict) return { k: 'line', m: strict };
+  var loose = pick({ durMax: 12, gainMin: 0.025, spMin: 0.0045, ddMax: 0.014, upMin: 0.70, stMin: 0.70, preMax: 0.08, calm: 0.03, calmN: 6 });
+  if (loose) return { k: 'near', m: loose };
+  return { k: '' };
+}
+function ldrLineScan(ds, done){
+  var A = ldrAgg(ds), rows = (A && A.rows) || [];
+  var cache = ldrLineCache();
+  if (LDRLSCANNING[ds]){ if (done) done(); return; }
+  var todo = rows.filter(function(r){ var v = cache[ldrLineKey(r.c, ds)]; return !(v && !v.miss); });
+  if (!todo.length){ LDRLSEEN[ds] = 1; if (done) done(); return; }
+  LDRLSCANNING[ds] = 1;
+  var got = 0, total = todo.length, btn = document.getElementById('ldrLine');
+  if (btn && LDRLINE) btn.textContent = '扫描 0/' + total;
+  mapLimit(todo, 3, function(r){
+    return new Promise(function(res){
+      ldrMinGet(r.c, ds, function(v){
+        var rec = (v && v.prec > 0) ? ldrLineJudge(v.arr, v.prec) : null;
+        var key = ldrLineKey(r.c, ds);
+        if (rec) cache[key] = { k: rec.k, s: (rec.m && rec.m.s) || 0, d: (rec.m && rec.m.d) || 0, g: (rec.m && rec.m.g) || 0, dd: (rec.m && rec.m.dd) || 0, miss: 0 };
+        else cache[key] = { k: '', miss: 1 };
+        got++;
+        if (btn && LDRLINE) btn.textContent = '扫描 ' + got + '/' + total;
+        res();
+      });
+    });
+  }).then(function(){
+    ldrLineSave();
+    LDRLSEEN[ds] = 1; delete LDRLSCANNING[ds];
+    if (btn) btn.textContent = LDRLINE ? '只看直线' : '分时拉板';
+    if (done) done();
+  });
+}
 function ldrPaint(){
   var tb = document.getElementById('ldrLv'); if (!tb) return;
   var ds = ldrCur(); if (!ds){ tb.innerHTML = ''; return; }
@@ -6333,8 +6517,13 @@ function ldrPaint(){
     for (var i = 0; i < r.tags.length; i++){ if (r.tags[i].t === LDRTH) return true; }
     return false;
   });
+  var scanning = LDRLINE && LDRLSCANNING[ds];
+  if (LDRLINE) rows = rows.filter(function(r){ return !!ldrLineHit(ds, r.c); });
   if (!rows.length){
-    tb.innerHTML = '<div class="empty" style="padding:10px 0">这一天这个题材没有涨停股</div>';
+    if (scanning){ tb.innerHTML = '<div class="empty" style="padding:10px 0">正在扫这一天的分时，识别「直线拉板」…</div>'; return; }
+    tb.innerHTML = '<div class="empty" style="padding:10px 0">'
+      + (LDRLINE ? (ldrLineMissAll(ds) ? '这一天分时取不到（分钟线只保留最近 5 个交易日），换近几天的日期再看' : '这一天没有识别到分时直线拉到涨停的股票')
+                 : '这一天这个题材没有涨停股') + '</div>';
     return;
   }
   var lv = {};
@@ -6345,11 +6534,16 @@ function ldrPaint(){
     var arr = lv[b];
     h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + '</span><span class="lvList">';
     arr.forEach(function(r){
+      var ln = ldrLineHit(ds, r.c);
       var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b + '连板') ? '（开盘啦原标 ' + r.ty + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
-        + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n + (x.raw && x.raw !== x.t ? '（原标 ' + x.raw + '）' : ''); }).join(' / ') || '—') + '（点开看K线）';
+        + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n + (x.raw && x.raw !== x.t ? '（原标 ' + x.raw + '）' : ''); }).join(' / ') || '—')
+        + (ln ? ' · 分时直线：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟 +' + ln.g + '%，最大回撤 ' + ln.dd + '%' : '')
+        + '（点开看K线）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" title="' + esc(ttl) + '">'
         + '<b>' + esc(r.n) + '</b><i>' + (ztHHMM(r.ts) || '') + '</i>'
-        + (LDRTS ? '<em>' + esc(r.tags.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (r.tags.length > 2 ? ' +' + (r.tags.length - 2) : '')) + '</em>' : '') + '</a>';
+        + (LDRTS ? '<em>' + esc(r.tags.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (r.tags.length > 2 ? ' +' + (r.tags.length - 2) : '')) + '</em>' : '')
+        + (ln ? '<em style="color:#c02c2c;font-style:normal;background:#fff1f0;border-radius:6px;padding:0 3px;margin-left:2px" title="' + esc('分时直线拉板：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟拉 ' + ln.g + '% 到涨停，最大回撤 ' + ln.dd + '%') + '">直线' + ldrHM(ln.s) + '</em>' : '')
+        + '</a>';
     });
     h += '</span></div>';
   });
@@ -8606,6 +8800,19 @@ vfInit();
     if(t.id === "ldrNext"){ if (typeof ldrNav === "function") ldrNav(1); e.preventDefault(); return; }
     if(t.id === "ldrLast"){ LDRDS = ""; LDRTH = ""; if (typeof renderLDR === "function") renderLDR(); e.preventDefault(); return; }
     if(t.id === "ldrBig"){ toggleBig(); e.preventDefault(); return; }
+    if(t.id === "ldrLine"){
+      LDRLINE = !LDRLINE;
+      t.classList.toggle("active", LDRLINE);
+      if (LDRLINE){
+        t.textContent = "只看直线";
+        var _d = (typeof ldrCur === "function") ? ldrCur() : "";
+        if (typeof ldrLineScan === "function" && _d) ldrLineScan(_d, function(){ if (typeof renderLDR === "function") renderLDR(); });
+      } else {
+        t.textContent = "分时拉板";
+        if (typeof renderLDR === "function") renderLDR();
+      }
+      e.preventDefault(); return;
+    }
     if(t.id === "ldrTOn"){ LDRTS = !LDRTS; t.classList.toggle("active", LDRTS); t.textContent = LDRTS ? "隐藏题材" : "显示题材"; if (typeof ldrPaint === "function") ldrPaint(); e.preventDefault(); return; }
     if(t.id === "ldrWrap"){ close(); }
   });
