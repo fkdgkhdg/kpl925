@@ -81,9 +81,10 @@
   #thCard.thfloat h2{cursor:move;user-select:none;position:sticky;top:-1px;z-index:2;background:var(--panel);margin:0 0 8px;padding:2px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:10px}
   #thCard.thfloat h2 #thTitle{flex:1 1 auto}
   #thCard.thfloat h2 #thClose{float:none;flex:0 0 auto}
-  /* 连板梯队（当晚复盘） */
-  #ldrCard .ldtags{margin:0;max-height:none;gap:4px}
-  #ldrCard .ldtags .dchip{padding:1px 7px;font-size:11px;border-radius:9px}
+  /* 连板梯队（当晚复盘 · 弹出面板） */
+  #ldrBody .ldtags{margin:0;max-height:none;gap:4px}
+  #ldrBody .ldtags .dchip{padding:1px 7px;font-size:11px;border-radius:9px}
+  #ldrBody .chips{margin:0 0 8px}
   #ldrTh{max-height:none;overflow:visible}
   #ldrTbl tr.ldrgrp td{background:#2b3a55;color:#fff;font-weight:700;font-size:12px;letter-spacing:.4px;padding:4px 9px}
   #ldrTbl tr.ldrgrp td b{color:#ffd9c2}
@@ -111,7 +112,7 @@
   #tpCard .kv b{font-size:14px}
   .hotb{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:#e07a1f;color:#fff;font-size:10.5px;font-weight:700;cursor:help}
   .hotb2{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:rgba(224,122,31,.18);color:#b8631a;font-size:10.5px;font-weight:700;cursor:help}
-  #klCard.klfloat{position:fixed;right:14px;bottom:14px;width:min(720px,94vw);max-height:80vh;overflow:auto;z-index:80;margin:0;box-shadow:0 10px 30px rgba(0,0,0,.30)}
+  #klCard.klfloat{position:fixed;right:14px;bottom:14px;width:min(720px,94vw);max-height:80vh;overflow:auto;z-index:130;margin:0;box-shadow:0 10px 30px rgba(0,0,0,.30)}
   #klCard.klfloat.big{width:min(1180px,97vw);max-height:93vh}
   #klCard.klfloat h2{cursor:move;user-select:none}
   .tpflex{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 2px}
@@ -269,7 +270,7 @@
     <div class="bar">
       <button id="btnRefresh" class="active">刷新最新</button>
       <button id="recalcBtn" title="清掉当天缓存，把名单 / 行情 / 板块 / 情绪序列全部重新抓一遍">重算</button>
-      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位 / F 龙虎榜板块活跃）">龙虎榜席位 ▸</button>
+      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位 / F 龙虎榜板块活跃）">龙虎榜席位 ▸</button><button id="ldrBtn" title="当晚复盘连板梯队：按板位分组，题材带当天涨停家数，点题材筛选，点个股看K线">连板梯队 ▸</button>
       <span class="optgrp">
         <button id="dPrev">◀ 前一交易日</button>
         <input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日">
@@ -311,13 +312,6 @@
 <p class="note" id="tpLive" style="color:#1f7a3d"></p>
   </div>
 
-  <div class="card" id="ldrCard" hidden>
-    <h2>连板梯队 · 当晚复盘（截至 <span id="ldrDate"></span>，开盘啦题材口径）</h2>
-    <div class="chips" id="ldrKpi"></div>
-    <div class="thdirs" id="ldrTh" style="margin-top:10px"></div>
-    <div class="tablewrap"><table id="ldrTbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
-    <p class="note" id="ldrNote"></p>
-  </div>
 
   <div class="card klfloat" id="plCard" hidden>
     <h2><span id="plTitle">持仓纪律 · 断板次日怎么办</span><span style="font-size:12px;font-weight:400;color:var(--muted)" id="plSub"></span>
@@ -538,6 +532,22 @@
         <button id="seatxRefresh" title="现场抓东财最新一档龙虎榜，重算 D 表；晚间出榜后不用等自动更新">今日刷新</button><button id="seatxBig">放大</button><button id="seatxOpen">新窗口 ↗</button><button id="seatxClose">关闭</button>
       </div>
       <iframe id="seatxFrame" data-src="seatx.html" src="about:blank" title="龙虎榜席位结构对照" style="flex:1;border:0;width:100%;background:#fff"></iframe>
+    </div>
+  </div>
+  <div id="ldrWrap" style="position:fixed;inset:0;z-index:118;background:rgba(0,0,0,.42);display:none;align-items:center;justify-content:center">
+    <div id="ldrBox" style="width:min(1240px,97vw);height:90vh;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden">
+      <div id="ldrBar" style="padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--chip)">
+        <b style="font-size:13px">连板梯队 · 当晚复盘</b>
+        <span id="ldrDate" style="font-size:12px;color:var(--muted);white-space:nowrap"></span>
+        <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
+        <button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+      </div>
+      <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
+        <div class="chips" id="ldrKpi"></div>
+        <div class="thdirs" id="ldrTh" style="margin-top:10px"></div>
+        <div class="tablewrap"><table id="ldrTbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
+        <p class="note" id="ldrNote"></p>
+      </div>
     </div>
   </div>
 
@@ -6050,10 +6060,11 @@ function ldrAgg(ds){
   return (LDRC[ds] = { ds: ds, rows: rows, ths: ths, cnt: cnt, cntB: cntB, maxB: maxB, lian: lian, n: rows.length });
 }
 function renderLDR(){
-  var el = document.getElementById('ldrCard'); if (!el) return;
-  var ds = ldrDay(); if (!ds){ el.hidden = true; return; }
-  var A = ldrAgg(ds); if (!A || !A.rows.length){ el.hidden = true; return; }
-  el.hidden = false;
+  var el = document.getElementById('ldrTbl'); if (!el) return;
+  var ds = ldrDay();
+  if (!ds){ el.innerHTML = '<tbody><tr><td class="empty">还没有开盘啦题材数据</td></tr></tbody>'; return; }
+  var A = ldrAgg(ds);
+  if (!A || !A.rows.length){ el.innerHTML = '<tbody><tr><td class="empty">这一天没有涨停股</td></tr></tbody>'; return; }
   if (LDRTH && !A.cnt[LDRTH]) LDRTH = '';
   var dd = ds.slice(0,4) + '-' + ds.slice(4,6) + '-' + ds.slice(6,8);
   var de = document.getElementById('ldrDate'); if (de) de.textContent = dd;
@@ -8327,6 +8338,32 @@ vfInit();
   });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
   window.__seatxSmoke = function(){ open(); var f = $("seatxFrame"); return f ? f.getAttribute("src") : "none"; };
+})();
+
+/* ===== 连板梯队：点「连板梯队 ▸」弹出面板（复用 #ldrTbl 渲染）===== */
+(function(){
+  function $(id){ return document.getElementById(id); }
+  var big = false;
+  function open(){
+    var w = $("ldrWrap"); if(!w) return;
+    if (typeof renderLDR === "function") { try { renderLDR(); } catch(e){} }
+    w.style.display = "flex";
+  }
+  function close(){ var w = $("ldrWrap"); if(w) w.style.display = "none"; }
+  function toggleBig(){
+    var b = $("ldrBox"); if(!b) return; big = !big;
+    b.style.width = big ? "99vw" : "min(1240px,97vw)";
+    b.style.height = big ? "98vh" : "90vh";
+  }
+  document.addEventListener("click", function(e){
+    var t = e.target; if(!t || !t.id) return;
+    if(t.id === "ldrBtn"){ open(); e.preventDefault(); return; }
+    if(t.id === "ldrClose"){ close(); e.preventDefault(); return; }
+    if(t.id === "ldrBig"){ toggleBig(); e.preventDefault(); return; }
+    if(t.id === "ldrWrap"){ close(); }
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
+  window.__ldrOpen = open;
 })();
 </script>
 </body>
