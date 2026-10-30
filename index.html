@@ -5808,7 +5808,7 @@ function renderNewTop5Archive(day){
   if (dt) dt.textContent = day + "（9:25 存档）";
   if (!o){
     if (el) el.innerHTML = "";
-    tb.innerHTML = '<tbody><tr><td class="empty">这一天的「未涨停前5」没有存档。存档覆盖最近 5 个交易日：' + (nvArchDayList().join(" / ") || "暂无") + '</td></tr></tbody>';
+    tb.innerHTML = '<tbody><tr><td class="empty">这一天的「未涨停前5」没有存档。工作日每天 15:10 自动存档（从 2026-10-23 起累积）。已有 ' + nvArchDayList().length + ' 天：' + (nvArchDayList().slice(-12).join(" / ") || "暂无") + '</td></tr></tbody>';
     if (nt) nt.textContent = "存档口径：当天 9:25 竞价成交额 ÷ 实际流通股数 算实际换手，剔除前一交易日涨停股后取前 5。";
     return;
   }
