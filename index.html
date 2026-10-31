@@ -195,6 +195,24 @@
   .tablewrap{overflow-x:auto}
   table{border-collapse:collapse;width:100%;font-size:13.5px}
   th,td{border-bottom:1px solid var(--border);padding:8px 9px;text-align:center;white-space:nowrap}
+  /* main 5-row table: compact density */
+  #tbl{font-size:12px}
+  #tbl th,#tbl td{padding:3px 6px;line-height:1.15}
+  #tbl td .tag{display:inline;font-size:10px;margin-left:4px}
+  #tbl .thmain{margin-bottom:0}
+  #tbl .thk{margin-top:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+  #tbl .thk>*{margin-left:0}
+  #tbl .tth,#tbl .mth,#tbl .bpos{padding-top:0;padding-bottom:0}
+  #tbl .tth{font-size:10px;padding:0 5px}
+  #tbl .tth2{font-size:9.5px;padding:0 4px;margin-left:0}
+  #tbl .mth{font-size:9.5px;padding:0 5px;margin-right:2px}
+  #tbl .bpos{font-size:11px;padding:0 7px;line-height:17px}
+  #tbl .kbtn{font-size:10px;padding:0 5px;margin-left:4px}
+  #tbl .hotb,#tbl .hotb2,#tbl .hotstar{font-size:9.5px;padding:0 5px;margin-left:3px}
+  #tbl td.seat{width:216px;min-width:216px;max-width:216px;padding:3px 7px}
+  #tbl td.seat .lseat{font-size:10px;line-height:13px;margin-bottom:1px;padding:0 4px}
+  #tbl td.seat .lseat:last-child{margin-bottom:0}
+  #tbl td.seat .lseat .stt{width:11px;height:11px;line-height:11px;font-size:8px;margin-right:2px}
   th{background:var(--chip);font-weight:600;color:var(--head)}
   td.name{text-align:left}
   tr.top td{background:rgba(192,44,44,.07)}
@@ -203,6 +221,7 @@
   .lseat i{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .lseat b{flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums}
   .lseat b.neg{color:#c02c2c}
+  .lseat .mre{flex:0 0 auto;margin-left:4px;padding:0 3px;border-radius:3px;background:#e6e8eb;color:#6b7178;font-size:9.5px;font-weight:600}
   .lseat .stt{display:inline-block;width:12px;height:12px;line-height:12px;text-align:center;border-radius:3px;font-size:9px;font-weight:700;margin-right:3px;color:#fff;vertical-align:middle}
   .lseat.st-retail{background:#fdeede}.lseat.st-retail i{color:#8a4d05}.lseat.st-retail .stt{background:#e0902a}
   .lseat.st-youzi{background:#fae7e7}.lseat.st-youzi i{color:#8f1d1d}.lseat.st-youzi .stt{background:#c02c2c}
@@ -273,6 +292,17 @@
     #ldrBody{min-height:0;padding:8px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
     #ldrLv .lvTag{min-width:56px}
     #ldrLv .lvS{padding:4px 8px}
+    #tbl{font-size:11px}
+    #tbl th,#tbl td{padding:2px 4px;line-height:1.15}
+    #tbl td.seat{width:186px;min-width:186px;max-width:186px;padding:2px 4px}
+    #tbl td.seat .lseat{font-size:9px;line-height:12px;margin-bottom:1px;padding:0 3px}
+    #tbl .tag{font-size:9px;margin-left:3px}
+    #tbl .kbtn{font-size:9.5px;padding:0 4px;margin-left:3px}
+    #tbl .mth,#tbl .tth{font-size:9.5px;padding:0 4px;margin:0 2px 0 0}
+    #tbl .tth2{font-size:9px;padding:0 3px;margin-left:2px}
+    #tbl .thlab{font-size:9px;margin-right:2px}
+    #tbl .bpos{font-size:10.5px;padding:0 5px}
+    #tbl .hotb,#tbl .hotb2,#tbl .hotstar{font-size:9.5px;padding:0 4px;margin-left:2px}
   }
   #advBox .advFold{display:none}
   #advBox.foldOpen .advFold{display:block}
@@ -4941,11 +4971,12 @@ function lhbCell(code, day){
     var tip = "【" + (TN[tk] || "游资/营业部") + "】" + x.name + "　净" + (x.net >= 0 ? "买 " : "卖 ") + lhbMoney(x.net) +
       (inList ? "　★在你的爆头席位名单里（由「" + inList + "」匹配）" : "") +
       (x.big === null ? "　（该席位净买入样本不足 20 笔）" : "　该席位买入后次日大面率 " + x.big + "%（净买入样本 " + x.n + " 笔，次日收盘≤-5% 算大面）");
+    var mre = (x === show[show.length - 1] && r.items.length > show.length)
+      ? '<b class="mre" title="' + esc('还有 ' + (r.items.length - show.length) + ' 个席位未显示（这里只列当天金额最大的 3 个）') + '">＋' + (r.items.length - show.length) + '</b>' : '';
     return '<span class="lseat ' + cls + '" data-seat="' + esc(x.name) + '" title="' + esc(tip) + '">' +
       '<i><span class="stt">' + seatTypeChar(tk) + '</span>' + esc(x.name) + '</i>' +
-      '<b class="' + (x.net >= 0 ? "pos" : "neg") + '">' + (x.net > 0 ? "+" : "-") + lhbMoney(x.net) + '</b></span>';
+      '<b class="' + (x.net >= 0 ? "pos" : "neg") + '">' + (x.net > 0 ? "+" : "-") + lhbMoney(x.net) + '</b>' + mre + '</span>';
   }).join("");
-  if (r.items.length > show.length) html += '<span class="lseat more">＋' + (r.items.length - show.length) + ' 席未显示</span>';
   return chip + html;
 }
 function lhbBoom(code, day){
