@@ -561,7 +561,7 @@
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span>
         <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
-        <button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~15 分钟拉到板、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+        <button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
@@ -6387,7 +6387,47 @@ function ldrLineMissAll(ds){
 }
 function ldrHM(t){ t = +t || 0; if (!t) return ''; var h = Math.floor(t / 100), m = t % 100; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
 var LDRMIN = {};                                   // code -> {at, days{日期:[{t,p}]}, prec{日期:昨收}}：东财 trends2 一次给最近 5 个交易日
-function ldrMin5(code, cb){
+function sinaMinSym(code){ var s = secid(code); return (String(s).charAt(0) === '1' ? 'sh' : 'sz') + code; }
+function ldrMin5(code, cb){                        // 新浪 1 分钟线（最近约 4 个交易日，约 1023 根）；东财在浏览器里常被拦，留作备用
+  var c = LDRMIN[code];
+  if (c && (Date.now() - c.at) < 600000){ cb(c); return; }
+  var nm = 'LDS' + (++KLSEQ), done = false, s = null;
+  var to = setTimeout(function(){ if (!done){ done = true; cb(null); } }, 12000);
+  function finish(v){
+    if (done) return; done = true; clearTimeout(to);
+    try { if (s && s.parentNode) s.parentNode.removeChild(s); } catch(e){}
+    var out = null;
+    try {
+      var days = {}, seen = {};
+      (v || []).forEach(function(x){
+        var sv = String((x && x.day) || ''), d = sv.slice(0, 10), hm = sv.slice(11, 16).replace(':', '');
+        var tt = +hm, p = +x.close || 0;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !tt || !(p > 0)) return;
+        if (!((tt >= 930 && tt <= 1130) || (tt >= 1300 && tt <= 1500))) return;
+        var kk = d + tt; if (seen[kk]) return; seen[kk] = 1;
+        (days[d] = days[d] || []).push({ t: tt, p: p });
+      });
+      var ks = Object.keys(days).sort();
+      if (ks.length){
+        var prec = {};
+        ks.forEach(function(d, k){
+          if (k > 0){ var pb = days[ks[k - 1]]; if (pb && pb.length) prec[d] = pb[pb.length - 1].p; }
+        });
+        out = { at: Date.now(), days: days, prec: prec };
+        LDRMIN[code] = out;
+      }
+    } catch(e){ out = null; }
+    if (out){ cb(out); return; }
+    ldrMin5EM(code, cb);                           // 新浪拿不到再退回东财
+  }
+  s = document.createElement('script');
+  s.onload = function(){ finish(window[nm]); };
+  s.onerror = function(){ finish(null); };
+  s.src = 'https://quotes.sina.cn/cn/api/jsonp_v2.php/' + nm + '=/CN_MarketDataService.getKLineData?symbol=' + sinaMinSym(code)
+        + '&scale=1&ma=no&datalen=1023&_=' + Date.now();
+  document.body.appendChild(s);
+}
+function ldrMin5EM(code, cb){
   var c = LDRMIN[code];
   if (c && (Date.now() - c.at) < 600000){ cb(c); return; }
   var nm = 'LDT' + (++KLSEQ), done = false;
