@@ -196,9 +196,18 @@
   table{border-collapse:collapse;width:100%;font-size:13.5px}
   th,td{border-bottom:1px solid var(--border);padding:8px 9px;text-align:center;white-space:nowrap}
   /* main 5-row table: compact density */
-  #tbl{font-size:12px}
-  #tbl th,#tbl td{padding:3px 6px;line-height:1.15}
-  #tbl td .tag{display:inline;font-size:10px;margin-left:4px}
+  #tbl{font-size:11.5px}
+  #tbl th,#tbl td{padding:2px 5px;line-height:1.15}
+  #tbl th{white-space:normal}
+  #tbl th:nth-child(5),#tbl th:nth-child(6),#tbl th:nth-child(7),#tbl th:nth-child(9),#tbl th:nth-child(10){white-space:nowrap}
+  #tbl td.name{width:172px;min-width:164px;white-space:normal}
+  #tbl th:nth-child(3),#tbl td:nth-child(3){width:94px}
+  #tbl th:nth-child(4),#tbl td:nth-child(4){width:134px;min-width:126px;white-space:normal}
+  #tbl th:nth-child(6),#tbl td:nth-child(6){width:78px}
+  #tbl th:nth-child(8),#tbl td:nth-child(8){width:88px}
+  #tbl .thmain{display:none}
+  #tbl td .thk::before{content:"开盘啦";margin-right:3px;padding:0 4px;border-radius:4px;background:#eef0f2;color:#8a8f98;font-size:9px}
+  #tbl td .tag{display:inline;font-size:9px;margin-left:3px}
   #tbl .thmain{margin-bottom:0}
   #tbl .thk{margin-top:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px}
   #tbl .thk>*{margin-left:0}
@@ -209,7 +218,7 @@
   #tbl .bpos{font-size:11px;padding:0 7px;line-height:17px}
   #tbl .kbtn{font-size:10px;padding:0 5px;margin-left:4px}
   #tbl .hotb,#tbl .hotb2,#tbl .hotstar{font-size:9.5px;padding:0 5px;margin-left:3px}
-  #tbl td.seat{width:216px;min-width:216px;max-width:216px;padding:3px 7px}
+  #tbl td.seat{width:166px;min-width:158px;max-width:176px;padding:2px 5px}
   #tbl td.seat .lseat{font-size:10px;line-height:13px;margin-bottom:1px;padding:0 4px}
   #tbl td.seat .lseat:last-child{margin-bottom:0}
   #tbl td.seat .lseat .stt{width:11px;height:11px;line-height:11px;font-size:8px;margin-right:2px}
@@ -760,11 +769,11 @@ function gkTitle(k){
   if (GKAN[k] === null || GKAN[k] === undefined) return GKA[k] + "：A 口径（封板持有、第一次断板卖出）暂无样本（近一年没有出现）";
   return GKA[k] + "：A 口径（9:25 竞价买、封板持有、第一次断板卖出）" + GKAN[k] + " 个样本，当日封板 " + GKAZT[k] + "%、断板卖出均值 " + (GKAT1[k] > 0 ? "+" : "") + GKAT1[k] + "%、胜率 " + GKAT1W[k] + "%";
 }
-function gkMark(chg, board){
+function gkMark(chg, board, short){
   if (chg === null || chg === undefined || isNaN(chg)) return "";
   var k = gkOf(chg);
-  if (board >= 4 && chg > 7) return '<span class="gkbad" title="' + esc("⚠ ≥4 板还高开 >7%：A 口径（封板持有、断板卖出）这一组 30 笔，均值 -2.77%、中位 -4.19%、胜率 36.7%。其中 4 板高开 7~9.5% 最差，均值 -4.09%、中位 -9.56%（15 笔）；4 板高开 ≥9.5% 同样偏差；同是 ≥4 板，平开 0~5% 反而是均值 +3.52%、中位 +0.75%（68 笔）。") + '">⚠ 高位高开</span>';
-  if (k === 1 || k === 3) return '<span class="gktop" title="' + esc("A 口径（封板持有、断板卖出）期望最好的两个档——" + gkTitle(1) + "；" + gkTitle(3)) + '">★优选档</span>';
+  if (board >= 4 && chg > 7) return '<span class="gkbad" title="' + esc("⚠ ≥4 板还高开 >7%：A 口径（封板持有、断板卖出）这一组 30 笔，均值 -2.77%、中位 -4.19%、胜率 36.7%。其中 4 板高开 7~9.5% 最差，均值 -4.09%、中位 -9.56%（15 笔）；4 板高开 ≥9.5% 同样偏差；同是 ≥4 板，平开 0~5% 反而是均值 +3.52%、中位 +0.75%（68 笔）。") + '">' + (short ? '⚠' : '⚠ 高位高开') + '</span>';
+  if (k === 1 || k === 3) return '<span class="gktop" title="' + esc("A 口径（封板持有、断板卖出）期望最好的两个档——" + gkTitle(1) + "；" + gkTitle(3)) + '">' + (short ? '★' : '★优选档') + '</span>';
   return "";
 }
 function pxCell(r){
@@ -776,10 +785,10 @@ function pxCell(r){
     return '<b style="color:#1f7a3d" title="' + esc("4 板 × 10~20 元：30 票/30 日，当天涨停 63.33%、A 口径（封板持有、断板卖出）中位 +3.69%；4 板其余 61 票/57 日 32.79% / -4.47%；置换 p=0.0085、BH=0.1105 擦线过 0.10") + '">' + s + '</b><span class="tag">优</span>';
   return s;
 }
-function gkCell(r){
+function gkCell(r, short){
   if (r.chg === null || r.chg === undefined || isNaN(r.chg)) return "—";
   var k = gkOf(r.chg);
-  return '<b title="' + esc(gkTitle(k)) + '">' + GKA[k] + '</b>' + gkMark(r.chg, r.board);
+  return '<b title="' + esc(gkTitle(k)) + '">' + GKA[k] + '</b>' + gkMark(r.chg, r.board, short);
 }
 function secid(code){ return (code.charAt(0) === "6" ? "1." : "0.") + code; }
 function tPrefix(code){ return (code.charAt(0) === "6") ? "sh" : ((code.charAt(0) === "8" || code.charAt(0) === "4") ? "bj" : "sz"); }
@@ -6019,7 +6028,7 @@ function renderNewTop5(){
       var c2 = (x.chg === null || x.chg === undefined || isNaN(x.chg)) ? '—' : ((x.chg > 0 ? '+' : '') + x.chg.toFixed(2) + '%');
       var a2 = (x.at === null || x.at === undefined || isNaN(x.at)) ? '—'
         : ('<b>' + x.at.toFixed(2) + '%</b>' + (x.approx ? '<span class="tag">≈</span>' : '')
-           + '<span class="minbar" style="width:58px"><i style="width:' + Math.min(100, x.at / _mxAt * 100).toFixed(0) + '%"></i></span>');
+           + '<span class="minbar" style="width:40px"><i style="width:' + Math.min(100, x.at / _mxAt * 100).toFixed(0) + '%"></i></span>');
       return '<tr class="' + (i === 0 ? 'top ' : '') + (_hr ? 'hot' : '') + '">'
         + '<td>' + (i + 1) + '</td>'
         + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + x.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(x.name) + '</a><a class="kbtn" data-kc="' + x.code + '" data-kn="' + esc(x.name) + '">K线</a><span class="tag">' + x.code + '</span>' + appBadge(x.code, _d0) + lhbBoom(x.code, _d0) + '</td>'
@@ -6807,7 +6816,7 @@ function ndCell(){
     out = '<b class="' + (inf.deg % 90 === 0 ? "up" : "hotb") + '" title="第 ' + N + ' 个交易日落在' +
           inf.kind + ' ' + inf.deg + '°">◆' + N + '日 ' + inf.deg + '°</b>';
   } else {
-    out = N + '日<span class="tag">距节点+' + (nx ? nx.gap : '?') + '</span>';
+    out = N + '日<span class="tag" title="距下一个节点还有 ' + (nx ? nx.gap : '?') + ' 个交易日">+' + (nx ? nx.gap : '?') + '</span>';
   }
   return '<td style="white-space:nowrap">' + out + '</td>';
 }
@@ -6890,7 +6899,7 @@ function renderCore(){
       + '<td class="left">' + thCell(r.code) + '</td>'
       + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>' + ndCell()
       + '<td class="' + (r.chg > 0 ? "up" : "down") + '">' + (r.chg > 0 ? "+" : "") + r.chg.toFixed(2) + '%</td>'
-      + '<td style="white-space:nowrap">' + gkCell(r) + '</td>'
+      + '<td style="white-space:nowrap">' + gkCell(r, true) + '</td>'
       + '<td style="white-space:nowrap">' + pxCell(r) + '</td>'
       + '<td>' + (r.at === null ? "—" : '<b>' + r.at.toFixed(2) + '%</b>' + (r.approx ? '<span class="tag">≈</span>' : '') + '<span class="minbar" style="width:58px"><i style="width:' + Math.min(100, r.at / maxAt * 100).toFixed(0) + '%"></i></span>') + '</td>'
       + '<td class="seat">' + lhbCell(r.code, STATE.day) + '</td>'
