@@ -87,7 +87,10 @@
   #ldrTh{gap:4px;margin:0 0 8px}
   #ldrTh .dchip{padding:1px 7px;font-size:11px;border-radius:9px}
   #ldrLv .lv{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--border)}
-  #ldrLv .lvTag{flex:0 0 54px;text-align:center;font-weight:700;font-size:12px;color:#fff;border-radius:6px;padding:3px 0;background:#8a8f98;white-space:nowrap}
+  #ldrLv .lvTag{flex:0 0 auto;min-width:66px;box-sizing:border-box;text-align:center;font-weight:700;font-size:11.5px;color:#fff;border-radius:6px;padding:3px 5px;background:#8a8f98;white-space:nowrap}
+  #ldrLv .lvTag em.dlt{display:block;font-style:normal;font-size:10px;font-weight:700;margin:2px auto 0;padding:0 4px;border-radius:5px;background:rgba(255,255,255,.92);color:#6b7280;line-height:1.5}
+  #ldrLv .lvTag em.dlt.up{color:#c02c2c}
+  #ldrLv .lvTag em.dlt.dn{color:#12805c}
   #ldrLv .lvTag.t5{background:#c02c2c}#ldrLv .lvTag.t4{background:#e07a1f}#ldrLv .lvTag.t3{background:#b8860b}#ldrLv .lvTag.t2{background:#5b7bb5}
   #ldrLv .lvList{flex:1;display:flex;flex-wrap:wrap;gap:5px;min-width:0}
   #ldrLv .lvS{margin:0;padding:2px 8px;font-size:12.5px;line-height:1.5;background:var(--chip);border:1px solid var(--border);border-radius:8px;color:var(--fg);display:inline-flex;gap:5px;align-items:baseline;cursor:pointer;text-decoration:none}
@@ -6361,7 +6364,7 @@ function renderLDR(){
   if (typeof renderLdrTop5 === "function") renderLdrTop5(ds);
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
+    + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
@@ -6683,11 +6686,34 @@ function ldrPaint(){
   }
   var lv = {};
   rows.forEach(function(r){ (lv[r.b] = lv[r.b] || []).push(r); });
+  // —— 每个板位相对「上一个交易日」的数量变化（题材筛选、只看直线都跟着同一口径算）——
+  var prevLv = null, prevDs = '';
+  (function(){
+    var ks = ldrDays(), i0 = ks.indexOf(ds);
+    if (i0 <= 0) return;
+    prevDs = ks[i0 - 1];
+    if (typeof KPLTH === 'undefined' || !KPLTH || !KPLTH.d || !KPLTH.d[prevDs]) return;   // 上一天没有涨停池就不算，免得显示成 -N
+    var PA = ldrAgg(prevDs); if (!PA || !PA.rows.length) return;
+    var pr = PA.rows.filter(function(r){
+      if (!LDRTH) return true;
+      for (var q = 0; q < r.tags.length; q++){ if (r.tags[q].t === LDRTH) return true; }
+      return false;
+    });
+    if (LDRLINE) pr = pr.filter(function(r){ return !!ldrLineHit(prevDs, r.c); });
+    prevLv = {};
+    pr.forEach(function(r){ prevLv[r.b] = (prevLv[r.b] || 0) + 1; });
+  })();
   var keys = Object.keys(lv).map(Number).sort(function(a, x){ return x - a; });
   var h = '';
   keys.forEach(function(b){
     var arr = lv[b];
-    h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + '</span><span class="lvList">';
+    var dlt = '';
+    if (prevLv){
+      var pv = prevLv[b] || 0, dv = arr.length - pv;
+      dlt = '<em class="dlt' + (dv > 0 ? ' up' : (dv < 0 ? ' dn' : '')) + '" title="' + esc('较上一个交易日（' + ldrIso(prevDs) + '）：这个板位昨天 ' + pv + ' 只 → 今天 ' + arr.length + ' 只，' + (dv > 0 ? '净增 ' + dv + ' 只' : (dv < 0 ? '净减 ' + (-dv) + ' 只' : '持平')))
+        + '">' + (dv > 0 ? '▲' + dv : (dv < 0 ? '▼' + (-dv) : '—')) + '</em>';
+    }
+    h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + dlt + '</span><span class="lvList">';
     arr.forEach(function(r){
       var ln = ldrLineHit(ds, r.c);
       var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b + '连板') ? '（开盘啦原标 ' + r.ty + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
