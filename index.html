@@ -588,6 +588,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 <script src="teamdata.js"></script>
 <script src="sbzdata.js"></script>
 <script src="ztrsdata.js"></script>
+<script src="ldrmin/list.js"></script>
 <script src="kplthdata.js"></script>
     <script src="kplhotdata.js"></script>
 <script src="gann-square-widget.js"></script>
@@ -3620,7 +3621,85 @@ function klMinPrevTrade(date){
   }
   return null;
 }
+/* ===== 本地分时存档（通达信 lc1 转出，outputs/ldrmin/YYYYMMDD.js） ===== */
+var LDRARCP = {};                                  // 日期 -> {code: {bars, prec}}
+function ldrArcHave(date){
+  var L = window.LDRMIN_LIST; return !!(L && L.days && L.days[date]);
+}
+function ldrArcTime(i){
+  var mins = i < 120 ? (571 + i) : (781 + (i - 120));
+  return Math.floor(mins / 60) * 100 + (mins % 60);
+}
+function ldrArcBars(o, code){
+  if (!o || !o.p || !o.p[code]) return null;
+  var ps = String(o.p[code]).split(','), vs = String((o.v && o.v[code]) || '').split(','), as = String((o.a && o.a[code]) || '').split(','), out = [];
+  for (var i = 0; i < ps.length; i++){
+    var pv = +ps[i]; if (!(pv > 0)) continue;
+    out.push({ t: ldrArcTime(i), p: pv / 100, v: (+vs[i] || 0) * 100, a: (+as[i] || 0) });
+  }
+  if (out.length < 12) return null;
+  var pc = o.pc && o.pc[code] ? o.pc[code] / 100 : 0;
+  return { bars: out, prec: pc };
+}
+function ldrArcIdx(o, sym){
+  if (!o || !o.ix || !o.ix[sym]) return null;
+  var q = o.ix[sym], ps = String(q.p).split(','), vs = String(q.v || '').split(','), as = String(q.a || '').split(','), out = [];
+  for (var i = 0; i < ps.length; i++){
+    var pv = +ps[i]; if (!(pv > 0)) continue;
+    out.push({ t: ldrArcTime(i), p: pv / 100, v: (+vs[i] || 0) * 100, a: (+as[i] || 0) });
+  }
+  if (out.length < 12) return null;
+  return { bars: out, prec: q.pc ? q.pc / 100 : 0 };
+}
+function ldrArcLoad(date, cb){
+  var got = (window.LDRMIN_DAY || {})[date];
+  if (got){ cb(got); return; }
+  var q = LDRARCP[date];
+  if (q){ if (q.o) cb(q.o); else q.cbs.push(cb); return; }
+  q = LDRARCP[date] = { cbs: [cb] };
+  var s = document.createElement('script');
+  s.src = 'ldrmin/' + String(date).replace(/-/g, '') + '.js';
+  s.onload = function(){
+    var o = (window.LDRMIN_DAY || {})[date] || null; q.o = o;
+    var cs = q.cbs; q.cbs = [];
+    cs.forEach(function(f){ try { f(o); } catch(e){} });
+  };
+  s.onerror = function(){
+    q.o = null; var cs = q.cbs; q.cbs = [];
+    cs.forEach(function(f){ try { f(null); } catch(e){} });
+  };
+  document.body.appendChild(s);
+}
+function klMinShowArc(date){
+  if (!KLST.code) return false;
+  if (!ldrArcHave(date)) return false;
+  var key = klMinKey(KLST.code, date), box = $("klChart"); if (!box) return false;
+  if (KLMIN[key]){ klMinPaint(date, KLMIN[key], KLMINP[key]); if ($("klSub")) $("klSub").textContent = "分时 " + date + "（本地存档）"; klIdxMinDraw(date); return true; }
+  box.innerHTML = '<p class="note">正在读 ' + date + ' 的分时存档…</p>';
+  var code0 = KLST.code;
+  ldrArcLoad(date, function(o){
+    var g = ldrArcBars(o, code0);
+    if (g){
+      KLMIN[key] = g.bars; if (g.prec > 0) KLMINP[key] = g.prec;
+      if (KLST.mode !== "min" || KLST.code !== code0) return;
+      klMinPaint(date, g.bars, g.prec);
+      if ($("klSub")) $("klSub").textContent = "分时 " + date + "（本地存档）";
+      if ($("klNote")) $("klNote").textContent = "分时是 " + date + " 09:30–15:00 的 1 分钟走势（通达信本地存档），不复权；均价＝累计成交额÷累计成交量；纵轴按涨跌停标准刻度。";
+      klIdxMinDraw(date);
+      return;
+    }
+    klMinShowNet(date);
+  });
+  return true;
+}
 function klMinShow(date){
+  if (!KLST.code) return;
+  if (!date) date = klDay || KLST.day;
+  date = klNormDay(date);
+  if (klMinShowArc(date)) return;
+  klMinShowNet(date);
+}
+function klMinShowNet(date){
   if (!KLST.code) return;
   if (!date) date = klDay || KLST.day;
   date = klNormDay(date);
@@ -3819,6 +3898,26 @@ function klIdxMinDraw(date){
   var sym = KLIDXSYM, nm = KLIDXNAME[sym] || sym, key = sym + "@" + date;
   var got = KLIDXMIN[key];
   if (got){ klIdxMinPaint(sym, nm, date, got.bars, got.prec); return; }
+  if (ldrArcHave(date) && !(window.LDRMIN_DAY || {})[date]){
+    box.innerHTML = klIdxMinTabs(sym) + '<div class="chartnote">大盘（' + nm + '）：正在读 ' + date + ' 的分时存档…</div>';
+    klIdxMinBind(date);
+    ldrArcLoad(date, function(o){
+      var g = ldrArcIdx(o, sym);
+      if (g){ KLIDXMIN[key] = { bars: g.bars, prec: g.prec }; if (KLST.mode === "min") klIdxMinPaint(sym, nm, date, g.bars, g.prec); return; }
+      klIdxMinDrawNet(date);
+    });
+    return;
+  }
+  if (ldrArcHave(date) && (window.LDRMIN_DAY || {})[date]){
+    var gi = ldrArcIdx((window.LDRMIN_DAY || {})[date], sym);
+    if (gi){ KLIDXMIN[key] = { bars: gi.bars, prec: gi.prec }; klIdxMinPaint(sym, nm, date, gi.bars, gi.prec); return; }
+  }
+  klIdxMinDrawNet(date);
+}
+function klIdxMinDrawNet(date){
+  var box = $("klIdx"); if (!box) return;
+  date = klNormDay(date);
+  var sym = KLIDXSYM, nm = KLIDXNAME[sym] || sym, key = sym + "@" + date;
   box.innerHTML = klIdxMinTabs(sym) + '<div class="chartnote">大盘（' + nm + '）：正在取 ' + date + ' 的分时…</div>';
   klIdxMinBind(date);
   klIdxMinFetch(sym, function(r){
@@ -6465,13 +6564,28 @@ function ldrMin5EM(code, cb){
     cb(out);
   }, 12000);
 }
-function ldrMinGet(code, ds, cb){                  // 返回这一天（最近 5 个交易日内）的分钟线 + 昨收
-  ldrMin5(code, function(r){
-    var d8 = klFmtDate8(ds), arr = (r && r.days) ? r.days[d8] : null;
-    if (!arr || arr.length < 12){ cb(null); return; }
-    var prec = (r.prec && r.prec[d8]) || 0;
-    if (prec > 0){ cb({ arr: arr, prec: prec }); return; }
-    klMinPrevFetch(code, function(){ cb({ arr: arr, prec: klMinPrevOf(code, d8) || 0 }); });
+function ldrMinGet(code, ds, cb){                  // 先查本地存档，再退回最近 5 个交易日接口
+  var d8 = klFmtDate8(ds);
+  function net(cb2){
+    ldrMin5(code, function(r){
+      var arr = (r && r.days) ? r.days[d8] : null;
+      if (!arr || arr.length < 12){ cb2(null); return; }
+      var prec = (r.prec && r.prec[d8]) || 0;
+      if (prec > 0){ cb2({ arr: arr, prec: prec }); return; }
+      klMinPrevFetch(code, function(){ cb2({ arr: arr, prec: klMinPrevOf(code, d8) || 0 }); });
+    });
+  }
+  if (!ldrArcHave(d8)){ net(cb); return; }
+  var cached = (window.LDRMIN_DAY || {})[d8];
+  if (cached){
+    var g0 = ldrArcBars(cached, code);
+    if (g0 && g0.prec > 0){ cb({ arr: g0.bars, prec: g0.prec }); return; }
+    net(cb); return;
+  }
+  ldrArcLoad(d8, function(o){
+    var g = ldrArcBars(o, code);
+    if (g && g.prec > 0){ cb({ arr: g.bars, prec: g.prec }); return; }
+    net(cb);
   });
 }
 function ldrLineJudge(arr, prec){
