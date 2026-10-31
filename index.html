@@ -198,6 +198,7 @@
   th{background:var(--chip);font-weight:600;color:var(--head)}
   td.name{text-align:left}
   #tbl td.name{width:196px;min-width:186px;max-width:196px;white-space:normal}
+  #ndBar{display:none}   /* 节点列已删，起算日设置一并收起 */
   tr.top td{background:rgba(192,44,44,.07)}
   td.seat{text-align:left;width:208px;min-width:208px;max-width:208px;padding:5px 9px}
   .lseat{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;line-height:15px;padding:0 5px;margin:0 0 2px;border-radius:3px;background:#f2f3f5;color:#5a6068;white-space:nowrap;overflow:hidden}
@@ -5972,13 +5973,12 @@ function renderNewTop5(){
     var hf = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th>'
       + '<th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th>'
       + '<th title="本栏股票昨日未涨停，没有「昨日涨停板数」这一项，显示 —">连板</th>'
-      + '<th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线上的日数＝节点；起算日须自行设定，仅历史统计，非投资建议。">节点</th>'
       + '<th>竞价涨幅</th>'
-      + '<th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%）；⚠ 高位高开＝≥4 板且高开 >7%。鼠标悬停看每档样本数 / 封板率 / 收益与胜率。">开盘档位</th>'
       + '<th title="价格＝9:25 竞价价（当日开盘价）">价格</th>'
+      + '<th>市值</th>'
       + '<th>实际换手</th>'
       + '<th title="昨日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率；红条＝该席位买入后次日大面率≥45%、橙条＝33~44%">昨日席位' + (lhbDate(_d0) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(_d0) + '</span>' : '') + '</th>'
-      + '<th>委比</th><th>成交量</th><th>市值</th>'
+      + '<th>委比</th><th>成交量</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">断板卖出(A均值)</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">A胜率</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">断板卖出(A中位)</th>'
@@ -5996,15 +5996,13 @@ function renderNewTop5(){
         + '<td class="left">' + esc(x.sector || '—') + (_hr ? '<span class="' + (_hr.rank <= 5 ? 'hotb' : 'hotb2') + '" title="' + esc(_hr.name + '：板块热度榜第 ' + _hr.rank + ' 名（截至 ' + _hr.d + '）｜行业 ' + _hr.n + ' 只、近3日涨停 ' + _hr.z3 + ' 家、近3日涨幅 ' + (_hr.r3 > 0 ? '+' : '') + _hr.r3 + '%、放量 ' + _hr.vol + '×') + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
         + '<td class="left">' + thCell(x.code) + '</td>'
         + '<td>—</td>'
-        + ndCell()
         + '<td class="' + ((x.chg > 0) ? 'up' : 'down') + '">' + c2 + '</td>'
-        + '<td style="white-space:nowrap">' + gkCell(x) + '</td>'
         + '<td style="white-space:nowrap">' + pxCell(x) + '</td>'
+        + '<td><b>' + (x.mc > 0 ? yzMoney(x.mc) : '—') + '</b></td>'
         + '<td>' + a2 + '</td>'
         + '<td class="seat">' + lhbCell(x.code, _d0) + '</td>'
         + '<td class="' + ((x.bid || x.ask) ? ((x.bid - x.ask) > 0 ? 'up' : 'down') : '') + '">' + ((x.bid || x.ask) ? (((x.bid - x.ask) / (x.bid + x.ask) * 100).toFixed(0) + '%') + '<span class="tag">' + (x.bid >= x.ask ? '买>卖' : '卖>买') + '</span>' : '—') + '</td>'
         + '<td><b>' + yzMoney(x.amt) + '</b></td>'
-        + '<td><b>' + (x.mc > 0 ? yzMoney(x.mc) : '—') + '</b></td>'
         + '<td>—</td><td>—</td><td>—</td><td>—</td>'
         + '</tr>';
     }).join('');
@@ -6062,9 +6060,7 @@ function renderNewTop5Archive(day){
   var mx = 1; rows.forEach(function(r){ if ((r.at || 0) > mx) mx = r.at; });
   var hf = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th>'
     + '<th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th>'
-    + '<th title="节点矩阵（歌神小易）：从自设「起算日」数交易日，落在方形螺旋 8 条放射线上的日数＝节点；起算日须自行设定，仅历史统计，非投资建议。">节点</th>'
     + '<th>竞价涨幅</th>'
-    + '<th title="竞价每日的开盘高低按绝对涨幅分 6 档（低开 / 平开 0~2% / 2~5% / 5~7% / 7~9.5% / ≥9.5%）。★优选档＝A 口径不亏的两档；⚠ 高位高开＝≥4 板且高开 >7%。">开盘档位</th>'
     + '<th title="价格＝当天 9:25 竞价价（当日开盘价）">价格</th>'
     + '<th>实际换手</th>'
     + '<th title="这一列＝竞价日的前一交易日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率">昨日席位' + (lhbDate(day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(day) + '</span>' : '') + '</th>'
@@ -6081,9 +6077,7 @@ function renderNewTop5Archive(day){
       + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, day) + lhbBoom(r.code, day) + '</td>'
       + '<td class="left">' + esc(r.sector || '—') + (r._hot ? '<span class="' + (r._hot.rank <= 5 ? 'hotb' : 'hotb2') + '" title="' + esc(r._hot.name + '：板块热度榜第 ' + r._hot.rank + ' 名（截至 ' + r._hot.d + '）｜行业 ' + r._hot.n + ' 只、近3日涨停 ' + r._hot.z3 + ' 家、近3日涨幅 ' + (r._hot.r3 > 0 ? '+' : '') + r._hot.r3 + '%、放量 ' + r._hot.vol + '×') + '">热度#' + r._hot.rank + '</span>' : '') + '</td>'
       + '<td class="left">' + thCell(r.code) + '</td>'
-      + ndCell()
       + '<td class="' + ((r.chg > 0) ? 'up' : 'down') + '">' + c2 + '</td>'
-      + '<td style="white-space:nowrap">' + gkCell(r) + '</td>'
       + '<td style="white-space:nowrap">' + ((r.px > 0) ? (+r.px).toFixed(2) : '—') + '</td>'
       + '<td>' + a2 + '</td>'
       + '<td class="seat">' + lhbCell(r.code, day) + '</td>'
