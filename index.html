@@ -259,7 +259,20 @@
     .cyc .ph{font-size:19px}
     .cyc .sc b{font-size:17px}
     .advice{font-size:12.5px}
-    .tablewrap{ -webkit-overflow-scrolling: touch }
+    .tablewrap{ -webkit-overflow-scrolling: touch; overflow-x:auto; touch-action:pan-x pan-y; overscroll-behavior-x:contain }
+    /* leaderboard modal: full-screen on portrait phones, wrap toolbar, scrollable body */
+    #ldrWrap{align-items:stretch;justify-content:stretch}
+    #ldrBox{width:100vw!important;max-width:100vw;height:100vh!important;height:100dvh!important;max-height:100dvh;border:0;border-radius:0}
+    #ldrBar{flex-wrap:wrap;align-content:flex-start;gap:6px;padding:6px 8px 8px}
+    #ldrBar>b{flex:0 0 auto;font-size:12.5px}
+    #ldrBar>span[style*="flex:1"]{display:none}
+    #ldrBar>span{flex:0 0 auto}
+    #ldrBar button{flex:0 0 auto;min-height:32px;padding:6px 9px;font-size:12.5px}
+    #ldrBar input[type=date]{max-width:116px;min-height:32px}
+    #ldrDate,#ldrPos{display:none}
+    #ldrBody{min-height:0;padding:8px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+    #ldrLv .lvTag{min-width:56px}
+    #ldrLv .lvS{padding:4px 8px}
   }
   #advBox .advFold{display:none}
   #advBox.foldOpen .advFold{display:block}
