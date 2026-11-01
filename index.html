@@ -6757,7 +6757,7 @@ function ldrPaint(){
       var ndRec = nodetixGet(ds, r.c), ndm = !!ndRec;
       if (LDRNODE) ttl += ' · 点一下' + (ndm ? '取消' : '标为') + '节点票（记 ' + b + ' 板）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + (b === 1 ? ' lv1' : '') + (ndm ? ' nd' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" data-lb="' + b + '" title="' + esc(ttl) + '">'
-        + '<b>' + esc(r.n) + '</b>' + (ndm ? '<em class="ndb">◆' + (ndRec.b || b) + '板</em>' : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
+        + '<b>' + esc(r.n) + '</b>' + (ndm ? '<em class="ndb">◆' + ((ndRec.b || b) === 1 ? '首板' : (ndRec.b || b) + '板') + '</em>' : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
         + (LDRTS ? '<em>' + esc(r.tags.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (r.tags.length > 2 ? ' +' + (r.tags.length - 2) : '')) + '</em>' : '')
         + (ln ? '<em style="color:#c02c2c;font-style:normal;background:#fff1f0;border-radius:6px;padding:0 3px;margin-left:2px" title="' + esc('分时直线拉板：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟拉 ' + ln.g + '% 到涨停，最大回撤 ' + ln.dd + '%') + '">直线' + ldrHM(ln.s) + '</em>' : '')
         + '</a>';
@@ -6808,14 +6808,14 @@ function renderNodeTix(){
   box.hidden = false;
   var days = Object.keys(NODETIX).sort().reverse();
   var h = '<div class="ndt"><div class="ndtHd">◆ 节点票 <b>' + total + '</b> 只'
-    + '<span class="ndtSub">连板梯队里点「节点」，再点当天的任意一只涨停股，就记下它当天是第几板；再点一次取消</span></div><div class="ndtList">';
+    + '<span class="ndtSub">连板梯队里点「节点」，再点当天的任意一只涨停股，就记下它当天是几板（首板 / 2板 / 3板…）；再点一次取消</span></div><div class="ndtList">';
   days.forEach(function(ds){
     var d = NODETIX[ds] || {};
     Object.keys(d).sort(function(x, y){ return (d[y].ts || 0) - (d[x].ts || 0); }).forEach(function(c){
       var r = d[c] || {};
       h += '<span class="ndtItem" data-ndd="' + ds + '" data-ndc="' + c + '" title="' + ndEsc((r.n || c) + ' ' + c + ' · ' + ldrIso(ds)) + '">'
         + '<span class="ndtDay">' + ds.slice(4, 6) + '-' + ds.slice(6, 8) + '</span>'
-        + '<span class="ndtB">第' + (r.b || 1) + '板</span>'
+        + '<span class="ndtB">' + ((r.b || 1) === 1 ? '首板' : (r.b || 1) + '板') + '</span>'
         + '<b class="ndtNm">' + esc(r.n || c) + '</b>'
         + '<input class="ndtNote" maxlength="40" placeholder="备注" value="' + ndEsc(r.note || "") + '">'
         + '<span class="ndtX" title="取消这只节点票">×</span></span>';
