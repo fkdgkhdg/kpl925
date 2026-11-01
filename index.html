@@ -127,11 +127,19 @@
   .ndtHd .ndtSub{font-weight:400;color:#b09b97;font-size:10.5px;margin-left:2px}
   .ndtSync{margin-left:auto;font-size:10.5px;color:#a0483f;border:1px solid #f0d3cf;border-radius:9px;padding:0 6px;line-height:16px;cursor:pointer;background:#fff;white-space:nowrap}
   .ndtSync:hover{background:#fff1ef}
+  .ndtSync.busy{color:#9a641f;border-color:#ecd6ad;background:#fffaf0}
+  .ndtSync.on{color:#216e46;border-color:#b9ddc7;background:#f4fff8}
+  .ndtSync.off{color:#8b6f69;border-color:#e4d8d5;background:#faf8f7}
   #ndSync{position:fixed;inset:0;background:rgba(20,25,40,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
   #ndSync[hidden]{display:none}
   .ndsBox{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:13px;color:#33415c;max-height:86vh;overflow:auto}
   .ndsBox h3{margin:0 0 6px;font-size:15px}
   .ndsBox p{margin:6px 0;font-size:12px;color:#6b7280;line-height:1.6}
+  .ndsState{border:1px solid #dbe8df;background:#f5fbf7;border-radius:9px;padding:7px 9px;color:#216e46;font-size:12px;font-weight:600;line-height:1.5}
+  .ndsState.busy{border-color:#ecd6ad;background:#fffaf0;color:#8a5a18}
+  .ndsState.off{border-color:#e4d8d5;background:#faf8f7;color:#8b6f69}
+  .ndsBox details{margin:10px 0 2px;border-top:1px dashed #e5e7eb;padding-top:8px}
+  .ndsBox summary{cursor:pointer;font-size:12px;color:#7b8492;user-select:none}
   .ndsBox input,.ndsBox textarea{width:100%;box-sizing:border-box;border:1px solid #d7dde6;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;color:#33415c}
   .ndsBox textarea{height:62px;resize:vertical}
   .ndsBox .row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center}
@@ -6794,9 +6802,26 @@ function ldrPaint(){
 // ===== 节点票：标一个交易日 → 这一天的首板全部算节点票，之后按天显示它们到了几板 =====
 var LDRNODE = false;                                  // 兼容旧引用；节点不再用「标记模式」
 var NODEDAY_KEY = "NODE_DAYS_V1";
+var NODEDEL_KEY = "NODE_DELS_V1";
+var NODESYNC_META_KEY = "NODE_SYNC_META_V1";
+var NODESYNC_BIN = "9b4ac0667034";
+var NODESYNC_TOPIC = "kpl925-nodes-061fee1449cf3db2d1946150";
+try { var NODESYNC_NS = new URLSearchParams(location.search).get("syncns"); if (NODESYNC_NS && /^[a-z0-9_-]{4,24}$/i.test(NODESYNC_NS)) NODESYNC_TOPIC += "-" + NODESYNC_NS; } catch(e){}
+function nodeLoadObj(k){ try { var o = JSON.parse(localStorage.getItem(k) || "{}"); return (o && typeof o === "object" && !Array.isArray(o)) ? o : {}; } catch(e){ return {}; } }
 var NODEDAYS = (function(){ try { var o = JSON.parse(localStorage.getItem(NODEDAY_KEY) || "{}"); return (o && typeof o === "object") ? o : {}; } catch(e){ return {}; } })();
+var NODEDELS = nodeLoadObj(NODEDEL_KEY);
+var NODESYNC = (function(){
+  var m = nodeLoadObj(NODESYNC_META_KEY), id = String(m.id || "");
+  if (!id){
+    id = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    try { localStorage.setItem(NODESYNC_META_KEY, JSON.stringify({ id: id })); } catch(e){}
+  }
+  return { id:id, started:false, busy:false, dirty:false, again:false, timer:0, pollTimer:0, retryTimer:0,
+           lastPull:0, lastPush:0, lastOk:0, state:"idle", msg:"连接中", seen:{}, es:null,
+           ctrl:null, runId:0, lastRemoteSig:"", lastPublishedSig:"", lastWakeSig:"" };
+})();
 var NODESET = null;                                   // 节点票代码集合（缓存）
-function nodeSave(){ try { localStorage.setItem(NODEDAY_KEY, JSON.stringify(NODEDAYS)); } catch(e){} }
+function nodeSave(){ try { localStorage.setItem(NODEDAY_KEY, JSON.stringify(NODEDAYS)); localStorage.setItem(NODEDEL_KEY, JSON.stringify(NODEDELS)); } catch(e){} }
 function nodeIsDay(ds){ return !!(ds && NODEDAYS[ds]); }
 function nodeLatest(){                                   // 节点票按「竞价日的前一交易日」收盘口径显示（29 竞价看 28 收盘，30 竞价看 29 收盘）
   var ks = ldrDays(); if (!ks.length) return "";
@@ -6822,17 +6847,18 @@ function nodeBoardNow(code, latest){
 }
 function nodeDayToggle(ds){
   if (!ds) return;
-  if (NODEDAYS[ds]) delete NODEDAYS[ds];
-  else NODEDAYS[ds] = { ts: Date.now(), note: "" };
-  NODESET = null; nodeSave(); renderNodeTix(); paintNodeBtn();
+  var now = Date.now();
+  if (NODEDAYS[ds]) { delete NODEDAYS[ds]; NODEDELS[ds] = now; }
+  else { NODEDAYS[ds] = { ts: now, note: "" }; delete NODEDELS[ds]; }
+  NODESET = null; nodeSave(); nodeMarkDirty(); renderNodeTix(); paintNodeBtn();
   if (typeof renderLDR === "function") renderLDR();
 }
 function nodeDayDel(ds){
   if (!NODEDAYS[ds]) return;
-  delete NODEDAYS[ds]; NODESET = null; nodeSave(); renderNodeTix(); paintNodeBtn();
+  delete NODEDAYS[ds]; NODEDELS[ds] = Date.now(); NODESET = null; nodeSave(); nodeMarkDirty(); renderNodeTix(); paintNodeBtn();
   if (typeof renderLDR === "function") renderLDR();
 }
-function nodeDayNote(ds, v){ if (!NODEDAYS[ds]) return; NODEDAYS[ds].note = v || ""; NODEDAYS[ds].ts = Date.now(); nodeSave(); }
+function nodeDayNote(ds, v){ if (!NODEDAYS[ds]) return; NODEDAYS[ds].note = String(v || "").slice(0, 40); NODEDAYS[ds].ts = Date.now(); nodeSave(); nodeMarkDirty(); }
 function ndEsc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function nodeNm(b){ return b === 1 ? "首板" : b + "板"; }
 var ND_REF = "";
@@ -6846,7 +6872,7 @@ function renderNodeTix(){
   var tip = '节点日的首板全部算节点票；按 ' + (latest ? ldrIso(latest) : '—') + ' 收盘看这批票走到了几板';
   var h = '<div class="ndt" title="' + ndEsc(tip) + '"><div class="ndtHd">◆ 节点票 <b>' + days.length + '</b> 个节点日'
     + '<span class="ndtSub">按 ' + (latest ? ldrIso(latest).slice(5) : '—') + ' 收盘</span>'
-    + '<span class="ndtSync" title="生成同步链接，在另一台设备打开即可合并节点">☁ 同步</span></div><div class="ndtList">';
+    + '<span class="ndtSync" id="ndtAuto" title="节点日、备注、删除会自动同步到另一台设备；点开查看状态或备用同步链接">☁ 连接中</span></div><div class="ndtList">';
   days.forEach(function(ds){
     var pool = nodePool(ds), dist = {}, dead = 0;
     pool.forEach(function(r){
@@ -6865,10 +6891,11 @@ function renderNodeTix(){
     h += '<div class="ndtItem" data-ndd="' + ds + '" title="' + ndEsc(ldrIso(ds) + ' 节点日 · 首板池 ' + pool.length + ' 只') + '">'
       + '<span class="ndtDay">' + ldrIso(ds).slice(5) + '</span>'
       + '<span class="ndtDists">' + dtxt + '</span>'
-      + '<input class="ndtNote" maxlength="40" placeholder="备注" value="' + ndEsc(rec.note || "") + '">'
+      + '<input class="ndtNote" data-ndd="' + ds + '" maxlength="40" placeholder="备注" value="' + ndEsc(rec.note || "") + '">'
       + '<span class="ndtX" title="取消这个节点日">×</span></div>';
   });
   box.innerHTML = h + '</div></div>';
+  nodeSyncPaint();
   Array.prototype.forEach.call(box.querySelectorAll(".ndtItem"), function(it){
     var ds = it.getAttribute("data-ndd");
     var inp = it.querySelector(".ndtNote");
@@ -6883,34 +6910,256 @@ function renderNodeTix(){
 function ndB64Enc(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 function ndB64Dec(s){ s = String(s || "").replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return decodeURIComponent(escape(atob(s))); }
 function nodeSyncLink(){
-  var code = ndB64Enc(JSON.stringify(NODEDAYS));
+  var code = ndB64Enc(JSON.stringify({ schema:1, days:NODEDAYS, dels:NODEDELS }));
   return location.origin + location.pathname + "#nd=" + code;
 }
-function nodeMerge(obj){
-  var n = 0;
-  Object.keys(obj || {}).forEach(function(d){
-    var inc = obj[d]; if (!inc || typeof inc !== "object") return;
-    var cur = NODEDAYS[d];
-    if (!cur || (inc.ts || 0) > (cur.ts || 0)){
-      NODEDAYS[d] = { ts: inc.ts || Date.now(), note: inc.note || "" }; n++;
-    }
+function nodeClock(){ try { return new Date().toLocaleTimeString("zh-CN", { hour12:false, hour:"2-digit", minute:"2-digit", second:"2-digit" }); } catch(e){ return ""; } }
+function nodeCleanTs(v){ var t = +v || 0; return t > 0 ? Math.min(t, Date.now() + 86400000) : 0; }
+function nodeCleanPayload(raw){
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  var rd = (raw.days && typeof raw.days === "object" && !Array.isArray(raw.days)) ? raw.days : raw;
+  var rx = (raw.dels && typeof raw.dels === "object" && !Array.isArray(raw.dels)) ? raw.dels : {};
+  var days = {}, dels = {};
+  Object.keys(rd).forEach(function(d){
+    if (!/^\d{8}$/.test(d)) return;
+    var r = rd[d]; if (!r || typeof r !== "object") return;
+    var t = nodeCleanTs(r.ts); if (!t) return;
+    days[d] = { ts:t, note:String(r.note || "").slice(0, 40) };
   });
-  if (n){ NODESET = null; nodeSave(); renderNodeTix(); if (typeof renderLDR === "function") renderLDR(); }
+  Object.keys(rx).forEach(function(d){
+    if (!/^\d{8}$/.test(d)) return;
+    var t = nodeCleanTs(rx[d]); if (t) dels[d] = t;
+  });
+  return { days:days, dels:dels };
+}
+function nodeSortedSig(obj){
+  var out = {};
+  Object.keys(obj || {}).sort().forEach(function(k){
+    var v = obj[k];
+    out[k] = (v && typeof v === "object") ? { ts:+v.ts || 0, note:String(v.note || "") } : (+v || 0);
+  });
+  return JSON.stringify(out);
+}
+function nodeSig(){ return JSON.stringify([nodeSortedSig(NODEDAYS), nodeSortedSig(NODEDELS)]); }
+function nodePayloadSig(p){ p = nodeCleanPayload(p) || { days:{}, dels:{} }; return JSON.stringify([nodeSortedSig(p.days), nodeSortedSig(p.dels)]); }
+function nodeNewerDay(a, b){
+  if (!a) return b; if (!b) return a;
+  var ta = +a.ts || 0, tb = +b.ts || 0;
+  if (ta !== tb) return ta > tb ? a : b;
+  var sa = JSON.stringify({ ts:ta, note:String(a.note || "") }), sb = JSON.stringify({ ts:tb, note:String(b.note || "") });
+  return sa >= sb ? a : b;
+}
+function nodeApplyPayload(raw){
+  var p = nodeCleanPayload(raw); if (!p) return false;
+  var before = nodeSig(), days = {}, dels = {}, all = {};
+  Object.keys(NODEDAYS).forEach(function(d){ all[d] = 1; });
+  Object.keys(NODEDELS).forEach(function(d){ all[d] = 1; });
+  Object.keys(p.days).forEach(function(d){ all[d] = 1; });
+  Object.keys(p.dels).forEach(function(d){ all[d] = 1; });
+  Object.keys(all).forEach(function(d){
+    var day = nodeNewerDay(NODEDAYS[d], p.days[d]);
+    var del = Math.max(+NODEDELS[d] || 0, +p.dels[d] || 0);
+    var dt = day ? (+day.ts || 0) : 0;
+    if (dt > 0 && dt > del) days[d] = { ts:dt, note:String(day.note || "").slice(0, 40) };
+    else if (del > 0) dels[d] = del;
+  });
+  NODEDAYS = days; NODEDELS = dels;
+  var changed = nodeSig() !== before;
+  if (changed){
+    NODESET = null; nodeSave();
+    try { nodeRepaint(); } catch(e){}
+    try { if (typeof renderLDR === "function") renderLDR(); } catch(e){}
+  }
+  return changed;
+}
+function nodeRepaint(){
+  var ae = document.activeElement, ds = "", pos = 0;
+  if (ae && ae.classList && ae.classList.contains("ndtNote")){
+    ds = ae.getAttribute("data-ndd") || ""; try { pos = ae.selectionStart || 0; } catch(e){}
+  }
+  renderNodeTix();
+  if (ds){
+    var inp = document.querySelector('.ndtNote[data-ndd="' + ds + '"]');
+    if (inp){ try { inp.focus(); inp.setSelectionRange(pos, pos); } catch(e){} }
+  }
+}
+function nodeMerge(obj){
+  var p = nodeCleanPayload(obj);
+  if (!p) return 0;
+  var before = {};
+  Object.keys(NODEDAYS).forEach(function(d){ before[d] = nodeSortedSig({x:NODEDAYS[d]}); });
+  var changed = nodeApplyPayload(p);
+  if (!changed) return 0;
+  var n = 0;
+  Object.keys(NODEDAYS).forEach(function(d){ if (before[d] !== nodeSortedSig({x:NODEDAYS[d]})) n++; });
+  if (!n) n = 1;
+  nodeMarkDirty();
   return n;
+}
+function nodeSyncPaint(){
+  var b = document.getElementById("ndtAuto");
+  if (b){
+    var cls = NODESYNC.state === "ok" ? " on" : (NODESYNC.state === "busy" ? " busy" : (NODESYNC.state === "off" ? " off" : ""));
+    b.className = "ndtSync" + cls;
+    b.textContent = NODESYNC.state === "ok" ? "☁ 已同步" : (NODESYNC.state === "busy" ? "☁ 同步中" : (NODESYNC.state === "off" ? "☁ 待补传" : "☁ 连接中"));
+    b.title = (NODESYNC.msg || "节点自动同步") + (NODESYNC.lastOk ? " · " + nodeClock() : "") + "；点开看状态或备用同步链接";
+  }
+  var st = document.getElementById("ndsState");
+  if (st){
+    st.className = "ndsState" + (NODESYNC.state === "busy" ? " busy" : (NODESYNC.state === "off" ? " off" : ""));
+    var days = Object.keys(NODEDAYS).length, notes = 0;
+    Object.keys(NODEDAYS).forEach(function(d){ if (NODEDAYS[d] && NODEDAYS[d].note) notes++; });
+    st.textContent = (NODESYNC.msg || (NODESYNC.state === "ok" ? "已自动同步" : "正在连接同步服务"))
+      + " · 本机 " + days + " 个节点日" + (notes ? " / " + notes + " 条备注" : "")
+      + (NODESYNC.lastOk ? " · 最近同步 " + nodeClock() : "");
+  }
+  var when = document.getElementById("ndsWhen");
+  if (when) when.textContent = NODESYNC.dirty ? "本机修改等待上传" : (NODESYNC.state === "ok" ? "手机和电脑会自动更新" : "");
+}
+function nodeSyncState(state, msg){
+  NODESYNC.state = state; NODESYNC.msg = msg || "";
+  if (state === "ok") NODESYNC.lastOk = Date.now();
+  nodeSyncPaint();
+}
+function nodeMarkDirty(){
+  NODESYNC.dirty = true;
+  nodeSyncState("busy", "本机有修改，准备同步");
+  if (NODESYNC.started) nodeWakeOther();
+  clearTimeout(NODESYNC.timer);
+  NODESYNC.timer = setTimeout(function(){ nodeSyncRun(true); }, 650);
+}
+function nodeFetchJson(url, opt, ms){
+  return new Promise(function(resolve, reject){
+    var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    var done = false, timer = setTimeout(function(){ done = true; if (ctrl) try { ctrl.abort(); } catch(e){} reject(new Error("timeout")); }, ms || 12000);
+    opt = opt || {}; if (ctrl) opt.signal = ctrl.signal; NODESYNC.ctrl = ctrl;
+    function finish(){ if (ctrl && NODESYNC.ctrl === ctrl) NODESYNC.ctrl = null; }
+    fetch(url, opt).then(function(r){
+      return r.text().then(function(txt){
+        if (done) return;
+        done = true; clearTimeout(timer); finish();
+        if (!r.ok) throw new Error("http " + r.status + (txt ? " " + txt.slice(0, 100) : ""));
+        var j = null; try { j = JSON.parse(txt); } catch(e){ throw new Error("bad json"); }
+        if (j && j.status === 1 && j.message) throw new Error(String(j.message));
+        resolve(j);
+      });
+    }).catch(function(e){ if (!done){ done = true; clearTimeout(timer); finish(); reject(e); } });
+  });
+}
+function nodeRemoteUrl(){ return "https://json.extendsclass.com/bin/" + NODESYNC_BIN + "?t=" + Date.now() + "&r=" + Math.random().toString(36).slice(2); }
+function nodeRemotePutUrl(){ return "https://json.extendsclass.com/bin/" + NODESYNC_BIN; }
+function nodeSnapshot(){
+  var days = {}, dels = {};
+  Object.keys(NODEDAYS).forEach(function(d){ var r = NODEDAYS[d]; days[d] = { ts:+r.ts || 0, note:String(r.note || "").slice(0, 40) }; });
+  Object.keys(NODEDELS).forEach(function(d){ dels[d] = +NODEDELS[d] || 0; });
+  return { schema:1, updated:Date.now(), writer:NODESYNC.id, days:days, dels:dels };
+}
+function nodeWakeOther(){
+  try {
+    var p = nodeSnapshot(), sig = nodePayloadSig(p);
+    if (sig === NODESYNC.lastWakeSig) return;
+    fetch("https://ntfy.sh/" + NODESYNC_TOPIC, { method:"POST", cache:"no-store", headers:{ "Content-Type":"text/plain;charset=UTF-8", "Title":"kpl925-nodes" }, body:JSON.stringify(p) }).then(function(r){ if (r.ok) NODESYNC.lastWakeSig = sig; }).catch(function(){});
+  } catch(e){}
+}
+function nodeSyncAbort(){
+  NODESYNC.runId++;
+  if (NODESYNC.ctrl) try { NODESYNC.ctrl.abort(); } catch(e){}
+  NODESYNC.ctrl = null; NODESYNC.busy = false; NODESYNC.again = false;
+}
+function nodeSyncSchedule(ms){ clearTimeout(NODESYNC.timer); NODESYNC.timer = setTimeout(function(){ nodeSyncRun(true); }, ms || 650); }
+function nodeSyncRun(force){
+  if (!NODESYNC.started) return;
+  if (NODESYNC.busy){ NODESYNC.again = true; return; }
+  if (typeof navigator !== "undefined" && navigator.onLine === false){ nodeSyncState("off", "当前离线，联网后自动补传"); return; }
+  var runId = ++NODESYNC.runId;
+  NODESYNC.busy = true; clearTimeout(NODESYNC.retryTimer); clearTimeout(NODESYNC.timer);
+  if (NODESYNC.dirty) nodeWakeOther();
+  nodeSyncState("busy", "正在和另一台设备同步");
+  nodeFetchJson(nodeRemoteUrl(), { cache:"no-store", headers:{ "api-key":"noaccount", "Accept":"application/json" } }, 12000).then(function(remoteRaw){
+    if (runId !== NODESYNC.runId) return null;
+    var remote = nodeCleanPayload(remoteRaw) || { days:{}, dels:{} };
+    var remoteSig = nodePayloadSig(remote);
+    nodeApplyPayload(remote);
+    var mergedSig = nodeSig();
+    NODESYNC.lastPull = Date.now();
+    if (mergedSig === remoteSig){
+      NODESYNC.busy = false; NODESYNC.dirty = false; NODESYNC.again = false;
+      NODESYNC.lastRemoteSig = remoteSig; NODESYNC.lastPublishedSig = remoteSig;
+      nodeSyncState("ok", "已是最新，无需上传"); return null;
+    }
+    var snap = nodeSnapshot(), snapSig = nodePayloadSig(snap);
+    return nodeFetchJson(nodeRemotePutUrl(), { method:"PUT", cache:"no-store", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(snap) }, 15000).then(function(){
+      if (runId !== NODESYNC.runId) return;
+      NODESYNC.lastPush = Date.now(); NODESYNC.lastPull = Date.now(); NODESYNC.errN = 0;
+      NODESYNC.lastRemoteSig = snapSig; NODESYNC.lastPublishedSig = snapSig;
+      NODESYNC.dirty = nodeSig() !== snapSig;
+      NODESYNC.busy = false; NODESYNC.again = false;
+      nodeWakeOther();
+      nodeSyncState("ok", NODESYNC.dirty ? "另一台设备刚有新修改，正在合并" : "已自动同步");
+      if (NODESYNC.dirty) nodeSyncSchedule(700);
+    });
+  }).catch(function(e){
+    if (runId !== NODESYNC.runId) return;
+    NODESYNC.busy = false; NODESYNC.errN = (NODESYNC.errN || 0) + 1;
+    nodeSyncState("off", (typeof navigator !== "undefined" && navigator.onLine === false) ? "当前离线，联网后自动补传" : "同步服务暂时连不上，本机数据已保存，会自动重试");
+    clearTimeout(NODESYNC.retryTimer);
+    NODESYNC.retryTimer = setTimeout(function(){ nodeSyncRun(NODESYNC.dirty); }, Math.min(120000, 6000 * Math.pow(2, Math.min(4, NODESYNC.errN - 1))));
+  });
+}
+function nodeListenSync(){
+  if (typeof EventSource === "undefined" || NODESYNC.es) return;
+  try {
+    var es = new EventSource("https://ntfy.sh/" + NODESYNC_TOPIC + "/sse?since=10m");
+    NODESYNC.es = es;
+    es.onopen = function(){ nodeSyncSchedule(350); };
+    es.onmessage = function(ev){
+      var id = String(ev.lastEventId || ""); if (id && NODESYNC.seen[id]) return; if (id) NODESYNC.seen[id] = 1;
+      try {
+        var outer = JSON.parse(ev.data || "{}"), p = null;
+        try { p = JSON.parse(outer.message || ev.data || "{}"); } catch(e){ p = outer; }
+        if (!p || p.schema !== 1 || String(p.writer || "") === NODESYNC.id) return;
+        nodeApplyPayload(p); nodeSyncSchedule(260);
+      } catch(e){}
+    };
+  } catch(e){}
+}
+function nodeAutoSyncStart(){
+  if (NODESYNC.started) return; NODESYNC.started = true;
+  nodeSyncPaint(); nodeListenSync();
+  window.addEventListener("offline", function(){ nodeSyncAbort(); nodeSyncState("off", "当前离线，联网后自动补传"); });
+  window.addEventListener("online", function(){
+    nodeSyncAbort(); nodeSyncState("busy", "网络已恢复，正在补传"); clearTimeout(NODESYNC.retryTimer); nodeWakeOther();
+    setTimeout(function(){ nodeSyncRun(true); }, 60);
+  });
+  window.addEventListener("focus", function(){ if (Date.now() - NODESYNC.lastPull > 30000) nodeSyncRun(NODESYNC.dirty); });
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden && Date.now() - NODESYNC.lastPull > 30000) nodeSyncRun(NODESYNC.dirty); });
+  window.addEventListener("pagehide", function(){ if (NODESYNC.dirty) nodeSyncRun(true); });
+  setTimeout(function(){ nodeSyncRun(false); }, 900);
+  setTimeout(function(){ nodeSyncRun(false); }, 5000);
+  setTimeout(function(){ nodeSyncRun(false); }, 15000);
+  (function tick(){
+    clearTimeout(NODESYNC.pollTimer);
+    NODESYNC.pollTimer = setTimeout(function(){ if (!document.hidden) nodeSyncRun(NODESYNC.dirty); tick(); }, document.hidden ? 1800000 : 600000);
+  })();
 }
 function nodeSyncUI(){
   if (document.getElementById("ndSync")) return;
   var d = document.createElement("div");
   d.id = "ndSync"; d.hidden = true;
   d.innerHTML = '<div class="ndsBox">'
-    + '<h3>节点票 · 手机 / 电脑同步</h3>'
-    + '<p>① 点「复制同步链接」，发到微信；在另一台设备打开这个链接，节点会自动合并（只合并不删除，同一天以更新的一条为准）。</p>'
+    + '<h3>节点票 · 手机 / 电脑自动同步</h3>'
+    + '<div class="ndsState" id="ndsState">正在连接同步服务…</div>'
+    + '<p>节点日、备注和删除都会自动同步。两台设备打开同一个页面即可，通常几秒内更新；离线时照常操作，联网后自动补传。删除会留下防复活记录，旧设备上线也不会把节点加回来。</p>'
+    + '<div class="row"><button class="pri" id="ndsRefresh">立即同步</button><button id="ndsClose">关闭</button><span class="ok" id="ndsWhen"></span></div>'
+    + '<details><summary>备用：用同步链接手动合并</summary>'
+    + '<p>自动同步暂时连不上时可用。点复制后发到微信，在另一台设备打开即可合并。</p>'
     + '<input id="ndsLink" readonly>'
-    + '<div class="row"><button class="pri" id="ndsCopy">复制同步链接</button><button id="ndsClose">关闭</button><span class="ok" id="ndsMsg"></span></div>'
-    + '<p>② 或者把另一台设备的同步码 / 链接粘贴到这里导入：</p>'
+    + '<div class="row"><button id="ndsCopy">复制同步链接</button><span class="ok" id="ndsMsg"></span></div>'
+    + '<p>也可以把另一台设备的同步码或链接粘贴到这里导入：</p>'
     + '<textarea id="ndsIn" placeholder="粘贴 #nd=… 的链接或同步码"></textarea>'
     + '<div class="row"><button id="ndsImport">导入并合并</button><span class="ok" id="ndsMsg2"></span></div>'
-    + '<p style="color:#98a0ad">没有服务器，节点数据只存在这条链接里，不会上传到任何账号；链接别发公开群。</p>'
+    + '</details>'
+    + '<p style="color:#98a0ad">节点内容会通过匿名同步服务在两台设备间传输，不含账号密码；备注请不要写敏感信息。</p>'
     + '</div>';
   document.body.appendChild(d);
   function close(){ d.hidden = true; }
@@ -6921,9 +7170,13 @@ function nodeSyncUI(){
     document.getElementById("ndsMsg").textContent = "";
     document.getElementById("ndsMsg2").textContent = "";
     d.hidden = false;
+    nodeSyncPaint();
+    nodeAutoSyncStart();
+    nodeSyncRun(true);
   }
   d.addEventListener("click", function(e){ if (e.target === d) close(); });
   d.querySelector("#ndsClose").addEventListener("click", close);
+  d.querySelector("#ndsRefresh").addEventListener("click", function(){ nodeSyncRun(true); });
   d.querySelector("#ndsCopy").addEventListener("click", function(){
     var inp = document.getElementById("ndsLink");
     var msg = document.getElementById("ndsMsg");
@@ -8973,6 +9226,7 @@ if ($("mbNV")) $("mbNV").addEventListener("click", function(){ mbApply("nv"); })
 mbSync();   // 初值：默认涨停前5；若上次停在「未涨停前5」则沿用
 if (typeof renderNodeTix === "function") renderNodeTix();
 if (typeof nodeSyncUI === "function") nodeSyncUI();
+if (typeof nodeAutoSyncStart === "function") nodeAutoSyncStart();
   $("klClose").addEventListener("click", function(){ $("klCard").hidden = true; });
   $("bkClose").addEventListener("click", function(){ $("bkCard").hidden = true; });
   $("bkPool").addEventListener("click", function(){
