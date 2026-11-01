@@ -124,6 +124,9 @@
   #ldrLv .ldracc.a{background:#eaf6ec;color:#1f7a3d}
   #ldrLv .ldracc.t{background:#fff3df;color:#a85b00}
   #ldrLv .ldracc.b{background:#f1ebff;color:#6540a0}
+  #ldrLv .ldracc.h{background:#e8f0ff;color:#2f5fae}
+  #ldrLv .ldracc.j{background:#fdeee7;color:#b04a1f}
+  #ldrLv .ldracc.hb{background:#f0ecff;color:#6540a0}
   .kpirow{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
   .kpirow>.kpi{flex:1 1 320px;min-width:0}
   #ndTix{margin:0 0 8px auto;max-width:560px}
@@ -645,7 +648,7 @@
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span>
         <span class="fineprint" style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
-        <select id="ldrAcc" title="按启动前的日K/成交量特征筛选：吸筹＝窄幅平台、低点抬高、启动前缩量、上涨日量能占优；试盘＝启动前有冲板未延续、回踩缩量、再放量突破。可与题材、分时拉板叠加；只是概率特征，不是确认主力吸筹"><option value="">吸筹/试盘</option><option value="a">只看吸筹</option><option value="t">只看试盘</option><option value="b">吸筹+试盘</option></select><button id="ldrHigh" title="只显示 3 板及以上的股票，可与吸筹/试盘、题材、分时拉板叠加">≥3板</button><button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+        <select id="ldrAcc" title="按启动前的日K/成交量特征筛选：吸筹＝窄幅平台、低点抬高、上涨日量能占优；试盘＝启动前有冲板未延续、回踩缩量、再放量突破。高标吸筹/试盘是按 4板+样本反推的高标口径：更重视低点抬高、上涨日量能、20日温和涨幅，不把死缩量当硬门槛。可与题材、≥3板、分时拉板叠加；只是概率特征，不是确认主力吸筹"><option value="">吸筹/试盘</option><option value="a">只看吸筹</option><option value="t">只看试盘</option><option value="b">吸筹+试盘</option><option value="ha">高标吸筹</option><option value="ht">高标试盘</option><option value="hb">高标吸+试</option></select><button id="ldrHigh" title="只显示 3 板及以上的股票，可与吸筹/试盘、高标吸筹/试盘、题材、分时拉板叠加">≥3板</button><button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
@@ -6419,7 +6422,7 @@ function renderLDR(){
     + (nodeIsDay(ds) ? '<span class="chip" id="ldrNdKpi" style="background:#c02c2c">节点日 · 首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>' : '')
     + '<span class="chip">题材 <b>' + TV.length + '</b> 个（≥2只 <b>' + TV.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
     + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (CV[LDRTH] || 0) + ' 只）</span>' : '')
-    + (ac ? '<span class="chip" style="background:#eef3fb;color:#2f5fae">' + (LDRACC_MODE === 'a' ? '吸筹' : (LDRACC_MODE === 't' ? '试盘' : '吸筹+试盘')) + ' <b>' + (LDRACC_MODE === 'a' ? ac.a : (LDRACC_MODE === 't' ? ac.t : ac.b)) + '</b> 只 · 3板+ <b>' + highN + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '')
+    + (ac ? '<span class="chip" style="background:#eef3fb;color:#2f5fae">' + ldrAccName(LDRACC_MODE) + ' <b>' + ldrAccNum(ac, LDRACC_MODE) + '</b> 只 · 3板+ <b>' + highN + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '')
     + (LDRLINE ? '<span class="chip" style="background:#fff1f0;color:#c02c2c">分时直线 <b>' + ldrLineNum(ds, 'line') + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '');
   var te = document.getElementById('ldrTh');
   if (te){
@@ -6446,7 +6449,7 @@ function renderLDR(){
   if (typeof renderLdrTop5 === "function") renderLdrTop5(ds);
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = '口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。「吸筹/试盘」按本轮启动前的日K和成交量筛：吸筹＝窄幅平台、低点抬高、启动前缩量、上涨日量能占优；试盘＝启动前冲板未延续、回踩缩量、再放量突破。两者都是概率特征，不是确认主力吸筹，可以和题材、分时筛选叠加；「≥3板」只保留 3 板及以上，也可和它们叠加。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
+    + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。「吸筹/试盘」是普通涨停股口径：吸筹＝窄幅平台、低点抬高、上涨日量能占优；试盘＝启动前冲板未延续、回踩后再放量突破。「高标吸筹/高标试盘」则是从 4 板+ 历史样本反推的高标口径：更重视 20 日振幅收敛、低点抬高、上涨日量能占优和 20 日温和涨幅，不把死缩量当硬门槛；试盘另要求启动前 20 日内出现过 8.5%+ 冲板痕迹。所有筛选都是概率特征，不是确认主力吸筹，可以和题材、≥3板、分时拉板叠加。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。';
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
@@ -6546,7 +6549,7 @@ function ensureLdrAcc(cb){
   if (LDRACC_BUSY) return;
   LDRACC_BUSY = true; LDRACC_ERR = "";
   var s = document.createElement("script");
-  s.src = "ldraccdata.js?v=20261101a";
+  s.src = "ldraccdata.js?v=20261101b";
   s.onload = function(){
     LDRACC_BUSY = false;
     if (!ldrAccData()){ LDRACC_ERR = "数据文件没有加载出 LDRACC"; }
@@ -6569,12 +6572,21 @@ function ldrAccPass(ds, code){
   if (!LDRACC_MODE) return true;
   var r = ldrAccRec(ds, code); if (!r) return false;
   var f = +r[0] || 0;
-  return LDRACC_MODE === "a" ? !!(f & 1) : (LDRACC_MODE === "t" ? !!(f & 2) : f === 3);
+  if (LDRACC_MODE === "a") return !!(f & 1);
+  if (LDRACC_MODE === "t") return !!(f & 2);
+  if (LDRACC_MODE === "b") return (f & 3) === 3;
+  if (LDRACC_MODE === "ha") return !!(f & 4);
+  if (LDRACC_MODE === "ht") return !!(f & 8);
+  if (LDRACC_MODE === "hb") return (f & 12) === 12;
+  return false;
 }
 function ldrAccTag(r){
   if (!r) return "";
   var f = +r[0] || 0;
-  if (f === 3) return { cls:"b", text:"吸+试", tip: ldrAccTip(r) };
+  if (LDRACC_MODE === "hb" && (f & 12) === 12) return { cls:"hb", text:"高标吸+试", tip: ldrAccTip(r) };
+  if (LDRACC_MODE === "ha" && (f & 4)) return { cls:"h", text:"高标吸", tip: ldrAccTip(r) };
+  if (LDRACC_MODE === "ht" && (f & 8)) return { cls:"j", text:"高标试", tip: ldrAccTip(r) };
+  if ((f & 3) === 3) return { cls:"b", text:"吸+试", tip: ldrAccTip(r) };
   if (f & 1) return { cls:"a", text:"吸筹", tip: ldrAccTip(r) };
   if (f & 2) return { cls:"t", text:"试盘", tip: ldrAccTip(r) };
   return null;
@@ -6584,16 +6596,28 @@ function ldrAccTip(r){
   var f = +r[0] || 0, p = [];
   if (f & 1) p.push("吸筹分 " + r[1] + "：启动前平台振幅 " + r[2] + "%，低点变化 " + (r[3] >= 0 ? "+" : "") + r[3] + "%，启动前5日量比 " + r[4] + "，上涨/下跌日量比 " + r[5]);
   if (f & 2) p.push("试盘：启动前 " + r[6] + " 天冲板 +" + r[7] + "%，量能 " + r[8] + "×，回踩 " + r[9] + "%，回踩缩量至 " + r[10] + "×");
+  if (f & 4) p.push("高标吸筹：启动前20日振幅 " + r[2] + "%，低点变化 " + (r[3] >= 0 ? "+" : "") + r[3] + "%，上涨/下跌日量比 " + r[5] + "，20日涨幅 " + (r[11] >= 0 ? "+" : "") + r[11] + "%");
+  if (f & 8) p.push("高标试盘：20日内触板 " + r[12] + " 次，启动前20日振幅 " + r[2] + "%，低点变化 " + (r[3] >= 0 ? "+" : "") + r[3] + "%，20日涨幅 " + (r[11] >= 0 ? "+" : "") + r[11] + "%");
   return p.join("；") + "。概率特征，不代表确认吸筹。";
 }
 function ldrAccCounts(A, ds){
-  var out = { a:0, t:0, b:0 };
+  var out = { a:0, t:0, b:0, ha:0, ht:0, hb:0 };
   if (!A || !A.rows) return out;
   A.rows.forEach(function(r){
     var q = ldrAccRec(ds, r.c); if (!q) return;
-    var f = +q[0] || 0; if (f & 1) out.a++; if (f & 2) out.t++; if (f === 3) out.b++;
+    var f = +q[0] || 0; if (f & 1) out.a++; if (f & 2) out.t++; if ((f & 3) === 3) out.b++;
+    if (f & 4) out.ha++; if (f & 8) out.ht++; if ((f & 12) === 12) out.hb++;
   });
   return out;
+}
+function ldrAccName(mode){
+  return mode === "a" ? "吸筹" : mode === "t" ? "试盘" : mode === "b" ? "吸筹+试盘" :
+    mode === "ha" ? "高标吸筹" : mode === "ht" ? "高标试盘" : mode === "hb" ? "高标吸+试" : "吸筹/试盘";
+}
+function ldrAccNum(ac, mode){
+  if (!ac) return 0;
+  return mode === "a" ? ac.a : mode === "t" ? ac.t : mode === "b" ? ac.b :
+    mode === "ha" ? ac.ha : mode === "ht" ? ac.ht : mode === "hb" ? ac.hb : 0;
 }
 function ldrLineCache(){
   if (LDRLN) return LDRLN;
@@ -6822,7 +6846,7 @@ function ldrPaint(){
   if (LDRACC_MODE) rows = rows.filter(function(r){ return ldrAccPass(ds, r.c); });
   if (!rows.length){
     if (scanning){ tb.innerHTML = '<div class="empty" style="padding:10px 0">正在扫这一天的分时，识别「直线拉板」…</div>'; return; }
-    var accWhy = LDRACC_MODE ? (!ldrAccCovered(ds) ? '这一天没有日K筛选样本（题材或日K数据没覆盖到）' : (LDRACC_MODE === 'a' ? '这一天没有命中「吸筹」的涨停股' : (LDRACC_MODE === 't' ? '这一天没有命中「涨停试盘」的涨停股' : '这一天没有同时命中「吸筹+试盘」的涨停股'))) : '';
+    var accWhy = LDRACC_MODE ? (!ldrAccCovered(ds) ? '这一天没有日K筛选样本（题材或日K数据没覆盖到）' : '这一天没有命中「' + ldrAccName(LDRACC_MODE) + '」的涨停股') : '';
     var highWhy = LDRHIGH ? '这一天筛选下没有 3 板及以上的股票' : '';
     tb.innerHTML = '<div class="empty" style="padding:10px 0">'
       + (LDRLINE ? (ldrLineMissAll(ds) ? '这一天分时取不到（分钟线只保留最近 5 个交易日），换近几天的日期再看' : '这一天没有识别到分时直线拉到涨停的股票')
