@@ -125,6 +125,19 @@
   .ndtHd{font-size:12px;color:#a0483f;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:6px}
   .ndtHd b{color:#c02c2c}
   .ndtHd .ndtSub{font-weight:400;color:#b09b97;font-size:10.5px;margin-left:2px}
+  .ndtSync{margin-left:auto;font-size:10.5px;color:#a0483f;border:1px solid #f0d3cf;border-radius:9px;padding:0 6px;line-height:16px;cursor:pointer;background:#fff;white-space:nowrap}
+  .ndtSync:hover{background:#fff1ef}
+  #ndSync{position:fixed;inset:0;background:rgba(20,25,40,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
+  #ndSync[hidden]{display:none}
+  .ndsBox{background:#fff;border-radius:12px;max-width:520px;width:100%;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:13px;color:#33415c;max-height:86vh;overflow:auto}
+  .ndsBox h3{margin:0 0 6px;font-size:15px}
+  .ndsBox p{margin:6px 0;font-size:12px;color:#6b7280;line-height:1.6}
+  .ndsBox input,.ndsBox textarea{width:100%;box-sizing:border-box;border:1px solid #d7dde6;border-radius:8px;padding:6px 8px;font-size:12px;font-family:inherit;color:#33415c}
+  .ndsBox textarea{height:62px;resize:vertical}
+  .ndsBox .row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center}
+  .ndsBox button{border:1px solid #d7dde6;background:#fff;border-radius:8px;padding:5px 12px;font-size:12.5px;cursor:pointer}
+  .ndsBox button.pri{background:#c02c2c;border-color:#c02c2c;color:#fff}
+  .ndsBox .ok{color:#1f7a3d;font-size:12px}
   .ndtList{display:flex;flex-direction:column;gap:3px;max-height:132px;overflow:auto}
   .ndtItem{display:flex;align-items:center;gap:6px;padding:3px 0 3px;border-top:1px dashed #f6e4e1;font-size:12px;max-width:100%}
   .ndtItem:first-child{border-top:0;padding-top:1px}
@@ -6819,7 +6832,7 @@ function nodeDayDel(ds){
   delete NODEDAYS[ds]; NODESET = null; nodeSave(); renderNodeTix(); paintNodeBtn();
   if (typeof renderLDR === "function") renderLDR();
 }
-function nodeDayNote(ds, v){ if (!NODEDAYS[ds]) return; NODEDAYS[ds].note = v || ""; nodeSave(); }
+function nodeDayNote(ds, v){ if (!NODEDAYS[ds]) return; NODEDAYS[ds].note = v || ""; NODEDAYS[ds].ts = Date.now(); nodeSave(); }
 function ndEsc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function nodeNm(b){ return b === 1 ? "首板" : b + "板"; }
 var ND_REF = "";
@@ -6832,7 +6845,8 @@ function renderNodeTix(){
   ND_REF = latest;
   var tip = '节点日的首板全部算节点票；按 ' + (latest ? ldrIso(latest) : '—') + ' 收盘看这批票走到了几板';
   var h = '<div class="ndt" title="' + ndEsc(tip) + '"><div class="ndtHd">◆ 节点票 <b>' + days.length + '</b> 个节点日'
-    + '<span class="ndtSub">按 ' + (latest ? ldrIso(latest).slice(5) : '—') + ' 收盘</span></div><div class="ndtList">';
+    + '<span class="ndtSub">按 ' + (latest ? ldrIso(latest).slice(5) : '—') + ' 收盘</span>'
+    + '<span class="ndtSync" title="生成同步链接，在另一台设备打开即可合并节点">☁ 同步</span></div><div class="ndtList">';
   days.forEach(function(ds){
     var pool = nodePool(ds), dist = {}, dead = 0;
     pool.forEach(function(r){
@@ -6866,6 +6880,76 @@ function renderNodeTix(){
     if (x) x.addEventListener("click", function(e){ e.stopPropagation(); nodeDayDel(ds); });
   });
 }
+function ndB64Enc(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function ndB64Dec(s){ s = String(s || "").replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return decodeURIComponent(escape(atob(s))); }
+function nodeSyncLink(){
+  var code = ndB64Enc(JSON.stringify(NODEDAYS));
+  return location.origin + location.pathname + "#nd=" + code;
+}
+function nodeMerge(obj){
+  var n = 0;
+  Object.keys(obj || {}).forEach(function(d){
+    var inc = obj[d]; if (!inc || typeof inc !== "object") return;
+    var cur = NODEDAYS[d];
+    if (!cur || (inc.ts || 0) > (cur.ts || 0)){
+      NODEDAYS[d] = { ts: inc.ts || Date.now(), note: inc.note || "" }; n++;
+    }
+  });
+  if (n){ NODESET = null; nodeSave(); renderNodeTix(); if (typeof renderLDR === "function") renderLDR(); }
+  return n;
+}
+function nodeSyncUI(){
+  if (document.getElementById("ndSync")) return;
+  var d = document.createElement("div");
+  d.id = "ndSync"; d.hidden = true;
+  d.innerHTML = '<div class="ndsBox">'
+    + '<h3>节点票 · 手机 / 电脑同步</h3>'
+    + '<p>① 点「复制同步链接」，发到微信；在另一台设备打开这个链接，节点会自动合并（只合并不删除，同一天以更新的一条为准）。</p>'
+    + '<input id="ndsLink" readonly>'
+    + '<div class="row"><button class="pri" id="ndsCopy">复制同步链接</button><button id="ndsClose">关闭</button><span class="ok" id="ndsMsg"></span></div>'
+    + '<p>② 或者把另一台设备的同步码 / 链接粘贴到这里导入：</p>'
+    + '<textarea id="ndsIn" placeholder="粘贴 #nd=… 的链接或同步码"></textarea>'
+    + '<div class="row"><button id="ndsImport">导入并合并</button><span class="ok" id="ndsMsg2"></span></div>'
+    + '<p style="color:#98a0ad">没有服务器，节点数据只存在这条链接里，不会上传到任何账号；链接别发公开群。</p>'
+    + '</div>';
+  document.body.appendChild(d);
+  function close(){ d.hidden = true; }
+  function open(){
+    var inp = document.getElementById("ndsLink");
+    inp.value = nodeSyncLink();
+    document.getElementById("ndsIn").value = "";
+    document.getElementById("ndsMsg").textContent = "";
+    document.getElementById("ndsMsg2").textContent = "";
+    d.hidden = false;
+  }
+  d.addEventListener("click", function(e){ if (e.target === d) close(); });
+  d.querySelector("#ndsClose").addEventListener("click", close);
+  d.querySelector("#ndsCopy").addEventListener("click", function(){
+    var inp = document.getElementById("ndsLink");
+    var msg = document.getElementById("ndsMsg");
+    function done(){ msg.textContent = "已复制，去微信粘贴"; }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(inp.value).then(done, function(){ inp.select(); document.execCommand("copy"); done(); });
+    } else { inp.select(); document.execCommand("copy"); done(); }
+  });
+  d.querySelector("#ndsImport").addEventListener("click", function(){
+    var msg = document.getElementById("ndsMsg2");
+    var raw = String(document.getElementById("ndsIn").value || "").trim();
+    var m = raw.match(/#nd=([A-Za-z0-9_-]+)/) || raw.match(/^([A-Za-z0-9_-]{8,})$/);
+    if (!m){ msg.style.color = "#b3261e"; msg.textContent = "没识别到同步码"; return; }
+    try {
+      var obj = JSON.parse(ndB64Dec(m[1]));
+      var n = nodeMerge(obj);
+      msg.style.color = "#1f7a3d";
+      msg.textContent = n ? ("已合并 " + n + " 个节点日") : "没有更新的节点（本地已是最新）";
+      setTimeout(close, 900);
+    } catch(e){ msg.style.color = "#b3261e"; msg.textContent = "同步码解析失败"; }
+  });
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    if (t && t.closest && t.closest(".ndtSync")){ e.preventDefault(); open(); }
+  });
+}
 function paintNodeBtn(){
   var b = document.getElementById("ldrNode"); if (!b) return;
   var on = nodeIsDay(ldrCur());
@@ -6874,6 +6958,7 @@ function paintNodeBtn(){
   b.title = on ? "这一天已是节点日：当天首板全部算节点票。再点一次取消"
                : "把当前这一天标为节点日：这一天的首板全部算节点票，之后每天显示它们走到了几板";
 }
+try { (function(){ var m = String(location.hash || "").match(/^#nd=([A-Za-z0-9_-]+)$/); if (m){ var obj = JSON.parse(ndB64Dec(m[1])); var n = nodeMerge(obj); history.replaceState(null, "", location.pathname + location.search); if (n) console.log("节点票同步：合并 " + n + " 个节点日"); } })(); } catch(e){}
 function render(){ ndPaint(); renderCore(); try { if (typeof nodeLatest === "function" && nodeLatest() !== ND_REF) renderNodeTix(); } catch(e){} if (typeof mbSync === "function") mbSync(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
@@ -8887,6 +8972,7 @@ if ($("mbZT")) $("mbZT").addEventListener("click", function(){ mbApply("zt"); })
 if ($("mbNV")) $("mbNV").addEventListener("click", function(){ mbApply("nv"); });
 mbSync();   // 初值：默认涨停前5；若上次停在「未涨停前5」则沿用
 if (typeof renderNodeTix === "function") renderNodeTix();
+if (typeof nodeSyncUI === "function") nodeSyncUI();
   $("klClose").addEventListener("click", function(){ $("klCard").hidden = true; });
   $("bkClose").addEventListener("click", function(){ $("bkCard").hidden = true; });
   $("bkPool").addEventListener("click", function(){
