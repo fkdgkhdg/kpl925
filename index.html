@@ -117,7 +117,10 @@
   #ldrLv .lvS.nd i{color:#c9793f}
   #ldrLv .lvS .ndb{font-style:normal;font-size:10px;font-weight:700;background:#c02c2c;color:#fff;border-radius:6px;padding:0 4px;line-height:1.5}
   #ldrNode.active{background:#c02c2c;color:#fff;border-color:#c02c2c}
-  #ndTix{margin:0 0 8px}
+  .kpirow{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .kpirow>.kpi{flex:1 1 320px;min-width:0}
+  #ndTix{margin:0 0 8px auto;max-width:560px}
+  @media (max-width:760px){ #ndTix{max-width:100%;width:100%;margin-left:0} }
   .ndt{border:1px solid #f0c9c4;background:#fff8f7;border-radius:10px;padding:6px 8px}
   .ndtHd{font-size:12px;color:#8a3a33;font-weight:700;margin-bottom:4px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
   .ndtHd b{color:#c02c2c}
@@ -389,8 +392,7 @@
     <div class="optgrp" id="mbBar" style="margin:4px 0 8px"><span>名单</span><button id="mbZT" class="active">涨停前5</button><button id="mbNV">未涨停前5</button></div>
     <div id="mbMain">
     <div class="opts" id="ndBar" style="margin:4px 0 8px;align-items:center"><span style="color:var(--muted)">节点起算日</span><input id="ndAnchor" type="date" style="width:150px"><button id="ndClear">清除</button><button id="ndHelp">节点口径</button><span class="note" id="ndHint" style="margin:0"></span></div>
-    <div class="kpi" id="kpi"></div>
-    <div id="ndTix"></div>
+    <div class="kpirow"><div class="kpi" id="kpi"></div><div id="ndTix"></div></div>
     <div class="tablewrap"><table id="tbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
     <div id="fixProg" style="margin:10px 0 6px"></div>
     <div id="advBox"></div>
@@ -6474,7 +6476,7 @@ function renderLdrTop5(ds){
       + "</span>"
       + "<span title=\"价格＝这一天 9:25 竞价价（存档价）\" style=\"text-align:right;color:#5f6b7a;white-space:nowrap\">" + pxTxt + "</span>"
       + "<span title=\"市值＝这一天的存档市值\" style=\"text-align:right;color:#8a8f98;white-space:nowrap\">" + mcTxt + "</span>";
-    h += "<span title=\"" + esc("竞价日冲 " + ((r.board || 1) + 1) + " 板（前一日收盘 " + (r.board || 1) + " 板）") + "\">" + (((r.board || 1) + 1) > 1 ? (((r.board || 1) + 1) + "板") : "首板") + "</span>";
+    h += "<span>" + (r.board > 1 ? (r.board + "板") : "首板") + "</span>";
     h += cc(r.chg, 2);
     h += "<span>" + (r.at ? ((+r.at).toFixed(2) + "%") : "—") + "</span>";
     h += cc(r.dc, 2);
@@ -6777,7 +6779,14 @@ var NODEDAYS = (function(){ try { var o = JSON.parse(localStorage.getItem(NODEDA
 var NODESET = null;                                   // 节点票代码集合（缓存）
 function nodeSave(){ try { localStorage.setItem(NODEDAY_KEY, JSON.stringify(NODEDAYS)); } catch(e){} }
 function nodeIsDay(ds){ return !!(ds && NODEDAYS[ds]); }
-function nodeLatest(){ var ks = ldrDays(); return ks.length ? ks[ks.length - 1] : ""; }
+function nodeLatest(){                                   // 节点票按「竞价日的前一交易日」收盘口径显示（29 竞价看 28 收盘，30 竞价看 29 收盘）
+  var ks = ldrDays(); if (!ks.length) return "";
+  var sd = (typeof STATE !== "undefined" && STATE && STATE.day) ? String(STATE.day).replace(/-/g, "") : "";
+  if (!sd) return ks[ks.length - 1];
+  var ref = "";
+  for (var i = 0; i < ks.length; i++){ if (ks[i] < sd) ref = ks[i]; else break; }
+  return ref || ks[0];
+}
 function nodePool(ds){ try { var A = ldrAgg(ds); return (A && A.rows) ? A.rows.filter(function(r){ return r.b === 1; }) : []; } catch(e){ return []; } }
 function nodeSet(){
   if (NODESET) return NODESET;
@@ -6807,14 +6816,16 @@ function nodeDayDel(ds){
 function nodeDayNote(ds, v){ if (!NODEDAYS[ds]) return; NODEDAYS[ds].note = v || ""; nodeSave(); }
 function ndEsc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function nodeNm(b){ return b === 1 ? "首板" : b + "板"; }
+var ND_REF = "";
 function renderNodeTix(){
   var box = document.getElementById("ndTix"); if (!box) return;
   var days = Object.keys(NODEDAYS).sort().reverse();
   if (!days.length){ box.innerHTML = ""; box.hidden = true; return; }
   box.hidden = false;
   var latest = nodeLatest();
+  ND_REF = latest;
   var h = '<div class="ndt"><div class="ndtHd">◆ 节点票 <b>' + days.length + '</b> 个节点日'
-    + '<span class="ndtSub">节点日当天的首板全部算节点票；右边是这批票到 ' + (latest ? ldrIso(latest) : "—") + ' 收盘走到了几板</span></div><div class="ndtList">';
+    + '<span class="ndtSub">节点日的首板全部算节点票；按 ' + (latest ? ldrIso(latest) : "—") + ' 收盘看这批票走到了几板</span></div><div class="ndtList">';
   days.forEach(function(ds){
     var pool = nodePool(ds), dist = {}, dead = 0;
     pool.forEach(function(r){
@@ -6856,7 +6867,7 @@ function paintNodeBtn(){
   b.title = on ? "这一天已是节点日：当天首板全部算节点票。再点一次取消"
                : "把当前这一天标为节点日：这一天的首板全部算节点票，之后每天显示它们走到了几板";
 }
-function render(){ ndPaint(); renderCore(); if (typeof mbSync === "function") mbSync(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
+function render(){ ndPaint(); renderCore(); try { if (typeof nodeLatest === "function" && nodeLatest() !== ND_REF) renderNodeTix(); } catch(e){} if (typeof mbSync === "function") mbSync(); if (RENDERTAIL) RTAILAGAIN = true; else RENDERTAIL = soon(renderTail, 180); }
 
 // ===== 节点矩阵（交易日计数 · 歌神小易口径）— 用 gann-nodes.js =====
 var ND_KEY = "NODE_ANCHOR";
@@ -6950,7 +6961,7 @@ function renderCore(){
 
   var arch = STATE.archived;
   var TI2 = topInInfo();
-  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th title="竞价日要冲的板数＝前一日收盘板数 + 1（昨收首板，今天显示的就是 2 板）">连板</th><th>竞价涨幅</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>市值</th><th>实际换手</th>'
+  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th>竞价涨幅</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>市值</th><th>实际换手</th>'
            + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝该席位买入后次日大面率≥45%（或在自选名单里）、橙条＝33~44%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>成交量</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
@@ -6970,8 +6981,7 @@ function renderCore(){
       + '<td class="name" data-zc="' + r.code + '"><a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(r.name) + '</a><a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '">K线</a><span class="tag">' + r.code + '</span>' + appBadge(r.code, STATE.day) + lhbBoom(r.code, STATE.day) + teamTag(r.code, STATE.day) + sbzTag(r.code, STATE.day) + '</td>'
       + '<td class="left">' + esc(r.sector || "—") + (_hr ? '<span class="' + (_hr.rank <= 5 ? "hotb" : "hotb2") + '" title="' + esc(_hr.name + "：板块热度榜第 " + _hr.rank + " 名（截至 " + _hr.d + "）｜行业 " + _hr.n + " 只、近3日涨停 " + _hr.z3 + " 家、近3日涨幅 " + (_hr.r3 > 0 ? "+" : "") + _hr.r3 + "%、放量 " + _hr.vol + "×") + '">热度#' + _hr.rank + '</span>' : '') + '</td>'
       + '<td class="left">' + thCell(r.code) + '</td>'
-      + (function(){ var tb = (r.board || 1) + 1;               // 竞价日要冲的板数＝前一天收盘板数+1
-          return '<td><span class="bpos b' + Math.min(5, Math.max(1, tb)) + '" data-zc="' + r.code + '" title="' + esc('竞价日冲 ' + tb + ' 板（前一日收盘 ' + (r.board || 1) + ' 板）· 鼠标悬停看它的涨停记录') + '">' + (tb >= 5 ? "≥5板" : (tb === 1 ? "首板" : tb + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>'; })()
+      + '<td><span class="bpos b' + Math.min(5, Math.max(1, r.board)) + '" data-zc="' + r.code + '" title="鼠标悬停看它的涨停记录">' + (r.board >= 5 ? "≥5板" : (r.board === 1 ? "首板" : r.board + "板")) + '</span>' + (_hi >= 0 ? '<span class="hotstar">★组合' + (_hi + 1) + '</span>' : '') + topInTag(r, TI2) + '</td>'
       + '<td class="' + (r.chg > 0 ? "up" : "down") + '">' + (r.chg > 0 ? "+" : "") + r.chg.toFixed(2) + '%</td>'
       + '<td style="white-space:nowrap">' + pxCell(r) + '</td>'
       + '<td class="up"><b>' + ((r.mc||r.fshare) ? ((r.mc||r.fshare||0)>=1e8?((r.mc||r.fshare||0)/1e8).toFixed(2)+'亿':(r.mc||r.fshare||0).toLocaleString()) : '—') + '</b></td>'
