@@ -293,6 +293,7 @@
   .down{color:var(--down);font-weight:600}
   .empty{padding:16px 4px;color:var(--muted);font-size:13px}
   .note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.7}
+  .fineprint{display:none!important}
   .warn{color:#b3261e}
   .kpi{display:flex;gap:22px;flex-wrap:wrap;margin:2px 0 8px}
   .kpi div{font-size:12.5px;color:var(--muted)}
@@ -352,7 +353,7 @@
 <body>
 <div class="wrap">
   <h1>9:25 竞价收益榜 · 昨日涨停股</h1>
-  <p class="sub">打开即自动还原
+  <p class="sub fineprint">打开即自动还原
   <b>最近一个交易日的 9:25 集合竞价快照</b>，配上当时对应的昨日涨停股名单，按 <b>A 口径</b>（9:25 竞价价买入 → 封板继续持有 → 第一次断板时卖出，买入日即断板的受 T+1 限制、次日开盘卖）的历史平均收益排名，并给出当前<b>情绪周期</b>判断。榜单明细：<span id="arcRange">246 个交易日（2025-09-10 ~ 2026-09-18）</span>；情绪周期/相似期用的是 2016 年以来的主板数据（约 3300 个交易日）。只看主板：沪 600/601/603/605、深 000/001/002/003，已剔除 ST／退市股。</p>
 
   <div class="card">
@@ -387,7 +388,7 @@
     <div class="chartnote" id="klTip"></div>
     <div id="klIdx"></div>
     <div class="chips" id="klInfo"></div>
-    <p class="note" id="klNote"></p>
+    <p class="note fineprint" id="klNote"></p>
   </div>
   <div class="card" id="topCard" hidden>
     <h2>涨停家数 &amp; 连板高度 · 每日变化<span id="tpDate"></span></h2>
@@ -397,7 +398,7 @@
     <div id="tpChart"></div>
     <div class="chips" id="tpTop"></div>
     <div class="chartnote" id="tpTip">柱＝当日涨停家数（深色＝最高板≥5）　线＝最高连板（右轴）　·　鼠标移到图上可看某一天</div>
-    <p class="note" id="tpNote"></p>
+    <p class="note fineprint" id="tpNote"></p>
 <p class="note" id="tpLive" style="color:#1f7a3d"></p>
   </div>
 
@@ -411,7 +412,7 @@
       <datalist id="plNames"></datalist>
       <span>买入价</span><input class="plCost" type="number" step="0.01" min="0.01" placeholder="选填">
       <button class="plGo">分析</button>
-      <span class="plHint">支持名称/代码/简称；自动判断今日是否涨停、连板数、当日跌幅，给出次日历史分布与压力支撑位。</span>
+      <span class="plHint fineprint">支持名称/代码/简称；自动判断今日是否涨停、连板数、当日跌幅，给出次日历史分布与压力支撑位。</span>
     </div>
     <div class="plBody"><p class="note">输入股票名或代码，点「分析」。</p></div>
   </div>
@@ -424,27 +425,27 @@
     <div id="fixProg" style="margin:10px 0 6px"></div>
     <div id="advBox"></div>
     <div id="bmBox"></div>
-    <p class="note" id="note"></p>
+    <p class="note fineprint" id="note"></p>
     </div><!-- /mbMain -->
     <div id="nvCard" hidden>
       <h2>昨日未涨停 · 今日竞价实际换手前 5（全市场主板，<span id="nvDate"></span>）<button class="mini" id="nvRefresh" style="float:right">重新扫描</button><button class="mini" id="nvView" style="float:right;margin-right:6px" title="在「简洁」和「跟主榜单一样的完整列」之间切换">榜单同款</button></h2>
       <div class="chips" id="nvTop"></div>
       <div class="tablewrap"><table id="nvTbl"></table></div>
-      <p class="note" id="nvNote"></p>
+      <p class="note fineprint" id="nvNote"></p>
     </div>
   </div>
 
   <div class="card" id="famCard" hidden>
     <h2>字辈人气（同花顺涨停原因里的「XX字辈」，<span id="famDate"></span>）</h2>
     <div class="tablewrap"><table id="famTbl"></table></div>
-    <p class="note" id="famNote"></p>
+    <p class="note fineprint" id="famNote"></p>
   </div>
 
   <div class="card" id="yzCard" hidden>
     <h2>今日一字板 · 竞价即一字（全市场主板，<span id="yzDate"></span>）<button class="mini" id="yzRefresh" style="float:right">重新扫描</button></h2>
     <div class="chips" id="yzTop"></div>
     <div class="tablewrap"><table id="yzTbl"></table></div>
-    <p class="note" id="yzNote"></p>
+    <p class="note fineprint" id="yzNote"></p>
   </div>
 
   <div class="card" id="ndCard" hidden>
@@ -452,8 +453,8 @@
     <div class="tablewrap"><table id="ndTbl"></table></div>
     <h3 style="font-size:14px;margin:14px 0 6px">高标断板后再走强（节点③）· 高标（≥4板）断板后 3 个交易日内再次涨停或涨≥5%</h3>
     <div class="tablewrap"><table id="ndGbTbl"></table></div>
-    <div id="ndGbNote" class="chartnote" style="margin:4px 0 8px"></div>
-    <p class="note" id="ndNote"></p>
+    <div id="ndGbNote" class="chartnote fineprint" style="margin:4px 0 8px"></div>
+    <p class="note fineprint" id="ndNote"></p>
   </div>
 
   <div class="card" id="bnCard" hidden>
@@ -466,7 +467,7 @@
     <div id="bnTopNote" class="chartnote" style="margin:4px 0 12px"></div>
     <h3 style="font-size:14px;margin:12px 0 6px">触发节点：横盘突破 / 放量大阳</h3>
     <div class="tablewrap"><table id="bnTbl"></table></div>
-    <p class="note" id="bnNote"></p>
+    <p class="note fineprint" id="bnNote"></p>
   </div>
 
 
@@ -474,32 +475,32 @@
     <h2><span id="bkTitle">板块成分股</span><button id="bkClose" style="float:right">关闭</button></h2>
     <div style="margin:0 0 8px"><button id="bkPool">只看蓄势池里的</button></div>
     <div class="tablewrap"><table id="bkTbl"><tbody><tr><td class="empty">点上面任意板块名，这里会列出它的主板成分股</td></tr></tbody></table></div>
-    <p class="note" id="bkNote"></p>
+    <p class="note fineprint" id="bkNote"></p>
   </div>
 
   <div class="card thfloat" id="thCard" hidden>
     <h2><span id="thTitle">题材连板梯队</span><button id="thClose" style="float:right">关闭</button></h2>
     <div class="thdirs" id="thDirs"></div>
     <div class="tablewrap"><table id="thTbl"><tbody><tr><td class="empty">点榜单里的题材标签，这里会列出该题材当天的连板梯队（按板位从高到低）</td></tr></tbody></table></div>
-    <p class="note" id="thNote"></p>
+    <p class="note fineprint" id="thNote"></p>
   </div>
 
   <div class="card" id="tbCard" hidden>
     <h2>题材榜 · 开盘啦口径（截至 <span id="tbDate"></span>）</h2>
     <div class="tablewrap"><table id="tbTbl"></table></div>
-    <p class="note" id="tbNote"></p>
+    <p class="note fineprint" id="tbNote"></p>
   </div>
   <div class="card" id="hotCard" hidden>
     <h2>板块热度 · 最近资金在哪个板块活跃（截至 <span id="hotDate"></span>）</h2>
     <div class="tablewrap"><table id="hotTbl"></table></div>
     <p class="note" id="hotLive" style="color:#1f7a3d"></p>
-    <p class="note" id="hotNote"></p>
+    <p class="note fineprint" id="hotNote"></p>
   </div>
 
   <div class="card" id="ldCard" hidden>
     <h2>龙头与补涨龙（含首板，自动补齐最近交易日）</h2>
     <div class="tablewrap"><table id="ldTbl"></table></div>
-    <p class="note" id="ldNote"></p>
+    <p class="note fineprint" id="ldNote"></p>
   </div>
 
   <div class="card" id="flowCard" hidden>
@@ -510,15 +511,15 @@
       <div class="chart"><h3>净流入前 10（红）</h3><div id="flowIn"></div></div>
       <div class="chart"><h3>净流出前 10（绿）</h3><div id="flowOut"></div></div>
     </div>
-    <p class="note" id="flowNote"></p>
+    <p class="note fineprint" id="flowNote"></p>
   </div>
 <div class="card" id="trCard" hidden>
     <h2>蓄势池 · 三连小阳+小上影（截至 <span id="trDate"></span>）</h2>
     <div class="tablewrap"><table id="trTbl"></table></div>
-    <p class="note" id="trNote"></p>
+    <p class="note fineprint" id="trNote"></p>
     <h2 style="font-size:15px;margin:18px 0 8px">突破池 · 蓄势池里今天放量启动的</h2>
     <div class="tablewrap"><table id="trUpTbl"><tbody><tr><td class="empty">正在取行情…</td></tr></tbody></table></div>
-    <p class="note" id="trUpNote"></p>
+    <p class="note fineprint" id="trUpNote"></p>
   </div>
 
   <div class="card" id="pbCard" hidden>
@@ -526,7 +527,7 @@
       <span style="float:right"><button class="mini" id="pbRefresh">刷新</button><button class="mini" id="pbDeep">加大窗口</button></span></h2>
     <div class="chips" id="pbTop"></div>
     <div class="tablewrap"><table id="pbTbl"><tbody><tr><td class="empty">正在自抓…</td></tr></tbody></table></div>
-    <p class="note" id="pbNote"></p>
+    <p class="note fineprint" id="pbNote"></p>
   </div>
 
   <div class="card" id="wlCard">
@@ -541,14 +542,14 @@
     </div>
     <p class="note" id="wlAlert" style="font-weight:600"></p>
     <div class="tablewrap"><table id="wlTbl"><tbody><tr><td class="empty">还没有关注标的，输入代码或名称加入</td></tr></tbody></table></div>
-    <p class="note" id="wlNote"></p>
+    <p class="note fineprint" id="wlNote"></p>
   </div>
 
 <div class="card" id="simCard">
     <h2>模拟交易 · 从历史某天开盘买入（算收益）</h2>
     <div class="opts">
       <span class="optgrp"><span>买入日（开盘价）</span><input type="date" id="simBuy" class="dtin" style="width:150px"></span>
-      <span class="optgrp"><span>卖出日</span><input type="date" id="simSell" class="dtin" style="width:150px" title="可以留空：先建仓，然后在K线窗口逐日看，哪天想卖点「以这天为卖出日」"></span><span class="note">留空＝先不设，建仓后逐日看再卖</span>
+      <span class="optgrp"><span>卖出日</span><input type="date" id="simSell" class="dtin" style="width:150px" title="可以留空：先建仓，然后在K线窗口逐日看，哪天想卖点「以这天为卖出日」"></span><span class="note fineprint">留空＝先不设，建仓后逐日看再卖</span>
       <span class="optgrp"><span>卖出价</span><button id="simModeOpen" class="active">开盘价</button><button id="simModeClose">收盘价</button></span>
       <span class="optgrp"><span>本金</span><input type="text" id="simCap" class="dtin" style="width:90px" value="100000"></span>
     </div>
@@ -562,13 +563,13 @@
     <div class="opts">
       <span class="optgrp"><span>模式</span><button id="simOne" class="active">单段（一只票）</button><button id="simMulti">多段换股</button></span>
       <span class="optgrp"><span>收益口径</span><button id="simComp" class="active">复利</button><button id="simSimple">不复利</button></span>
-      <span class="note">多段＝中间可以换成别的股票，每段按顺序接力</span>
+      <span class="note fineprint">多段＝中间可以换成别的股票，每段按顺序接力</span>
     </div>
     <div id="simSegBox" hidden>
       <div class="tablewrap"><table id="simSegTbl"><tbody></tbody></table></div>
       <div class="opts">
         <button id="simAddSeg">+ 加一段</button>
-        <span class="note">每行都要填齐：<b>起始日</b>（开盘买）＋<b>买哪只</b>＋<b>卖出日</b>。段与段之间可以留空档（空仓），但日期不能重叠。最后一段没填卖出日时，用上面的「卖出日」。</span>
+        <span class="note fineprint">每行都要填齐：<b>起始日</b>（开盘买）＋<b>买哪只</b>＋<b>卖出日</b>。段与段之间可以留空档（空仓），但日期不能重叠。最后一段没填卖出日时，用上面的「卖出日」。</span>
       </div>
     </div>
     <div class="tablewrap"><table id="simTbl"><tbody><tr><td class="empty">填好日期和股票，点「开始模拟」。买入＝买入日开盘价；卖出可选当天开盘价或收盘价。</td></tr></tbody></table></div>
@@ -576,7 +577,7 @@
     <h3 style="font-size:14px;margin:12px 0 6px">交割单 · 每笔成交（含当时最高板 / 涨停家数）</h3>
     <div class="tablewrap"><table id="simBillTbl"><tbody><tr><td class="empty">跑完模拟后，这里列出每一笔买入/卖出。</td></tr></tbody></table></div>
     <p class="note" id="simBillNote"></p>
-    <p class="note" id="simNote">口径：日线为不复权数据，同花顺→东财→新浪 自动降级取数；买入日/卖出日碰到非交易日会自动顺延到下一个交易日。收益＝卖出价 ÷ 买入价 − 1；单段多只＝各只等权平均；最大回撤按持有期间收盘价算。多段换股有两个口径：<b>复利</b>＝上一段结束的市值当作下一段本金；<b>不复利</b>＝每段都用同样本金、各段收益直接相加（你常用的那个）。</p>
+    <p class="note fineprint" id="simNote">口径：日线为不复权数据，同花顺→东财→新浪 自动降级取数；买入日/卖出日碰到非交易日会自动顺延到下一个交易日。收益＝卖出价 ÷ 买入价 − 1；单段多只＝各只等权平均；最大回撤按持有期间收盘价算。多段换股有两个口径：<b>复利</b>＝上一段结束的市值当作下一段本金；<b>不复利</b>＝每段都用同样本金、各段收益直接相加（你常用的那个）。</p>
   </div>
 
   <div class="card" id="vfCard">
@@ -592,7 +593,7 @@
     <div id="vfSum" class="chips" style="margin-top:8px"></div>
     <div id="vfAn"></div>
     <div id="vfDays"></div>
-    <p class="note" id="vfNote">口径：名单＝和上面 5 只榜单完全同一份（同一套口径：主板、剔 ST、剔一字开关、实际换手前 5 或「全部昨日涨停股」模式）。<b>买入价＝当天开盘价</b>；<b>当日涨停</b>就继续持有，<b>次日再涨停就再拿一天</b>，<b>直到第一次断板，断板当天收盘价卖出</b>；<b>当天竞价买进却没能封板的（约 62.4% 的票），受 T+1 约束最早只能次日开盘卖</b>，所以这一档一律按<b>次日开盘价</b>结算，不再按当天收盘。决策记在本机浏览器里（每台设备各自保存），随时可以改；「今天空仓」＝这天不算出手。「统计全部记录」只统计你标过买/空仓的日子。</p>
+    <p class="note fineprint" id="vfNote">口径：名单＝和上面 5 只榜单完全同一份（同一套口径：主板、剔 ST、剔一字开关、实际换手前 5 或「全部昨日涨停股」模式）。<b>买入价＝当天开盘价</b>；<b>当日涨停</b>就继续持有，<b>次日再涨停就再拿一天</b>，<b>直到第一次断板，断板当天收盘价卖出</b>；<b>当天竞价买进却没能封板的（约 62.4% 的票），受 T+1 约束最早只能次日开盘卖</b>，所以这一档一律按<b>次日开盘价</b>结算，不再按当天收盘。决策记在本机浏览器里（每台设备各自保存），随时可以改；「今天空仓」＝这天不算出手。「统计全部记录」只统计你标过买/空仓的日子。</p>
   </div>
 
   <div id="zTip"></div>
@@ -635,20 +636,20 @@
           <button id="ldrLast" title="回到最近一个交易日">最新</button>
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span>
-        <span style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
+        <span class="fineprint" style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
         <button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
         <div class="thdirs" id="ldrTh" style="margin-top:10px"></div>
         <div id="ldrLv"><div class="empty" style="padding:10px 0">加载中…</div></div>
-        <p class="note" id="ldrNote"></p>
+        <p class="note fineprint" id="ldrNote"></p>
         <div id="ldrTop5" style="margin-top:8px"></div>
       </div>
     </div>
   </div>
 
-  <p class="note">
+  <p class="note fineprint">
     口径：竞价涨幅＝9:25 竞价成交价 ÷ 前收盘；竞价成交额＝9:25 集合竞价成交额（取当日第一根分钟 K 线 09:30 的成交额）；实际换手＝竞价成交额 ÷ 实际流通市值（取最近一次统计值，未收录个股用普通换手率顶替并标「≈」）。开盘档位＝竞价高低按<b>绝对涨幅</b>分 6 档：低开 / 平开 0~2% / 高开 2~5% / 5~7% / 7~9.5% / ≥9.5%（以前用的是「竞价涨幅 ÷ 涨停幅度」的相对档，现已换成绝对涨幅，因为绝对涨幅档对断板卖出的收益区分度最高）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）里不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%；低开最差 -2.09%、7~9.5% -1.75%）；⚠ 高位高开＝<b>≥4 板且高开 >7%</b>，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%（30 笔），其中 4 板高开 7~9.5% 最差：均值 -4.09% / 中位 -9.56%（15 笔）；同是 ≥4 板，平开 0~5% 反而是均值 +3.52% / 中位 +0.75%（68 笔）。回测口径：856 笔 / 246 个交易日（2025-09-10 ~ 2026-09-18）。
     历史收益＝同「板数 × 开盘档位」组合的样本均值，<b>口径为 A</b>（9:25 竞价买入 → 封板继续持有 → 第一次断板时卖出；买入日就没封住的最早只能按次日开盘价卖，受 T+1 限制），样本少于 8 只波动很大。情绪周期＝六阶段循环（冰点→修复→主升发酵→高潮→分歧衰退→退潮主跌），用四个指标的近十年分位自适应判定（只统计主板）：晋级率、大面率（昨日涨停股当日跌≤-5% 比例）、最高连板、涨停家数；优先级为 退潮 → 冰点 → 高潮 → 分歧衰退 → 主升 → 修复。本页只是历史统计工具，不构成投资建议。
   </p>
@@ -2339,7 +2340,7 @@ function openBk(kind, key){
         + '<td>' + (zt ? '<span class="up">涨停</span>' : "") + '</td></tr>';
     }).join("");
     $("bkTbl").innerHTML = h + '</tbody>';
-    if (!hasQ) $("bkNote").textContent = "⚠ 没取到行情（可能被拦截或限流），下面只有名单。";
+    if (!hasQ){ $("bkNote").classList.remove("fineprint"); $("bkNote").textContent = "⚠ 没取到行情（可能被拦截或限流），下面只有名单。"; }
   }).catch(function(){ $("bkTbl").innerHTML = '<tbody><tr><td class="empty">取行情失败，稍后再点一次</td></tr></tbody>'; });
 }
 document.addEventListener("click", function(e){
@@ -2824,7 +2825,7 @@ function tpNodeBlk(){
     '<div style="font-size:11.5px;font-weight:600;color:var(--fg);line-height:1.5;margin-top:3px">供' + _nd + ' 9:25 可买的接力池（＝' + d0 + ' 涨停池，共 ' + RP.length + ' 只）：' +
       '首板 ' + c1 + ' 只 · 2板 ' + c2 + ' 只 · 3板+ ' + c3 + ' 只。' +
       '历史节点日晋级率 首板 19% · 2板 36% · 3板+ 46%（全交易日基线 19/34/44%）——节点本身只多约 2 个点，真正抬胜率的是竞价涨幅（2板＋竞价≥3% 节点日 57%、≥9% 时 76%）。</div>' +
-    '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：节点日＝⑤冰点转修复满足 ≥2 个信号，或「最高板掉档（≥4板）+ 当日放量」；判定用 ' + d0 + ' 收盘数据，决定' + _nd + ' 9:25 敢不敢下手（择时开关），不是直接选票。' +
+    '<div class="fineprint" style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：节点日＝⑤冰点转修复满足 ≥2 个信号，或「最高板掉档（≥4板）+ 当日放量」；判定用 ' + d0 + ' 收盘数据，决定' + _nd + ' 9:25 敢不敢下手（择时开关），不是直接选票。' +
       '统计窗口 2024-09-10 ~ 2026-10-21（508 个交易日、175 个节点日，主板口径，非预测）。' +
       (recent.length ? '　最近节点日：' + recent.map(function(r){ return r.d.slice(5) + (r.why ? "（" + esc(r.why) + "）" : ""); }).join("、") : '') + '</div>' +
     '</div>';
@@ -2979,7 +2980,7 @@ function renderTop(){
           return '<span class="chip" style="' + sty + '" title="' + esc(c.t) + '">' + (c.h ? '● ' : '○ ') + esc(c.k + ' ' + c.n) + '</span>';
         }).join('') + '</div>' +
         (envHitN ? '<div style="font-size:10.5px;color:#c02c2c;margin-top:3px">命中：' + esc(envHitNames) + '</div>' : '') +
-        '<div style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：248 个交易日（2025-09-10 ~ 2026-09-17）· 主板昨日涨停股 · 当日池＝按实际换手取前 5（含一字；点「只看能买到的（剔一字）」可切换）· 9:25 竞价等权买 5 只；A 口径＝封板则持有到第一次断板当日收盘卖，买入日即断板则次日开盘卖。命中条数越多越该空仓（分档统计，非投资建议）。' +
+        '<div class="fineprint" style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：248 个交易日（2025-09-10 ~ 2026-09-17）· 主板昨日涨停股 · 当日池＝按实际换手取前 5（含一字；点「只看能买到的（剔一字）」可切换）· 9:25 竞价等权买 5 只；A 口径＝封板则持有到第一次断板当日收盘卖，买入日即断板则次日开盘卖。命中条数越多越该空仓（分档统计，非投资建议）。' +
         '挑选说明：五条都按 hit0 与 hit≥2 的差距筛出，已要求含/剔一字双口径同向；⑤ 与前四条重叠少（③ 0/7、④ 2/7），补的是「普涨过热」这一头，单条最重（7 日 A −6.01%、大跌率 71%）。剔一字对照：hit0 −0.05%、hit≥2 −3.67%。' +
         '⚠ ④ 是纯数据里挑出来的，单条方向是「换手越高隔夜越差」（34 日、t=−2.49），不是先验逻辑，有过拟合风险；实际换手字段 2025-09-10 才有，样本仅 248 日、无真正样本外。必空档是本方案最结实的部分；出手档的正期望大部分来自买不到的一字板。</div></div>' + tpNodeBlk();
       stp.className = "tpflex";
@@ -5059,13 +5060,13 @@ function renderBoomSet(){
   var L = bmList();
   var h = '<div class="chips" style="margin:12px 0 4px">' +
     '<span class="chip big" style="background:#a11;color:#fff">爆头席位名单 ' + L.length + ' 个（可自己增删）</span>' +
-    '<span class="chip">名单里的席位 → 昨日席位列左侧显红条；若它在买 → 逐票竞价建议一票否决</span></div>';
+    '<span class="chip fineprint">名单里的席位 → 昨日席位列左侧显红条；若它在买 → 逐票竞价建议一票否决</span></div>';
   if (typeof TEAMSEAT !== "undefined" && TEAMSEAT && TEAMSEAT.t) h += '<div class="chips" style="margin:2px 0 8px">' +
     '<span class="chip big" style="background:#c60;color:#fff">⚑三班组 ' + TEAMSEAT.t.length + ' 个组合</span>' +
-    '<span class="chip">股票名后出现「⚑三班组」＝这只票涨停那天，龙虎榜买入席位里同时出现了某个已知 3 席组合（共现 ≥5 次）。鼠标停在其上看是哪 3 个营业部 + 历史 T+1 收益。</span></div>';
+    '<span class="chip fineprint">股票名后出现「⚑三班组」＝这只票涨停那天，龙虎榜买入席位里同时出现了某个已知 3 席组合（共现 ≥5 次）。鼠标停在其上看是哪 3 个营业部 + 历史 T+1 收益。</span></div>';
   if (typeof SBZ !== "undefined" && SBZ && SBZ.d) h += '<div class="chips" style="margin:2px 0 8px">' +
     '<span class="chip big" style="background:#b02;color:#fff">三板组</span>' +
-    '<span class="chip">股票名后出现「三板组」（红）＝这票涨停那天，龙虎榜里出现了公开归纳的三板组席位（点名营业部/同门多席/池内多席）；「疑似三板组」（橙）＝没命中名单但有明显席位联动。鼠标停上去看命中席位与套路。</span></div>';
+    '<span class="chip fineprint">股票名后出现「三板组」（红）＝这票涨停那天，龙虎榜里出现了公开归纳的三板组席位（点名营业部/同门多席/池内多席）；「疑似三板组」（橙）＝没命中名单但有明显席位联动。鼠标停上去看命中席位与套路。</span></div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px">' +
     (L.length ? L.map(function(n){
         return '<span class="lseat boom"><i>' + esc(n) + '</i><b data-bmdel="' + esc(n) + '" title="点这里从名单里删掉" style="cursor:pointer">×</b></span>';
@@ -5076,7 +5077,7 @@ function renderBoomSet(){
     '<button class="mini" id="bmAdd">添加</button>' +
     '<button class="mini" id="bmReset">恢复默认名单</button>' +
     '<button class="mini" id="bmClear">清空</button></div>';
-  h += '<div class="chartnote" style="margin:6px 0 0">默认名单＝历史统计里「净买入后次日大面率 ≥45%、样本 ≥20」的 13 个席位（2026-10-28 重算；全席位基准 24.5%）。红条也按「买入后次日大面率 ≥45%」自动标，不必非得在名单里。关键词匹配：填「源深路」会把该营业部一起算上。改完立即生效，存在本机浏览器（手机、电脑各自保存）。</div>';
+  h += '<div class="chartnote fineprint" style="margin:6px 0 0">默认名单＝历史统计里「净买入后次日大面率 ≥45%、样本 ≥20」的 13 个席位（2026-10-28 重算；全席位基准 24.5%）。红条也按「买入后次日大面率 ≥45%」自动标，不必非得在名单里。关键词匹配：填「源深路」会把该营业部一起算上。改完立即生效，存在本机浏览器（手机、电脑各自保存）。</div>';
   el.innerHTML = h;
   var apply = function(fn, keep){
     var a = bmList().slice();
@@ -9378,7 +9379,7 @@ vfInit();
       '</div><div style="margin:6px 0 2px"><span style="color:var(--muted)">窗口：</span><span id="scTabs">'+tabs+'</span></div>'+
       '<div id="scGrid">'+g.map(function(x){ return '<div class="m"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'; }).join("")+'</div>'+
       '<div id="scVerdict" style="color:'+v.c+'">'+v.t+'</div>'+
-      '<div style="color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px">口径：龙虎榜只有日频，看不到盘中真实价位；「高位」＝上榜当日涨幅≥5%（涨停另计）；「全抛」＝买/(买+卖)≤0.15；「大面率」＝该席位净卖出后次日收盘≤-5% 的比例。样本 '+(SS.range?SS.range[0]+" ~ "+SS.range[1]:"")+'，共 '+SS.days+' 个上榜日。</div>';
+      '<div class="fineprint" style="color:var(--muted);font-size:11px;line-height:1.6;margin-top:8px">口径：龙虎榜只有日频，看不到盘中真实价位；「高位」＝上榜当日涨幅≥5%（涨停另计）；「全抛」＝买/(买+卖)≤0.15；「大面率」＝该席位净卖出后次日收盘≤-5% 的比例。样本 '+(SS.range?SS.range[0]+" ~ "+SS.range[1]:"")+'，共 '+SS.days+' 个上榜日。</div>';
     c.style.display = "flex";
   }
   document.addEventListener("click", function(e){

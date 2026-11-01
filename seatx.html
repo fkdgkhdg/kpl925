@@ -44,6 +44,7 @@ tr.hl{background:var(--hl)}
 .chip.st-retail.r,.chip.st-youzi.r,.chip.st-inst.r,.chip.st-north.r{border-color:#dd8080;background:#fdeeee}
 .legend2{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px;color:var(--mut);margin:6px 0 2px}
 .small{font-size:11px;color:var(--mut)}
+.fineprint{display:none!important}
 table.cmp{max-width:960px}
 .hlbox{background:#fff;border:1px solid #f0c98a;border-left:4px solid #e29b3c;border-radius:8px;padding:9px 11px;font-size:12.5px;margin:8px 0}
 .sec{background:#fdf3e3;color:#a15c00;text-align:left;font-weight:600}
@@ -58,8 +59,8 @@ table.cmp{max-width:960px}
 <body>
 <h1>席位结构对照 · 买一占比 / 净买 / 席位性质</h1>
 <div class="sub" id="gen"></div>
-<div class="bar" id="sxbar"><button id="sxRefresh" title="现场抓东财最新一档龙虎榜并重算下面 D 表；出榜一般 17:00 后">今日刷新</button><span class="small" id="sxNote">点「今日刷新」= 现场抓东财最新龙虎榜、重算 D 表；晚间出榜后不用等自动更新。</span></div>
-<div class="note">
+<div class="bar" id="sxbar"><button id="sxRefresh" title="现场抓东财最新一档龙虎榜并重算下面 D 表；出榜一般 17:00 后">今日刷新</button><span class="small fineprint" id="sxNote">点「今日刷新」= 现场抓东财最新龙虎榜、重算 D 表；晚间出榜后不用等自动更新。</span></div>
+<div class="note fineprint">
 口径：数据来自东财龙虎榜营业部明细（<b>lhb_main.json</b>，2024-09 起全量）。一只票当天可能同时上多个榜，只取<b>买入合计最大</b>的那个榜（连板股通常是「连续三个交易日涨幅偏离」三日榜，故 span=三日榜）。<br>
 <b>买一占成交</b> = 榜内买入第一大席位的买入额 ÷ 上榜区间成交额（三日榜算三日累计）；成交额用日K「量×均价」估算，非官方值，看量级别用。<br>
 <b>卖方机构/北向</b> = 卖方榜里是否出现机构专用 / 沪股通·深股通席位。<br>
@@ -68,7 +69,7 @@ table.cmp{max-width:960px}
 </div>
 <div class="hlbox" id="hlbox"></div>
 <h2>A. 榜单日 → 主板涨停股的席位结构 <span class="small" id="aDay"></span></h2>
-<div class="note" id="aNote"></div>
+<div class="note fineprint" id="aNote"></div>
 <div class="bar">
   <label>榜单日 <select id="daysel"></select></label>
   <label>排序 <select id="sortsel">
@@ -81,7 +82,7 @@ table.cmp{max-width:960px}
 </div>
 <div style="overflow:auto"><table id="tA"></table></div>
 <h2>F. 龙虎榜板块活跃（题材口径＝同花顺涨停原因）<span class="small" id="fDay"></span></h2>
-<div class="small">把每个交易日上龙虎榜的主板股，按<b>同花顺涨停原因</b>归类 —— 就是上面 A/D 表里那些绿色题材 chip 的名字。看哪个板块在<b>扎堆上榜 / 净买最多</b>。<br>
+<div class="small fineprint">把每个交易日上龙虎榜的主板股，按<b>同花顺涨停原因</b>归类 —— 就是上面 A/D 表里那些绿色题材 chip 的名字。看哪个板块在<b>扎堆上榜 / 净买最多</b>。<br>
 同一只票有多个原因会计入多个题材（如「机器人轴承 + 汽车轴承」），所以各题材只数相加大于上榜股数。<b>点题材名 → 展开该题材当天的上榜个股。</b></div>
 <div class="bar">
   <label>榜单日 <select id="fDaySel"></select></label>
@@ -91,26 +92,26 @@ table.cmp{max-width:960px}
   <span class="small" id="fNote"></span>
 </div>
 <div style="overflow:auto"><table id="tF"></table></div>
-<div class="note">读法：<b>上榜只数多 + 净买为正</b> = 板块里资金在抢（接力题材）；<b>只数多但净卖</b> = 板块高位出货（分歧/退潮）。净买＝当日龙虎榜买五合计−卖五合计，只算<b>主板非 ST</b>。窗口 &gt;1 日时同一只票多次上榜会重复计入，看的是「上榜频次」；末列个股按净买绝对值取前 3。</div>
+<div class="note fineprint">读法：<b>上榜只数多 + 净买为正</b> = 板块里资金在抢（接力题材）；<b>只数多但净卖</b> = 板块高位出货（分歧/退潮）。净买＝当日龙虎榜买五合计−卖五合计，只算<b>主板非 ST</b>。窗口 &gt;1 日时同一只票多次上榜会重复计入，看的是「上榜频次」；末列个股按净买绝对值取前 3。</div>
 
 <h2>B. 席位特征 × 次日表现（历史全量 · 底稿）</h2>
-<div class="small">A 表「档位判读」列已内联本表分档结论；下面四张是完整底稿。</div>
+<div class="small fineprint">A 表「档位判读」列已内联本表分档结论；下面四张是完整底稿。</div>
 <div class="small" id="bmeta"></div>
 <div style="overflow:auto"><table class="cmp" id="tB1"></table></div>
 <div style="overflow:auto"><table class="cmp" id="tB2"></table></div>
 <div style="overflow:auto"><table class="cmp" id="tB3"></table></div>
 <div style="overflow:auto"><table class="cmp" id="tB4"></table></div>
 <h2>C. 为什么「买一占比高」有时是利好、有时是警报（条件拆解）</h2>
-<div class="small">同一档「买一占比」，再叠加 位置（连板数） 或 区间成交额 之后，次日表现会完全两极。</div>
+<div class="small fineprint">同一档「买一占比」，再叠加 位置（连板数） 或 区间成交额 之后，次日表现会完全两极。</div>
 <div style="overflow:auto"><table class="cmp" id="tC"></table></div>
 <h2>D. 最新一档龙虎榜（<span id="dDay">-</span>，收盘后已出 · 已并入 A）</h2>
-<div class="small">A 节那张表是「当个交易日的 9:25 名单」，席位取自名单里股票的涨停日，所以永远是<b>前一日</b>的榜。<br>
+<div class="small fineprint">A 节那张表是「当个交易日的 9:25 名单」，席位取自名单里股票的涨停日，所以永远是<b>前一日</b>的榜。<br>
 这一节直接取<b>最近一档已出的龙虎榜</b>（含当日涨停股），也就是<b>明早 9:25 名单</b>会用到的席位结构 —— 收盘后当晚就能看。</div>
 <div class="bar"><label><input type="checkbox" id="dOnlyUp"> 只看今日涨停</label></div>
 <div style="overflow:auto"><table id="tD"></table></div>
-<div class="note">读法：买一占比是<b>放大器</b>，不是方向。<b>小盘缩量</b>时它=筹码锁死（利好）；<b>高位 + 大成交</b>时它=一票兑现就崩（警报）。龙渊阁说的「超两成放弃」，前提正是<b>高位连板 + 区间成交大</b>。样本 n&lt;100 的档位只作参考。</div>
+<div class="note fineprint">读法：买一占比是<b>放大器</b>，不是方向。<b>小盘缩量</b>时它=筹码锁死（利好）；<b>高位 + 大成交</b>时它=一票兑现就崩（警报）。龙渊阁说的「超两成放弃」，前提正是<b>高位连板 + 区间成交大</b>。样本 n&lt;100 的档位只作参考。</div>
 <h2>E. 最近高连板股活跃席位（<span id="eDay">-</span>）</h2>
-<div class="small">取最近 N 个交易日里「当日涨停且 ≥3 板」的主板股，汇总其上榜席位。<b>点任意席位行 → 展开它参与过哪些票。</b><br>
+<div class="small fineprint">取最近 N 个交易日里「当日涨停且 ≥3 板」的主板股，汇总其上榜席位。<b>点任意席位行 → 展开它参与过哪些票。</b><br>
 板数 = 当日往前连续涨停数；性质（配色同主页面）：散户通道（拉萨天团 + 国信浙江互联网）/ 游资·营业部 / 机构专用 / 北向（沪深股通）。<b>历史大面率</b> = 该席位历史<b>净卖出后</b>次日收盘 ≤-5% 的占比（红 ≥45%、橙 33~44%）；「净卖后次日均」= 同样口径的平均次日涨跌幅，n 为样本数。</div>
 <div class="bar">
   <label>窗口 <select id="eDaySel"><option value="20">近 20 日</option><option value="40">近 40 日</option></select></label>
