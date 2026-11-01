@@ -121,20 +121,26 @@
   .kpirow>.kpi{flex:1 1 320px;min-width:0}
   #ndTix{margin:0 0 8px auto;max-width:560px}
   @media (max-width:760px){ #ndTix{max-width:100%;width:100%;margin-left:0} }
-  .ndt{border:1px solid #f0c9c4;background:#fff8f7;border-radius:10px;padding:6px 8px}
-  .ndtHd{font-size:12px;color:#8a3a33;font-weight:700;margin-bottom:4px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .ndt{border:1px solid #f3d3ce;background:linear-gradient(180deg,#fffafa,#fff);border-radius:12px;padding:6px 9px 7px;box-shadow:0 1px 3px rgba(192,44,44,.07)}
+  .ndtHd{font-size:12px;color:#a0483f;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:6px}
   .ndtHd b{color:#c02c2c}
-  .ndtHd .ndtSub{font-weight:400;color:#a08b88;font-size:11px}
-  .ndtList{display:flex;flex-wrap:wrap;gap:6px}
-  .ndtItem{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;background:#fff;border:1px solid #f0c9c4;border-radius:9px;padding:2px 6px;font-size:12px;max-width:100%}
-  .ndtItem .ndtDay{font-size:10.5px;color:#9a7f7b;font-variant-numeric:tabular-nums}
+  .ndtHd .ndtSub{font-weight:400;color:#b09b97;font-size:10.5px;margin-left:2px}
+  .ndtList{display:flex;flex-direction:column;gap:3px;max-height:132px;overflow:auto}
+  .ndtItem{display:flex;align-items:center;gap:6px;padding:3px 0 3px;border-top:1px dashed #f6e4e1;font-size:12px;max-width:100%}
+  .ndtItem:first-child{border-top:0;padding-top:1px}
+  .ndtItem .ndtDay{flex:0 0 auto;font-size:10.5px;color:#8a6f6b;font-variant-numeric:tabular-nums;background:#fdf1ef;border-radius:6px;padding:0 5px;line-height:17px}
   .ndtItem .ndtNm{color:#9aa3b2;font-weight:500;font-size:11px;white-space:nowrap}
-  .ndtItem .ndtB{font-size:11px;font-weight:700;background:#c02c2c;color:#fff;border-radius:6px;padding:0 5px;white-space:nowrap}
-  .ndtItem .ndtNote{width:112px;max-width:38vw;border:1px solid #eddad7;border-radius:6px;font-size:11.5px;padding:1px 5px;background:#fffdfd;color:#5a4a48}
+  .ndtItem .ndtB{font-size:10.5px;font-weight:700;background:#c02c2c;color:#fff;border-radius:6px;padding:0 5px;line-height:17px;white-space:nowrap}
+  .ndtItem .ndtNote{flex:0 1 108px;width:108px;min-width:64px;border:1px solid transparent;border-radius:6px;font-size:11px;padding:1px 5px;background:transparent;color:#6b5a57}
+  .ndtItem .ndtNote:hover{border-color:#f0dcd9;background:#fff}
+  .ndtItem .ndtNote:focus{outline:none;border-color:#e0b3ac;background:#fffdfd}
   .ndtItem .ndtPool{font-size:10.5px;color:#a08b88}
   .ndtItem .ndtB.b1{background:#8a8f98}
-  .ndtItem .ndtDead{font-size:10.5px;color:#b0a3a1;text-decoration:line-through}
-  .ndtItem .ndtX{cursor:pointer;color:#b0a3a1;font-weight:700;padding:0 2px;line-height:1}
+  .ndtItem .ndtDead{font-size:10px;color:#b7a5a2;text-decoration:line-through;line-height:17px}
+  .ndtItem .ndtWait{font-size:10.5px;color:#a08b88}
+  .ndtItem .ndtDists{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;flex-wrap:wrap}
+  @media (max-width:760px){ .ndtItem{flex-wrap:wrap} .ndtItem .ndtNote{flex:1 1 90px;width:auto} }
+  .ndtItem .ndtX{flex:0 0 auto;cursor:pointer;color:#c4b4b1;font-weight:700;padding:0 2px;line-height:1;font-size:13px}
   .ndtItem .ndtX:hover{color:#c02c2c}
 
   @media (max-width:640px){ #thCard.thfloat{left:8px;right:8px;bottom:8px;width:auto;max-height:68vh} }
@@ -6824,8 +6830,9 @@ function renderNodeTix(){
   box.hidden = false;
   var latest = nodeLatest();
   ND_REF = latest;
-  var h = '<div class="ndt"><div class="ndtHd">◆ 节点票 <b>' + days.length + '</b> 个节点日'
-    + '<span class="ndtSub">节点日的首板全部算节点票；按 ' + (latest ? ldrIso(latest) : "—") + ' 收盘看这批票走到了几板</span></div><div class="ndtList">';
+  var tip = '节点日的首板全部算节点票；按 ' + (latest ? ldrIso(latest) : '—') + ' 收盘看这批票走到了几板';
+  var h = '<div class="ndt" title="' + ndEsc(tip) + '"><div class="ndtHd">◆ 节点票 <b>' + days.length + '</b> 个节点日'
+    + '<span class="ndtSub">按 ' + (latest ? ldrIso(latest).slice(5) : '—') + ' 收盘</span></div><div class="ndtList">';
   days.forEach(function(ds){
     var pool = nodePool(ds), dist = {}, dead = 0;
     pool.forEach(function(r){
@@ -6837,15 +6844,15 @@ function renderNodeTix(){
     keys.forEach(function(bb){
       dtxt += '<span class="ndtB' + (bb === 1 ? ' b1' : '') + '" title="' + ndEsc(nodeNm(bb) + '：' + dist[bb] + ' 只') + '">' + nodeNm(bb) + ' ×' + dist[bb] + '</span>';
     });
-    if (dead) dtxt += '<span class="ndtDead" title="这些票已经断板，不在最新一天的涨停池里">断板 ×' + dead + '</span>';
+    if (dead) dtxt += '<span class="ndtDead" title="这些票已经断板，不在 ' + ldrIso(latest) + ' 的涨停池里">断板 ×' + dead + '</span>';
     if (!pool.length) dtxt = '<span class="ndtDead">这一天没有首板</span>';
+    if (latest && ds > latest) dtxt = '<span class="ndtWait">首板池 ' + pool.length + ' 只 · 下一交易日起算</span>';
     var rec = NODEDAYS[ds] || {};
-    h += '<span class="ndtItem" data-ndd="' + ds + '" title="' + ndEsc(ldrIso(ds) + ' 节点日 · 首板池 ' + pool.length + ' 只') + '">'
+    h += '<div class="ndtItem" data-ndd="' + ds + '" title="' + ndEsc(ldrIso(ds) + ' 节点日 · 首板池 ' + pool.length + ' 只') + '">'
       + '<span class="ndtDay">' + ldrIso(ds).slice(5) + '</span>'
-      + '<span class="ndtPool">首板池 ' + pool.length + ' 只 →</span>'
-      + dtxt
+      + '<span class="ndtDists">' + dtxt + '</span>'
       + '<input class="ndtNote" maxlength="40" placeholder="备注" value="' + ndEsc(rec.note || "") + '">'
-      + '<span class="ndtX" title="取消这个节点日">×</span></span>';
+      + '<span class="ndtX" title="取消这个节点日">×</span></div>';
   });
   box.innerHTML = h + '</div></div>';
   Array.prototype.forEach.call(box.querySelectorAll(".ndtItem"), function(it){
