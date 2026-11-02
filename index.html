@@ -373,7 +373,7 @@
     <div id="autoNote" class="note" style="margin:8px 0 0"></div>
     <div id="freshWarn" class="note" style="display:none;margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#fff4e5;border:1px solid #e9b96e;color:#7a4a00;font-weight:600"></div>
     <div class="opts">
-      <div class="optgrp"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mALL">全部昨日涨停股</button></div>
+      <div class="optgrp"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL">全部昨日涨停股</button></div>
       <div class="optgrp"><span>筛选</span><button id="fNL">只看能买到的（剔一字）</button></div>
       <div class="optgrp"><span>排名依据</span><button id="sAt" class="active">实际换手率</button><button id="sRet">断板卖出(A均值)</button></div>
     </div>
@@ -1487,17 +1487,29 @@ function arcList(dateStr){                          // ARCDATA 的一天 → 与
   });
 }
 function pickTopRows(rows){                         // 「5 只榜单」「逐日决策」「今日竞价建议」共用的唯一选股口径：
-                                                    // 主板 + 剔 ST 已在 buildRows 里做过；这里再叠 剔一字 → ≈行沉底 → 实际换手排序 → 前 5 / 全部
+                                                    // 主板 + 剔 ST 已在 buildRows 里做过；这里再叠 剔一字 → 按当前名单口径排序 → 前 5 / 全部
   var noAt = !rows.some(function(r){ return r.at !== null && r.at !== undefined && r.at > 0; });
-  var useBase = (STATE.mode === "all");             // 「全部昨日涨停股」模式
-  if (noAt && !useBase) useBase = true;             // 老存档没有竞价成交额（实际换手）→ 按全部口径显示
+  var noAmt = !rows.some(function(r){ return (r.amtA || r.amount || 0) > 0; });
+  var mode = STATE.mode || "at";
+  var useBase = (mode === "all");                   // 「全部昨日涨停股」模式
+  if ((mode === "at" && noAt) || (mode === "amt" && noAmt)) useBase = true;   // 老存档缺这一列 → 按全部口径显示
   if (STATE.noLimit) rows = rows.filter(function(r){ return r.chg < r.L * 0.99; });   // 只看能买到的（剔一字）
-  rows.sort(function(a, b){                         // 「≈全天换手率」的近似行不能挤进前5：一律排到最后
+  // 实际换手名次始终先算：历史统计、建议、标签都只认这个名次，不能被成交额档位改掉
+  var byAt = rows.slice().sort(function(a, b){      // 「≈全天换手率」的近似行不能挤进前5：一律排到最后
     if (!!a.approx !== !!b.approx) return a.approx ? 1 : -1;
     return (b.at || 0) - (a.at || 0);
   });
-  rows.forEach(function(r, i){ r._rankAT = i + 1; });
-  return { useBase: useBase, noAt: noAt, rows: rows, list: rows.filter(function(r){ return useBase ? true : r._rankAT <= 5; }) };
+  byAt.forEach(function(r, i){ r._rankAT = i + 1; });
+  var out = byAt, list;
+  if (mode === "amt" && !useBase){
+    out = rows.slice().sort(function(a, b){ return (b.amtA || b.amount || 0) - (a.amtA || a.amount || 0); });
+    out.forEach(function(r, i){ r._rankAMT = i + 1; });
+    list = out.slice(0, 5);
+  } else {
+    out.forEach(function(r){ r._rankAMT = 0; });
+    list = useBase ? out : out.filter(function(r){ return r._rankAT <= 5; });
+  }
+  return { useBase: useBase, noAt: noAt, noAmt: noAmt, rows: out, list: list, mode: mode };
 }
 function guessDay(){
   var n = new Date(), wd = n.getDay(), hm = n.getHours()*100 + n.getMinutes(), d = new Date(n.getTime());
@@ -7398,8 +7410,9 @@ function renderCore(){
     $("kpi").innerHTML = ""; $("note").textContent = ""; return;
   }
   var _pk = pickTopRows(rows);                  // 和「逐日决策」「今日竞价建议」共用同一套选股口径（主板 / 剔一字 / 实际换手前5 或 全部）
-  var useBase = _pk.useBase, noAt = _pk.noAt; rows = _pk.rows;
-  if ($("mAT") && $("mALL")){ $("mAT").classList.toggle("active", !useBase); $("mALL").classList.toggle("active", !!useBase); }
+  var useBase = _pk.useBase, noAt = _pk.noAt, noAmt = _pk.noAmt; rows = _pk.rows;
+  var amtMode = (_pk.mode === "amt" && !useBase);
+  if ($("mAT") && $("mALL")){ $("mAT").classList.toggle("active", !useBase && !amtMode); $("mAMT") && $("mAMT").classList.toggle("active", amtMode); $("mALL").classList.toggle("active", !!useBase); }
   if (!rows.length){
     $("tbl").innerHTML = '<tbody><tr><td class="empty">' +
       (STATE.noLimit ? "今天没有「开盘没涨停」的昨日涨停股。" : "没有可显示的股票。") +
@@ -7414,7 +7427,7 @@ function renderCore(){
     r._avgC = useBase ? (r.baseAvgC === undefined ? r.avgC : r.baseAvgC) : r.avgC;
     r._n    = useBase ? r.baseN : r.n;
     r._key  = STATE.sort === "ret" ? (r._n === 0 || r._avg === null ? -999 : r._avg)
-            : ((r.at || 0) > 0 ? r.at : -999);   // 排名依据＝实际换手率从高到低
+            : (amtMode ? (r.amtA || r.amount || -999) : ((r.at || 0) > 0 ? r.at : -999));   // 排名依据＝当前档位（实际换手 / 竞价成交额）
   });
   list.sort(function(a,b){ return b._key - a._key; });
   STATE._list = list;                          // 给「历史小标签算完后的补刷新」用；顺序和表格行完全一致
@@ -7467,16 +7480,18 @@ function renderCore(){
   var top = list[0];
   $("kpi").innerHTML =
     '<div>榜单首位<b>' + esc(top.name) + '</b>' + (STATE.sort === "ret" ? (top._avg > 0 ? "+" : "") + top._avg.toFixed(2) + '% 断板卖出(A均值)'
-      : ((top.at === null || !(top.at > 0)) ? "—" : top.at.toFixed(2) + "%") + ' 实际换手率') + '</div>'
+      : (amtMode ? ((top.amtA || top.amount) ? yzMoney(top.amtA || top.amount) + ' 竞价成交额' : '—')
+        : ((top.at === null || !(top.at > 0)) ? "—" : top.at.toFixed(2) + "%") + ' 实际换手率')) + '</div>'
     + '<div>竞价日<b>' + STATE.day + '</b>' + STATE.src + '</div>'
-    + '<div>入选只数<b>' + list.length + '</b>' + (useBase ? "全部昨日涨停股" : "实际换手前5") + (STATE.noLimit ? "（剔一字，名次按剔除后重算）" : "") + '</div>';
+    + '<div>入选只数<b>' + list.length + '</b>' + (amtMode ? "成交额前5" : (useBase ? "全部昨日涨停股" : "实际换手前5")) + (STATE.noLimit ? "（剔一字，名次按剔除后重算）" : "") + '</div>';
   $("note").textContent = "「题材」＝开盘啦（涨停原因）当天给这只票挂的题材（网上当前对这只票的属性，例：大业股份＝机器人概念、海洋王＝军工+羊年概念）；点任意题材标签可展开该题材当天的连板梯队（同一题材精确聚成员，按板位从高到低，含板型与首封时间）。" +
     "「近10日N次」＝最近 10 个交易日里它进过几次「实际换手前5」（含今天）；" + "「前N天也进过榜」＝这只票 N 个交易日前也进过「实际换手前5」；「前N天涨停过」＝它 N 个交易日前也在涨停名单里（但中间断过板）。鼠标悬停能看到具体是哪一天。\n" +
-    ((noAt && STATE.mode !== "all") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
+    ((noAt && STATE.mode === "at") ? "⚠ 这一天没有「实际换手」数据（历史竞价成交额接口只能回溯 5 天，补的老数据只有竞价涨幅/涨跌/晋级/A 口径），已自动按「全部昨日涨停股」口径显示。\n" : "") +
+    ((noAmt && STATE.mode === "amt") ? "⚠ 这一天没有「竞价成交额」数据，已自动按「全部昨日涨停股」口径显示。\n" : "") +
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
     "「题材厚度」＝该股按「开盘啦人气版」题材逐条列出，并标注每个题材在前一交易日同题材一起涨停的主板家数（开盘啦口径）。大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只，灰＝≤1 只），后面的小标签是它的其他题材，鼠标悬停可看全部；没有任何题材数据时才显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
     "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行开头一个字标、右边是净额，鼠标悬停看席位全称与样本数。席位底色＝类型：散＝散户通道（东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网，橙底）、游＝游资/营业部（红底）、机＝机构专用（蓝底）、北＝北向沪深股通（紫底），其余营业部席位都归「游」；净额字色：绿＝净买、红＝净卖。左侧竖条：红＝该席位「买入后次日大面率」≥45%（或在你自选的爆头席位名单里；命中且它当天在买→逐票竞价建议一票否决），橙＝33~44%。口径＝该席位每次净买入上榜后，下一交易日收盘≤-5% 的比例（样本≥20 笔）。没上龙虎榜就显示「无龙虎榜」。席位列最上方出现红/橙「散户接盘 +X万」标签＝该股涨停（或上榜）那天，龙虎榜上「散户通道」（拉萨天团：东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网）合计净买 ≥500 万（红＝≥1000 万），同日非散户席位净额在悬停提示里。历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 61%（全体上榜股基率 52%）、次日平均 -1.5%、次日跌超 5% 的概率 34%（基率 24%）；若当天本身就跌停被散户接盘，次日下跌概率 73%、平均 -3.4%。读法＝散户大额接盘，次日基本没有溢价。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
-    "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : "今日 9:25 竞价的实际换手率，从高到低") + "（本组名单＝" + (useBase ? "全部昨日涨停股" : "实际换手前5") + "）" +
+    "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : (amtMode ? "今日 9:25 竞价成交额，从高到低" : "今日 9:25 竞价的实际换手率，从高到低")) + "（本组名单＝" + (amtMode ? "成交额前5" : (useBase ? "全部昨日涨停股" : "实际换手前5")) + "）" +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
   renderFam();
@@ -9330,8 +9345,9 @@ $("recalcBtn").addEventListener("click", function(){ recalcAll(); });
 $("dt").addEventListener("change", function(){ selectDate(this.value); });
 $("dPrev").addEventListener("click", function(){ stepDay(-1); });
 $("dNext").addEventListener("click", function(){ stepDay(1); });
-$("mAT").addEventListener("click", function(){ STATE.mode="at"; $("mAT").classList.add("active"); $("mALL").classList.remove("active"); render(); });
-$("mALL").addEventListener("click", function(){ STATE.mode="all"; $("mALL").classList.add("active"); $("mAT").classList.remove("active"); render(); });
+$("mAT").addEventListener("click", function(){ STATE.mode="at"; $("mAT").classList.add("active"); $("mAMT") && $("mAMT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
+if ($("mAMT")) $("mAMT").addEventListener("click", function(){ STATE.mode="amt"; $("mAMT").classList.add("active"); $("mAT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
+$("mALL").addEventListener("click", function(){ STATE.mode="all"; $("mALL").classList.add("active"); $("mAT").classList.remove("active"); $("mAMT") && $("mAMT").classList.remove("active"); render(); });
 $("sAt").addEventListener("click", function(){ STATE.sort="at"; $("sAt").classList.add("active"); $("sRet").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
 $("sRet").addEventListener("click", function(){ STATE.sort="ret"; $("sRet").classList.add("active"); $("sAt").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
 $("fNL").addEventListener("click", function(){ STATE.noLimit = !STATE.noLimit; $("fNL").classList.toggle("active", STATE.noLimit); render(); });
@@ -9417,6 +9433,8 @@ setInterval(function(){                    // 回踩池：开盘后每 60 秒只
   } catch(e){}
 }, 60000);
 ensureLiveMkt().then(function(){ ensureLiveSeqs(); });   // 市场量能+情绪序列：打开网页就自抓
+// 允许用 ?mode=amt / ?mode=all / ?mode=at 直接打开对应名单（方便手机书签）
+try { var _qm = (location.search.match(/[?&]mode=(amt|all|at)(?:&|$)/) || [])[1]; if (_qm) STATE.mode = _qm; } catch(e) {}
 load();
 autoRefreshWatch();
 simInit();
