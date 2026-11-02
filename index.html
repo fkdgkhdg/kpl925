@@ -377,7 +377,6 @@
     <div id="autoNote" class="note" style="margin:8px 0 0"></div>
     <div id="freshWarn" class="note" style="display:none;margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#fff4e5;border:1px solid #e9b96e;color:#7a4a00;font-weight:600"></div>
     <div class="opts">
-      <div class="optgrp"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button></div>
       <div class="optgrp"><span>筛选</span><button id="fNL">只看能买到的（剔一字）</button></div>
       <div class="optgrp"><span>排名依据</span><button id="sAt" class="active">实际换手率</button><button id="sRet">断板卖出(A均值)</button></div>
     </div>
@@ -422,7 +421,7 @@
     <div class="plBody"><p class="note">输入股票名或代码，点「分析」。</p></div>
   </div>
   <div class="card" id="mbCard">
-    <div class="optgrp" id="mbBar" style="margin:4px 0 8px"><span>名单</span><button id="mbZT" class="active">涨停前5</button><button id="mbNV">未涨停前5</button></div>
+    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button></div>
     <div id="mbMain">
     <div class="opts" id="ndBar" style="margin:4px 0 8px;align-items:center"><span style="color:var(--muted)">节点起算日</span><input id="ndAnchor" type="date" style="width:150px"><button id="ndClear">清除</button><button id="ndHelp">节点口径</button><span class="note" id="ndHint" style="margin:0"></span></div>
     <div class="kpirow"><div class="kpi" id="kpi"></div><div id="ndTix"></div></div>
@@ -5890,11 +5889,15 @@ var NV = { day:"", rows:null, loading:false, ts:0, err:"", src:"", n:0, candN:0,
 var MB = { view: (function(){ try { return localStorage.getItem("kpl_mb_view") === "nv" ? "nv" : "zt"; } catch(e){ return "zt"; } })() };
 function mbSync(){
   var bz = $("mbZT"), bn = $("mbNV");
-  if (!bz || !bn) return;
-  bz.classList.toggle("active", MB.view === "zt");
+  if (!bn) return;
+  if (bz) bz.classList.toggle("active", MB.view === "zt");
   bn.classList.toggle("active", MB.view === "nv");
   bn.disabled = false;
   bn.title = "昨日未涨停股 · 今日竞价实际换手前 5（全市场主板）；历史存档日可回看当天 9:25 竞价实际换手前 5";
+  var md = (typeof STATE !== "undefined" && STATE.mode) || "at";
+  [["mAT", md !== "amt" && md !== "node"], ["mAMT", md === "amt"], ["mALL", md === "node"]].forEach(function(x){
+    var b = $(x[0]); if (b) b.classList.toggle("active", MB.view === "zt" && x[1]);
+  });
   var main = $("mbMain"); if (main) main.style.display = (MB.view === "nv") ? "none" : "";
   var nvB = $("nvCard"); if (nvB) nvB.hidden = (MB.view !== "nv");
 }
@@ -7435,7 +7438,7 @@ function renderCore(){
   var nodeMode = !!_pk.nodeMode;
   var rankAmt = nodeMode ? !!_pk.rankAmt : amtMode;
   var modeLabel = nodeMode ? (rankAmt ? "节点票成交额前5" : "节点票（按实际换手）") : (amtMode ? "成交额前5" : (useBase ? "全部昨日涨停股" : "实际换手前5"));
-  if ($("mAT") && $("mALL")){ $("mAT").classList.toggle("active", !nodeMode && !useBase && !amtMode); $("mAMT") && $("mAMT").classList.toggle("active", !nodeMode && amtMode); $("mALL").classList.toggle("active", nodeMode); }
+  if ($("mAT") && $("mALL")){ var _mbMain = (typeof MB === "undefined" || MB.view === "zt"); $("mAT").classList.toggle("active", _mbMain && !nodeMode && !useBase && !amtMode); $("mAMT") && $("mAMT").classList.toggle("active", _mbMain && !nodeMode && amtMode); $("mALL").classList.toggle("active", _mbMain && nodeMode); }
   if (!rows.length){
     $("tbl").innerHTML = '<tbody><tr><td class="empty">' +
       (nodeMode ? (STATE.noLimit ? "节点票今天都被一字过滤掉了。" : "昨日涨停股里没有节点票；先在连板梯队里点「节点」标记节点日。")
@@ -9381,9 +9384,9 @@ $("recalcBtn").addEventListener("click", function(){ recalcAll(); });
 $("dt").addEventListener("change", function(){ selectDate(this.value); });
 $("dPrev").addEventListener("click", function(){ stepDay(-1); });
 $("dNext").addEventListener("click", function(){ stepDay(1); });
-$("mAT").addEventListener("click", function(){ STATE.mode="at"; STATE.colSort=""; STATE.colDir=-1; $("mAT").classList.add("active"); $("mAMT") && $("mAMT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
-if ($("mAMT")) $("mAMT").addEventListener("click", function(){ STATE.mode="amt"; STATE.colSort=""; STATE.colDir=-1; $("mAMT").classList.add("active"); $("mAT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
-$("mALL").addEventListener("click", function(){ STATE.mode="node"; STATE.colSort=""; STATE.colDir=-1; $("mALL").classList.add("active"); $("mAT").classList.remove("active"); $("mAMT") && $("mAMT").classList.remove("active"); render(); });
+$("mAT").addEventListener("click", function(){ STATE.mode="at"; STATE.colSort=""; STATE.colDir=-1; mbApply("zt"); render(); });
+if ($("mAMT")) $("mAMT").addEventListener("click", function(){ STATE.mode="amt"; STATE.colSort=""; STATE.colDir=-1; mbApply("zt"); render(); });
+$("mALL").addEventListener("click", function(){ STATE.mode="node"; STATE.colSort=""; STATE.colDir=-1; mbApply("zt"); render(); });
 if ($("tbl")) $("tbl").addEventListener("click", function(ev){   // 表头「实际换手 / 竞价成交额」点击排序：第一次降序，再点升序
   var th = (ev.target && ev.target.closest) ? ev.target.closest("th[data-sort]") : null;
   if (!th) return;
@@ -9397,7 +9400,6 @@ $("sAt").addEventListener("click", function(){ STATE.sort="at"; STATE.colSort=""
 $("sRet").addEventListener("click", function(){ STATE.sort="ret"; STATE.colSort=""; STATE.colDir=-1; $("sRet").classList.add("active"); $("sAt").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
 $("fNL").addEventListener("click", function(){ STATE.noLimit = !STATE.noLimit; $("fNL").classList.toggle("active", STATE.noLimit); render(); });
 $("fNL").classList.toggle("active", !!STATE.noLimit);   // 默认就是剔一字池，按钮初始态同步
-if ($("mbZT")) $("mbZT").addEventListener("click", function(){ mbApply("zt"); });
 if ($("mbNV")) $("mbNV").addEventListener("click", function(){ mbApply("nv"); });
 mbSync();   // 初值：默认涨停前5；若上次停在「未涨停前5」则沿用
 if (typeof renderNodeTix === "function") renderNodeTix();
