@@ -3439,6 +3439,30 @@ function klShow(day){                       // 用已取到的K线重画某一�
   klHoverBind();
 }
 var klDay = null;
+var KLOPENREQ = 0;                         // 防止快速切换股票时，上一只的异步结果盖住新弹窗
+function klQuoteBar(q){                    // 日K源常比分时晚一根：用实时行情补当天K线
+  var ts = String((q && q.ts) || "").replace(/[^0-9]/g, "");
+  if (ts.length < 8 || !q || !(q.price > 0) || !(q.open > 0) || !(q.high > 0) || !(q.low > 0)) return null;
+  return { d: ts.slice(0,4) + "-" + ts.slice(4,6) + "-" + ts.slice(6,8),
+           o: +q.open, h: +q.high, l: +q.low, c: +q.price, v: +q.vol > 0 ? +q.vol : 0 };
+}
+function klRepairToday(code, req){
+  plQuote(code).then(function(q){
+    if (req !== KLOPENREQ || KLST.code !== code || !KLST.bars || !KLST.bars.length) return;
+    var card = $("klCard"); if (!card || card.hidden) return;
+    var bar = klQuoteBar(q); if (!bar) return;
+    var bars = KLST.bars.slice(), j = -1, dk = klKey(bar.d);
+    for (var i = 0; i < bars.length; i++){ if (klKey(bars[i].d) === dk){ j = i; break; } }
+    if (j >= 0) bars[j] = bar;
+    else if (klKey(bar.d) > klKey(bars[bars.length - 1].d)) bars.push(bar);
+    else return;
+    KLST.bars = bars;
+    klShow(klDay || KLST.day);
+    var base = (KLST.dayNote || "K 线为不复权日线").replace(/[。；\s]+$/, "");
+    $("klNote").textContent = base + "；" + bar.d + " 这根已用腾讯实时行情" + (j < 0 ? "补齐" : "更新") + "。";
+    KLST.dayNote = $("klNote").textContent;
+  }).catch(function(){});
+}
 function klHoverBind(){
   var svg = $("klSvg"); if (!svg || !KLST.bars || !KLST.bars.length) return;
   var w = 980, hh = 300, padL = 6, padR = 62, padB = 20;
@@ -3479,6 +3503,7 @@ function klStep(dir){                       // 前后翻一个交易日
 }
 function klOpen(code, name, day, day2){
   day = klNormDay(day); day2 = day2 ? klNormDay(day2) : day2;
+  var klReq = ++KLOPENREQ;
   var card = $("klCard");
   if (!card) return;
   card.hidden = false;                                  // 浮动在右下角，不再把页面滚到顶部
@@ -3541,6 +3566,7 @@ function klOpen(code, name, day, day2){
     });
   }
   klFetch(code, function(r, src){
+    if (klReq !== KLOPENREQ) return;
     if (!r || !r.bars.length){
       $("klChart").innerHTML = '<p class="note">三个数据源（同花顺/东财/新浪）这会儿都没取到 K 线，稍后再点一次，或点右上角「同花顺 ↗」。</p>';
       return;
@@ -3572,6 +3598,7 @@ function klOpen(code, name, day, day2){
       $("klNote").textContent = "K 线为不复权日线，虚线是正在看的那天。";
     }
     KLST.dayNote = $("klNote").textContent; KLST.dayTip = $("klTip").textContent;
+    klRepairToday(code, klReq);
   });
 }
 // ===== 分时：点「分时」看这一天（默认正在看的这天＝昨天）每分钟怎么走的 =====
