@@ -660,7 +660,7 @@
 if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
 </script>
 <script src="lhbdata.js?v=20261030b"></script>
-<script src="nvdata.js?v=20261030c"></script>
+<script src="nvdata.js?v=20261102"></script>
 <script src="smashdata.js"></script>
 <script src="teamdata.js"></script>
 <script src="sbzdata.js"></script>
@@ -5819,7 +5819,7 @@ function nvLoadCache(d){
     return o;
   } catch(e){ return null; }
 }
-function nvSaveCache(o){ var _t = new Date((o && o.ts) || Date.now()); var _hm = ("0"+_t.getHours()).slice(-2) + ":" + ("0"+_t.getMinutes()).slice(-2); if (_hm < "09:15" || _hm >= "09:30") return; try { localStorage.setItem(nvKeyOf(o.day), JSON.stringify(o)); } catch(e){} }
+function nvSaveCache(o){ var _t = new Date((o && o.ts) || Date.now()); var _hm = ("0"+_t.getHours()).slice(-2) + ":" + ("0"+_t.getMinutes()).slice(-2); if (_hm < "09:15" || _hm >= "09:34") return; try { localStorage.setItem(nvKeyOf(o.day), JSON.stringify(o)); } catch(e){} }
 function nvHM(){ var n = new Date(); return ("0"+n.getHours()).slice(-2) + ":" + ("0"+n.getMinutes()).slice(-2); }
 function nvInWin(){ var h = nvHM(); return h >= "09:15" && h < "09:30"; }
 function nvLastZT(day){                 // 竞价日（STATE.day）的前一个交易日主板涨停股集合（这一栏要剔除的对象）
