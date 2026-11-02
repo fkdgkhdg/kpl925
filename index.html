@@ -238,7 +238,7 @@
   h1{font-size:20px;margin:0 0 4px;font-weight:600}
   .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;
-        content-visibility:auto;contain-intrinsic-size:auto 420px}   /* 手机长页面：屏外卡片跳过渲染，滚动更稳 */
+        contain-intrinsic-size:auto 420px}   /* 注：content-visibility:auto 在 Chromium 上叠加大块 innerHTML 重建会偶发崩渲染进程，这里去掉 */
   .card h2{font-size:14px;margin:0 0 10px;font-weight:600;color:var(--head)}
   .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   #status{font-size:12.5px;color:var(--muted)}
