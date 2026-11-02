@@ -6336,8 +6336,8 @@ function ldrPaintNav(){                   // 把当前选的日期写回日期�
   }
 }
 function ldrDay(){
-  if (typeof KPLTH === 'undefined' || !KPLTH || !KPLTH.days || !KPLTH.days.length) return '';
-  var ks = KPLTH.days, last = ks[ks.length - 1];
+  var ks = ldrDays(), last = ks.length ? ks[ks.length - 1] : '';
+  if (!last) return '';
   var bj = new Date(Date.now() + 8 * 3600 * 1000);
   var today = bj.toISOString().slice(0, 10).split('-').join('');
   if (last === today && bj.getUTCHours() < 15 && ks.length > 1) last = ks[ks.length - 2];
