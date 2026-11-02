@@ -651,7 +651,7 @@
   </div>
 
   <p class="note fineprint">
-    口径：竞价涨幅＝9:25 竞价成交价 ÷ 前收盘；竞价成交额＝9:25 集合竞价成交额（取当日第一根分钟 K 线 09:30 的成交额）；实际换手＝竞价成交额 ÷ 实际流通市值（取最近一次统计值，未收录个股用普通换手率顶替并标「≈」）。开盘档位＝竞价高低按<b>绝对涨幅</b>分 6 档：低开 / 平开 0~2% / 高开 2~5% / 5~7% / 7~9.5% / ≥9.5%（以前用的是「竞价涨幅 ÷ 涨停幅度」的相对档，现已换成绝对涨幅，因为绝对涨幅档对断板卖出的收益区分度最高）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）里不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%；低开最差 -2.09%、7~9.5% -1.75%）；⚠ 高位高开＝<b>≥4 板且高开 >7%</b>，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%（30 笔），其中 4 板高开 7~9.5% 最差：均值 -4.09% / 中位 -9.56%（15 笔）；同是 ≥4 板，平开 0~5% 反而是均值 +3.52% / 中位 +0.75%（68 笔）。回测口径：856 笔 / 246 个交易日（2025-09-10 ~ 2026-09-18）。
+    口径：竞价涨幅＝9:25 竞价成交价 ÷ 前收盘；竞价成交额＝9:25 集合竞价成交额；实际换手＝竞价成交额 ÷ 实际流通市值（取最近一次统计值，未收录个股用普通换手率顶替并标「≈」）。开盘档位＝竞价高低按<b>绝对涨幅</b>分 6 档：低开 / 平开 0~2% / 高开 2~5% / 5~7% / 7~9.5% / ≥9.5%（以前用的是「竞价涨幅 ÷ 涨停幅度」的相对档，现已换成绝对涨幅，因为绝对涨幅档对断板卖出的收益区分度最高）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）里不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%；低开最差 -2.09%、7~9.5% -1.75%）；⚠ 高位高开＝<b>≥4 板且高开 >7%</b>，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%（30 笔），其中 4 板高开 7~9.5% 最差：均值 -4.09% / 中位 -9.56%（15 笔）；同是 ≥4 板，平开 0~5% 反而是均值 +3.52% / 中位 +0.75%（68 笔）。回测口径：856 笔 / 246 个交易日（2025-09-10 ~ 2026-09-18）。
     历史收益＝同「板数 × 开盘档位」组合的样本均值，<b>口径为 A</b>（9:25 竞价买入 → 封板继续持有 → 第一次断板时卖出；买入日就没封住的最早只能按次日开盘价卖，受 T+1 限制），样本少于 8 只波动很大。情绪周期＝六阶段循环（冰点→修复→主升发酵→高潮→分歧衰退→退潮主跌），用四个指标的近十年分位自适应判定（只统计主板）：晋级率、大面率（昨日涨停股当日跌≤-5% 比例）、最高连板、涨停家数；优先级为 退潮 → 冰点 → 高潮 → 分歧衰退 → 主升 → 修复。本页只是历史统计工具，不构成投资建议。
   </p>
 </div>
@@ -1444,11 +1444,15 @@ function buildRows(list){
     if (x.atOv !== undefined && x.atOv !== null) { at = x.atOv; approx = !!x.approxSnap; }
     else if (x.amount && FF[code]) at = x.amount / FF[code] * 100;
     else if (x.hs !== null && x.hs !== undefined) { at = x.hs; approx = true; }
+    var _ff = (typeof FF !== "undefined" && FF[code]) || null;
+    // 竞价成交额与「实际换手」同口径：实际换手＝竞价成交额÷实际流通市值。
+    // 存档里的 p[8] 有时是首分钟成交额（含 9:30 后连续成交），不能再拿来当竞价额显示。
+    var amtA = (at !== null && at !== undefined && !approx && _ff) ? at / 100 * _ff : x.amount;
     var c = colOf(x.chg, L);
     var cellA = G_AT[rowOf(board)][c]; if (!cellA) cellA = [null,null,null,0,null,null,0,0,0]; if (!cellA[1] && cellA[1] !== 0) cellA[1]=cellA[2];
     var cell = cellA, base = G_ALL[rowOf(board)][c];
     rows.push({ code:code, name:x.name, board:board, chg:x.chg, gap:GK[c], L:L, px:((x.px === undefined || x.px === null || isNaN(x.px) || !(x.px > 0)) ? null : +x.px),
-                at:at, approx:approx, atSrc:x.atSrc||null, amount:x.amount, fshare:(typeof FF!=="undefined"&&FF[code])||null, mc:x.mc, avg:cell[0], wr:cell[1], prob:cell[2], n:cell[3],
+                at:at, approx:approx, atSrc:x.atSrc||null, amount:x.amount, amtA:amtA, fshare:_ff, mc:x.mc, avg:cell[0], wr:cell[1], prob:cell[2], n:cell[3],
                 avgC:(cell[4] === undefined ? null : cell[4]), wrC:(cell[5] === undefined ? null : cell[5]),
                 prem:(cell[6] === undefined || !cell[8]) ? null : cell[6], premW:(cell[7] === undefined ? null : cell[7]),
                 premN:(cell[8] === undefined ? 0 : cell[8]),
@@ -6077,7 +6081,7 @@ function renderNewTop5(){
       + '<th title="价格＝9:25 竞价价（当日开盘价）">价格</th>'
       + '<th>市值</th>'
       + '<th>实际换手</th>'
-      + '<th>成交量</th>' + '<th title="昨日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率；红条＝该席位买入后次日大面率≥45%、橙条＝33~44%">昨日席位' + (lhbDate(_d0) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(_d0) + '</span>' : '') + '</th>'
+      + '<th title="9:25 集合竞价成交额，与「实际换手」同一口径：实际换手＝本列÷实际流通市值">竞价成交额</th>' + '<th title="昨日龙虎榜席位。鼠标悬停看该席位净额、类型与历史大面率；红条＝该席位买入后次日大面率≥45%、橙条＝33~44%">昨日席位' + (lhbDate(_d0) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(_d0) + '</span>' : '') + '</th>'
       + '<th>委比</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">断板卖出(A均值)</th>'
       + '<th title="本栏股票昨日未涨停，没有 A 口径回测样本，显示 —">A胜率</th>'
@@ -6535,8 +6539,8 @@ function renderLdrTop5(ds){
   var h = "<div style=\"display:flex;align-items:center;gap:8px;margin:2px 0 5px;flex-wrap:wrap\"><b style=\"font-size:12.5px\">" + label + "</b>"
     + "<span style=\"font-size:11.5px;color:#8a8f98\">" + tgt + " · " + (hasAt ? "按实际换手前 5（和主榜单同口径）" : "这一天没存竞价成交额，按竞价涨幅前 5") + "</span>"
     + tabBar() + "</div>";
-  h += "<div style=\"display:grid;grid-template-columns:20px minmax(168px,1.5fr) 58px 72px 48px 60px 62px 62px 62px 62px;gap:6px 10px;font-size:12px;align-items:center\">";
-  h += "<span style=\"color:#8a8f98\">#</span><span style=\"color:#8a8f98\">股票 · 题材</span><span style=\"color:#8a8f98;text-align:right\">价</span><span style=\"color:#8a8f98;text-align:right\">市值</span><span style=\"color:#8a8f98\">连板</span><span style=\"color:#8a8f98\">竞价</span><span style=\"color:#8a8f98\">实际换手</span><span style=\"color:#8a8f98\">当日</span><span style=\"color:#8a8f98\">T+1开</span><span style=\"color:#8a8f98\">T+1收</span>";
+  h += "<div style=\"overflow-x:auto\"><div style=\"display:grid;grid-template-columns:20px minmax(140px,1.4fr) 54px 66px 44px 56px 58px 64px 58px 58px 58px;gap:6px 8px;font-size:12px;align-items:center;min-width:740px\">";
+  h += "<span style=\"color:#8a8f98\">#</span><span style=\"color:#8a8f98\">股票 · 题材</span><span style=\"color:#8a8f98;text-align:right\">价</span><span style=\"color:#8a8f98;text-align:right\">市值</span><span style=\"color:#8a8f98\">连板</span><span style=\"color:#8a8f98\">竞价</span><span style=\"color:#8a8f98\">实际换手</span><span style=\"color:#8a8f98;text-align:right\">成交额</span><span style=\"color:#8a8f98\">当日</span><span style=\"color:#8a8f98\">T+1开</span><span style=\"color:#8a8f98\">T+1收</span>";
   var tgtDs = tgt.replace(/-/g, "");
   function t5Tags(code){                    // 这只票「涨停那天」的题材：取 tgt 之前最近一个梯队列里有它的交易日（最多往前找 4 天，防开盘啦缺数据）
     var ks = ldrDays(), tried = 0;
@@ -6565,11 +6569,38 @@ function renderLdrTop5(ds){
     h += "<span>" + (r.board > 1 ? (r.board + "板") : "首板") + "</span>";
     h += cc(r.chg, 2);
     h += "<span>" + (r.at ? ((+r.at).toFixed(2) + "%") : "—") + "</span>";
+    h += "<span style=\"text-align:right;color:#5f6b7a;white-space:nowrap\">" + (r.amtA ? yzMoney(r.amtA) : "—") + "</span>";
     h += cc(r.dc, 2);
     h += cc(r.t1o, 2);
     h += cc(r.t1c, 2);
   });
-  h += "</div>";
+  h += "</div></div>";
+  // 下面：同一天的「未涨停前5」存档（NVDATA）；和上面的 5 只涨停股同一日期、同一竞价口径
+  var nv = (typeof nvArchDay === "function") ? nvArchDay(tgt) : null;
+  h += "<div style=\"display:flex;align-items:center;gap:8px;margin:14px 0 5px;flex-wrap:wrap\"><b style=\"font-size:12.5px\">当天未涨停前5</b>"
+    + "<span style=\"font-size:11.5px;color:#8a8f98\">" + tgt + " · 按 9:25 竞价实际换手</span></div>";
+  if (!nv){
+    h += "<div class=\"note\" style=\"padding:2px 0 6px\">这一天的「未涨停前5」没有存档。</div>";
+  } else {
+    var nvRows = (nv.rows || []).slice(0, 5);
+    h += "<div style=\"overflow-x:auto\"><div style=\"display:grid;grid-template-columns:20px minmax(160px,1.5fr) 54px 56px 58px 64px 58px;gap:6px 10px;font-size:12px;align-items:center;min-width:560px\">";
+    h += "<span style=\"color:#8a8f98\">#</span><span style=\"color:#8a8f98\">股票 · 板块</span><span style=\"color:#8a8f98;text-align:right\">价</span><span style=\"color:#8a8f98\">竞价</span><span style=\"color:#8a8f98\">实际换手</span><span style=\"color:#8a8f98;text-align:right\">成交额</span><span style=\"color:#8a8f98\">当日</span>";
+    nvRows.forEach(function(r, i){
+      var nvPx = (+r[8] > 0) ? (+r[8]).toFixed(2) + "元" : "—";
+      h += "<span style=\"color:#8a8f98\">" + (i + 1) + "</span>";
+      h += "<span style=\"min-width:0;display:flex;align-items:baseline;gap:8px;white-space:normal\">"
+        + "<a class=\"kbtn\" data-kc=\"" + r[0] + "\" data-kn=\"" + esc(r[1]) + "\" data-kd=\"" + tgt + "\" style=\"font-weight:600;text-decoration:none;color:inherit;cursor:pointer;white-space:nowrap;display:inline-block;min-width:96px\" title=\"点开看这只票的日K\">" + esc(r[1]) + "<span style=\"color:#9aa3b2;font-size:11px\"> " + r[0] + "</span></a>"
+        + "<span style=\"font-size:10.5px;color:#3b6fd4;word-break:break-word;white-space:normal\">" + esc(r[2] || "—") + "</span>"
+        + "</span>"
+        + "<span style=\"text-align:right;color:#5f6b7a;white-space:nowrap\">" + nvPx + "</span>"
+        + cc(r[3], 2)
+        + "<span>" + (r[4] === null || r[4] === undefined || isNaN(+r[4]) ? "—" : (+r[4]).toFixed(2) + "%") + "</span>"
+        + "<span style=\"text-align:right;color:#5f6b7a;white-space:nowrap\">" + (r[5] ? yzMoney(r[5]) : "—") + "</span>"
+        + cc(r[6], 2);
+    });
+    h += "</div></div>";
+    if (nv.src) h += "<div class=\"note\" style=\"font-size:10.5px;color:#9aa3b2;margin-top:2px\">口径：" + esc(nv.src) + "；实际换手＝竞价成交额 ÷ 实际流通市值。</div>";
+  }
   box.innerHTML = h;
   mountTabs();
 }
@@ -7370,7 +7401,7 @@ function renderCore(){
   var arch = STATE.archived;
   var TI2 = topInInfo();
   var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th>竞价涨幅</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>市值</th><th>实际换手</th>'
-           + '<th>成交量</th>' + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝该席位买入后次日大面率≥45%（或在自选名单里）、橙条＝33~44%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
+           + '<th title="9:25 集合竞价成交额，与「实际换手」同一口径：实际换手＝本列÷实际流通市值">竞价成交额</th>' + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝该席位买入后次日大面率≥45%（或在自选名单里）、橙条＝33~44%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
   // 条形量纲：每一列用自己的绝对值最大值（不能用排序键）
@@ -7394,7 +7425,7 @@ function renderCore(){
       + '<td style="white-space:nowrap">' + pxCell(r) + '</td>'
       + '<td class="up"><b>' + ((r.mc||r.fshare) ? ((r.mc||r.fshare||0)>=1e8?((r.mc||r.fshare||0)/1e8).toFixed(2)+'亿':(r.mc||r.fshare||0).toLocaleString()) : '—') + '</b></td>'
       + '<td>' + (r.at === null ? "—" : '<b>' + r.at.toFixed(2) + '%</b>' + (r.approx ? '<span class="tag">≈</span>' : '') + '<span class="minbar" style="width:58px"><i style="width:' + Math.min(100, r.at / maxAt * 100).toFixed(0) + '%"></i></span>') + '</td>'
-      + '<td class="up"><b>' + (r.amount ? (r.amount >= 1e8 ? (r.amount/1e8).toFixed(2)+'亿' : (r.amount/1e4).toFixed(0)+'万') : '—') + '</b></td>'
+      + '<td class="up"><b>' + (r.amtA ? (r.amtA >= 1e8 ? (r.amtA/1e8).toFixed(2)+'亿' : (r.amtA/1e4).toFixed(0)+'万') : '—') + '</b></td>'
       + '<td class="seat">' + lhbCell(r.code, STATE.day) + '</td>'
       + '<td class="' + ((r.bid || r.ask) ? ((r.bid - r.ask) > 0 ? "up" : "down") : "") + '">' +
         ((r.bid || r.ask) ? (((r.bid - r.ask) / (r.bid + r.ask) * 100).toFixed(0) + '%') + '<span class="tag">' +
