@@ -6310,7 +6310,7 @@ function renderTB(){
   if ($("tbNote")) $("tbNote").textContent = "口径：开盘啦「涨停原因」题材（只统计主板、非 ST），" + tbFmtDay(ds) + " 收盘口径，共 " + A.rows.length + " 个题材今天有涨停。今日涨停＝该题材当天一起涨停的主板家数；昨日涨停＝前一交易日同题材家数（▲加速 / ▼减速）；近3日合计＝最近 3 个交易日该题材涨停家数之和；最高板 / 连板梯队＝题材内个股的板位分布（3 板以上红、2 板橙、首板灰）；龙头＝题材里板位最高、封板最早的那只。点题材名看它的连板梯队。数据每天 15:10 由本机脚本更新。";
 }
 /* ===== 连板梯队 · 当晚复盘（开盘啦题材口径，主板）===== */
-var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '', LDRTHX = false;
+var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '', LDRTHX = false, LDRRUN = null;
 function ldrDays(){                       // 可回看的交易日（早→晚）
   var ks = [], k;
   if (typeof KPLTH !== 'undefined' && KPLTH && KPLTH.days) ks = KPLTH.days.slice();
@@ -6361,17 +6361,35 @@ function ldrThNorm(t){                       // 开盘啦常给同一板块起�
   var x = String(t || "").replace(/（[^）]*）|\([^)]*\)/g, "").trim();
   return LDRALIAS[x] || LDRALIAS[t] || x || String(t || "");
 }
+function ldrRunAll(){                       // 连板数只按涨停池连续出现的天数算；中间断板就归 1
+  if (LDRRUN) return LDRRUN;
+  var cache = {}, prev = null;
+  ldrDays().forEach(function(ds){
+    var pool = poolOfDs(ds) || [];
+    if (!pool.length){ cache[ds] = null; prev = null; return; }
+    var m = {};
+    pool.forEach(function(a){
+      var c = String(a[0]);
+      m[c] = prev && prev[c] ? prev[c] + 1 : 1;
+    });
+    cache[ds] = m; prev = m;
+  });
+  return (LDRRUN = cache);
+}
+function ldrRun(ds, code){ var m = ldrRunAll()[ds]; return (m && m[String(code)]) || 1; }
 function ldrAgg(ds){
   if (LDRC[ds]) return LDRC[ds];
   var pool = (typeof poolOfDs === 'function' ? poolOfDs(ds) : null) || [];
+  var fromKpl = !!kthDay(ds);
   var cnt = {}, rows = [];
   pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ t = ldrThNorm(t); cnt[t] = (cnt[t] || 0) + 1; }); });
   pool.forEach(function(a){
     rows.push({
       c: String(a[0]),
       n: a[1] || ((typeof NAMEMAP !== 'undefined' && NAMEMAP[a[0]]) || String(a[0])),
-      b: +a[4] || 1,
-      ty: String(a[5] || ''),
+      b: ldrRun(ds, a[0]),
+      ty: String((fromKpl ? a[5] : a[3]) || ''),
+      bt: String((fromKpl ? '' : a[5]) || ''),
       ts: +a[6] || 0,
       tags: (function(){ var seen = {}, out = []; thTagsOf(a).forEach(function(t){ var k = ldrThNorm(t); if (!k || seen[k]) return; seen[k] = 1; out.push({ t: k, n: cnt[k] || 1, raw: String(t) }); }); return out.sort(function(x, y){ var ex = LDREVENT[x.t] ? 1 : 0, ey = LDREVENT[y.t] ? 1 : 0; return ex - ey || y.n - x.n || (x.t < y.t ? -1 : 1); }); })()
     });
@@ -6776,7 +6794,7 @@ function ldrPaint(){
     var ks = ldrDays(), i0 = ks.indexOf(ds);
     if (i0 <= 0) return;
     prevDs = ks[i0 - 1];
-    if (typeof KPLTH === 'undefined' || !KPLTH || !KPLTH.d || !KPLTH.d[prevDs]) return;   // 上一天没有涨停池就不算，免得显示成 -N
+    if (!poolOfDs(prevDs) || !poolOfDs(prevDs).length) return;   // 上一天没有涨停池就不算，免得显示成 -N
     var PA = ldrAgg(prevDs); if (!PA || !PA.rows.length) return;
     var pr = PA.rows.filter(function(r){
       if (!LDRTH) return true;
@@ -6801,7 +6819,7 @@ function ldrPaint(){
     h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + dlt + '</span><span class="lvList">';
     arr.forEach(function(r){
       var ln = ldrLineHit(ds, r.c);
-      var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b + '连板') ? '（开盘啦原标 ' + r.ty + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
+      var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b === 1 ? '首板' : b + '连板') ? '（' + (kthDay(ds) ? '开盘啦' : '同花顺') + '原标 ' + r.ty + (r.bt ? ' / ' + r.bt : '') + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
         + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n + (x.raw && x.raw !== x.t ? '（原标 ' + x.raw + '）' : ''); }).join(' / ') || '—')
         + (ln ? ' · 分时直线：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟 +' + ln.g + '%，最大回撤 ' + ln.dd + '%' : '')
         + '（点开看K线）';
