@@ -254,6 +254,10 @@
   table{border-collapse:collapse;width:100%;font-size:13.5px}
   th,td{border-bottom:1px solid var(--border);padding:8px 9px;text-align:center;white-space:nowrap}
   th{background:var(--chip);font-weight:600;color:var(--head)}
+  th.sortable{cursor:pointer;user-select:none}
+  th.sortable:hover{background:#e2eaf6}
+  th.sortable .sa{display:inline-block;margin-left:3px;font-size:10px;opacity:.45}
+  th.sortable.active .sa{opacity:1;color:#c02c2c}
   td.name{text-align:left}
   #tbl td.name{width:196px;min-width:186px;max-width:196px;white-space:normal}
   #ndBar{display:none}   /* 节点列已删，起算日设置一并收起 */
@@ -1271,7 +1275,7 @@ function prevPool(P){                     // 取 P 之前一个交易日的涨�
   return step(0);
 }
 
-var STATE = { mode:"at", sort:"at", noLimit:false, rows:[], day:"", src:"", cyc:null,
+var STATE = { mode:"at", sort:"at", colSort:"", colDir:-1, noLimit:false, rows:[], day:"", src:"", cyc:null,
               archived:false, picked:false, sel:"" };
 var DZTSET = null;   // 前一交易日（D 日）主板涨停股代码集合，用于算「当日同题材涨停家数」
 
@@ -7430,12 +7434,21 @@ function renderCore(){
             : (amtMode ? (r.amtA || r.amount || -999) : ((r.at || 0) > 0 ? r.at : -999));   // 排名依据＝当前档位（实际换手 / 竞价成交额）
   });
   list.sort(function(a,b){ return b._key - a._key; });
+  if (STATE.colSort === "at" || STATE.colSort === "amt"){   // 表头排序：只改显示顺序，不改「前5」的入选口径
+    var _cs = STATE.colSort, _cd = STATE.colDir === 1 ? 1 : -1;
+    list.sort(function(a, b){
+      var av = _cs === "at" ? (a.at || 0) : (a.amtA || a.amount || 0);
+      var bv = _cs === "at" ? (b.at || 0) : (b.amtA || b.amount || 0);
+      return _cd * (av - bv);
+    });
+  }
   STATE._list = list;                          // 给「历史小标签算完后的补刷新」用；顺序和表格行完全一致
 
   var arch = STATE.archived;
   var TI2 = topInInfo();
-  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th>竞价涨幅</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>市值</th><th>实际换手</th>'
-           + '<th title="9:25 集合竞价成交额，与「实际换手」同一口径：实际换手＝本列÷实际流通市值">竞价成交额</th>' + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝该席位买入后次日大面率≥45%（或在自选名单里）、橙条＝33~44%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
+  var head = '<thead><tr><th>#</th><th>股票</th><th>所属板块</th><th title="所属板块＝行业；题材厚度＝按「开盘啦人气版」题材逐条列出，并标注昨天同题材一起涨停的主板家数（红≥5只，蓝2-4只，灰≤1只，小标签是它的其他题材，鼠标悬停看全部）">题材厚度</th><th>连板</th><th>竞价涨幅</th><th title="价格＝9:25 竞价价（当日开盘价）。红「坑」＝板位≥3 且 20~40 元：22.73% 涨停 / A 中位 -8.38%（66 票/58 日），同板其余 47.53% / -0.23%，置换 p=0.0005、BH=0.013（过 0.10 校正）；绿「优」＝4 板且 10~20 元：63.33% / A 中位 +3.69%（30 票/30 日）vs 4 板其余 32.79% / -4.47%，p=0.0085、BH=0.1105（擦线过 0.10，仍只当力度分）。价格与流通市值相关性只有 0.197，不是市值代理。">价格</th><th>市值</th>'
+           + '<th class="sortable' + (STATE.colSort === "at" ? ' active' : '') + '" data-sort="at" title="点击按实际换手排序；再点切换升序 / 降序">实际换手<span class="sa">' + (STATE.colSort === "at" ? (STATE.colDir === 1 ? "▲" : "▼") : "↕") + '</span></th>'
+           + '<th class="sortable' + (STATE.colSort === "amt" ? ' active' : '') + '" data-sort="amt" title="点击按 9:25 竞价成交额排序；再点切换升序 / 降序">竞价成交额<span class="sa">' + (STATE.colSort === "amt" ? (STATE.colDir === 1 ? "▲" : "▼") : "↕") + '</span></th>' + '<th title="昨日龙虎榜席位（该股昨天涨停那天的龙虎榜）。席位左边一个字标＋底色＝席位类型（散=散户橙、游=游资红、机=机构蓝、北=北向紫）；鼠标悬停看该席位的净额、类型与历史大面率；左侧红条＝该席位买入后次日大面率≥45%（或在自选名单里）、橙条＝33~44%">昨日席位' + (lhbDate(STATE.day) ? ' <span style="font-weight:400;opacity:.65">' + lhbDate(STATE.day) + '</span>' : '') + '</th>'
            + '<th>委比</th><th>断板卖出(A均值)</th><th>A胜率</th><th>断板卖出(A中位)</th><th>样本</th>'
            + (arch ? '<th>当日涨跌幅</th><th>当日结果</th><th>该股断板卖出(A)</th>' : '') + '</tr></thead><tbody>';
   // 条形量纲：每一列用自己的绝对值最大值（不能用排序键）
@@ -7478,9 +7491,10 @@ function renderCore(){
   zTipBind();
 
   var top = list[0];
+  var _kpiKey = STATE.colSort === "at" ? "at" : (STATE.colSort === "amt" ? "amt" : (STATE.sort === "ret" ? "ret" : (amtMode ? "amt" : "at")));
   $("kpi").innerHTML =
-    '<div>榜单首位<b>' + esc(top.name) + '</b>' + (STATE.sort === "ret" ? (top._avg > 0 ? "+" : "") + top._avg.toFixed(2) + '% 断板卖出(A均值)'
-      : (amtMode ? ((top.amtA || top.amount) ? yzMoney(top.amtA || top.amount) + ' 竞价成交额' : '—')
+    '<div>榜单首位<b>' + esc(top.name) + '</b>' + (_kpiKey === "ret" ? (top._avg > 0 ? "+" : "") + top._avg.toFixed(2) + '% 断板卖出(A均值)'
+      : (_kpiKey === "amt" ? ((top.amtA || top.amount) ? yzMoney(top.amtA || top.amount) + ' 竞价成交额' : '—')
         : ((top.at === null || !(top.at > 0)) ? "—" : top.at.toFixed(2) + "%") + ' 实际换手率')) + '</div>'
     + '<div>竞价日<b>' + STATE.day + '</b>' + STATE.src + '</div>'
     + '<div>入选只数<b>' + list.length + '</b>' + (amtMode ? "成交额前5" : (useBase ? "全部昨日涨停股" : "实际换手前5")) + (STATE.noLimit ? "（剔一字，名次按剔除后重算）" : "") + '</div>';
@@ -7492,6 +7506,7 @@ function renderCore(){
     "「题材厚度」＝该股按「开盘啦人气版」题材逐条列出，并标注每个题材在前一交易日同题材一起涨停的主板家数（开盘啦口径）。大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只，灰＝≤1 只），后面的小标签是它的其他题材，鼠标悬停可看全部；没有任何题材数据时才显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
     "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行开头一个字标、右边是净额，鼠标悬停看席位全称与样本数。席位底色＝类型：散＝散户通道（东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网，橙底）、游＝游资/营业部（红底）、机＝机构专用（蓝底）、北＝北向沪深股通（紫底），其余营业部席位都归「游」；净额字色：绿＝净买、红＝净卖。左侧竖条：红＝该席位「买入后次日大面率」≥45%（或在你自选的爆头席位名单里；命中且它当天在买→逐票竞价建议一票否决），橙＝33~44%。口径＝该席位每次净买入上榜后，下一交易日收盘≤-5% 的比例（样本≥20 笔）。没上龙虎榜就显示「无龙虎榜」。席位列最上方出现红/橙「散户接盘 +X万」标签＝该股涨停（或上榜）那天，龙虎榜上「散户通道」（拉萨天团：东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网）合计净买 ≥500 万（红＝≥1000 万），同日非散户席位净额在悬停提示里。历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 61%（全体上榜股基率 52%）、次日平均 -1.5%、次日跌超 5% 的概率 34%（基率 24%）；若当天本身就跌停被散户接盘，次日下跌概率 73%、平均 -3.4%。读法＝散户大额接盘，次日基本没有溢价。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
     "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : (amtMode ? "今日 9:25 竞价成交额，从高到低" : "今日 9:25 竞价的实际换手率，从高到低")) + "（本组名单＝" + (amtMode ? "成交额前5" : (useBase ? "全部昨日涨停股" : "实际换手前5")) + "）" +
+    (STATE.colSort ? "；表格当前按「" + (STATE.colSort === "at" ? "实际换手" : "竞价成交额") + "」" + (STATE.colDir === 1 ? "升序" : "降序") + "排列，点表头可切换" : "") +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按实际换手重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
   renderFam();
@@ -9345,11 +9360,20 @@ $("recalcBtn").addEventListener("click", function(){ recalcAll(); });
 $("dt").addEventListener("change", function(){ selectDate(this.value); });
 $("dPrev").addEventListener("click", function(){ stepDay(-1); });
 $("dNext").addEventListener("click", function(){ stepDay(1); });
-$("mAT").addEventListener("click", function(){ STATE.mode="at"; $("mAT").classList.add("active"); $("mAMT") && $("mAMT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
-if ($("mAMT")) $("mAMT").addEventListener("click", function(){ STATE.mode="amt"; $("mAMT").classList.add("active"); $("mAT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
-$("mALL").addEventListener("click", function(){ STATE.mode="all"; $("mALL").classList.add("active"); $("mAT").classList.remove("active"); $("mAMT") && $("mAMT").classList.remove("active"); render(); });
-$("sAt").addEventListener("click", function(){ STATE.sort="at"; $("sAt").classList.add("active"); $("sRet").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
-$("sRet").addEventListener("click", function(){ STATE.sort="ret"; $("sRet").classList.add("active"); $("sAt").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
+$("mAT").addEventListener("click", function(){ STATE.mode="at"; STATE.colSort=""; STATE.colDir=-1; $("mAT").classList.add("active"); $("mAMT") && $("mAMT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
+if ($("mAMT")) $("mAMT").addEventListener("click", function(){ STATE.mode="amt"; STATE.colSort=""; STATE.colDir=-1; $("mAMT").classList.add("active"); $("mAT").classList.remove("active"); $("mALL").classList.remove("active"); render(); });
+$("mALL").addEventListener("click", function(){ STATE.mode="all"; STATE.colSort=""; STATE.colDir=-1; $("mALL").classList.add("active"); $("mAT").classList.remove("active"); $("mAMT") && $("mAMT").classList.remove("active"); render(); });
+if ($("tbl")) $("tbl").addEventListener("click", function(ev){   // 表头「实际换手 / 竞价成交额」点击排序：第一次降序，再点升序
+  var th = (ev.target && ev.target.closest) ? ev.target.closest("th[data-sort]") : null;
+  if (!th) return;
+  var k = th.getAttribute("data-sort");
+  if (!k) return;
+  if (STATE.colSort === k) STATE.colDir = (STATE.colDir === 1 ? -1 : 1);
+  else { STATE.colSort = k; STATE.colDir = -1; }
+  render();
+});
+$("sAt").addEventListener("click", function(){ STATE.sort="at"; STATE.colSort=""; STATE.colDir=-1; $("sAt").classList.add("active"); $("sRet").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
+$("sRet").addEventListener("click", function(){ STATE.sort="ret"; STATE.colSort=""; STATE.colDir=-1; $("sRet").classList.add("active"); $("sAt").classList.remove("active"); var _p=$("sProb"); if(_p)_p.classList.remove("active"); var _q=$("sPrem"); if(_q)_q.classList.remove("active"); render(); });
 $("fNL").addEventListener("click", function(){ STATE.noLimit = !STATE.noLimit; $("fNL").classList.toggle("active", STATE.noLimit); render(); });
 $("fNL").classList.toggle("active", !!STATE.noLimit);   // 默认就是剔一字池，按钮初始态同步
 if ($("mbZT")) $("mbZT").addEventListener("click", function(){ mbApply("zt"); });
