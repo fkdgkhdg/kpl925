@@ -324,6 +324,9 @@
     .cyc .ph{font-size:19px}
     .cyc .sc b{font-size:17px}
     .advice{font-size:12.5px}
+    #mbDateNav{width:100%;justify-content:flex-end}
+    #mbDateNav button{padding:6px 7px;font-size:12px;white-space:nowrap}
+    #mbDateNav .dtin{width:116px;min-width:116px;padding:5px 5px;font-size:12px}
     .tablewrap{ -webkit-overflow-scrolling: touch; overflow-x:auto; touch-action:pan-x pan-y; overscroll-behavior-x:contain }
     /* leaderboard modal: full-screen on portrait phones, wrap toolbar, scrollable body */
     #ldrWrap{align-items:stretch;justify-content:stretch}
@@ -366,11 +369,6 @@
       <button id="btnRefresh" class="active">刷新最新</button>
       <button id="recalcBtn" title="清掉当天缓存，把名单 / 行情 / 板块 / 情绪序列全部重新抓一遍">重算</button>
       <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位 / F 龙虎榜板块活跃）">龙虎榜席位 ▸</button><button id="ldrBtn" title="当晚复盘连板梯队：按板位分组，题材带当天涨停家数，点题材筛选，点个股看K线">连板梯队 ▸</button>
-      <span class="optgrp">
-        <button id="dPrev">◀ 前一交易日</button>
-        <input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日">
-        <button id="dNext">后一交易日 ▶</button>
-      </span>
       <span id="status">正在加载…</span>
     <span id="verNote" style="color:#667;font-size:12px;margin-left:8px"></span>
     </div>
@@ -421,7 +419,7 @@
     <div class="plBody"><p class="note">输入股票名或代码，点「分析」。</p></div>
   </div>
   <div class="card" id="mbCard">
-    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button></div>
+    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button><span class="optgrp" id="mbDateNav" style="margin-left:auto;flex-wrap:wrap;justify-content:flex-end"><button id="dPrev">◀ 前一交易日</button><input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日"><button id="dNext">后一交易日 ▶</button></span></div>
     <div id="mbMain">
     <div class="opts" id="ndBar" style="margin:4px 0 8px;align-items:center"><span style="color:var(--muted)">节点起算日</span><input id="ndAnchor" type="date" style="width:150px"><button id="ndClear">清除</button><button id="ndHelp">节点口径</button><span class="note" id="ndHint" style="margin:0"></span></div>
     <div class="kpirow"><div class="kpi" id="kpi"></div><div id="ndTix"></div></div>
