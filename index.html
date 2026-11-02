@@ -661,6 +661,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 </script>
 <script src="lhbdata.js?v=20261030b"></script>
 <script src="nvdata.js?v=20261102"></script>
+<script src="auction925.js?v=20261102"></script>
 <script src="smashdata.js"></script>
 <script src="teamdata.js"></script>
 <script src="sbzdata.js"></script>
@@ -1143,12 +1144,12 @@ function fetchQuotes(codes, gated){         // 东财 → 腾讯，自动降级
     return fetchTqQuotes(codes, gated).then(function(q){ return { m:q, src:"腾讯", tq:true }; });
   });
 }
-var TQMIN_HOST = ["ifzq.gtimg.cn", "proxy.finance.qq.com/ifzqgtimg", "web.ifzq.gtimg.cn"];   // 腾讯分时主机（按顺序降级，web.ifzq 已 501）
+var TQMIN_HOST = ["ifzq.gtimg.cn", "proxy.finance.qq.com/ifzqgtimg"];   // 腾讯分时主机（web.ifzq 已 501，不再白等一轮）
 function fetchMinuteOnceH(code, host){      // 腾讯分时（单主机单次尝试）
   var vname = "__tq" + (++cbid);
   return new Promise(function(resolve){
     var s = document.createElement("script"), done = false;
-    var t = setTimeout(function(){ if(!done){ done = true; fin(null); } }, 5000);
+    var t = setTimeout(function(){ if(!done){ done = true; fin(null); } }, 3000);
     function fin(v){ if (s.parentNode) s.parentNode.removeChild(s); clearTimeout(t); resolve(v); }
     s.onload = function(){
       if (done) return; done = true;
@@ -1183,7 +1184,7 @@ function fetchMinuteThs(code){               // 同花顺分时：第一根 09:3
   var fn = "quotebridge_v6_time_hs_" + code + "_last";
   return new Promise(function(resolve){
     var s = document.createElement("script"), done = false;
-    var t = setTimeout(function(){ if(!done){ done = true; fin(null); } }, 5000);
+    var t = setTimeout(function(){ if(!done){ done = true; fin(null); } }, 3000);
     function fin(v){ if (s.parentNode) s.parentNode.removeChild(s); clearTimeout(t);
       window[fn] = function(){}; resolve(v); }
     window[fn] = function(o){
@@ -1213,7 +1214,7 @@ function fetchMinute(code){                  // 腾讯分时（单次，5s 超�
     if (r) return r;
     var u = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get?secid=" + secid(code) +
             "&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=1&iscr=0&iscca=0";
-    return jsonp(u, 5000).then(function(d){
+    return jsonp(u, 3000).then(function(d){
       var tr = (d && d.data && d.data.trends) ? d.data.trends : null;
       if (!tr || !tr.length) return null;
       var q = tr[0].split(",");
@@ -4576,14 +4577,32 @@ function snapGood(s){                       // 只有真实竞价口径（近似
   if (!(s.hm >= 925)) return false;                       // 9:25 前抓到的多半是上一交易日的全天数据，作废
   var n = (s.rows || []).length;
   if (!n) return false;
-  if (s.apx > Math.max(1, n * 0.1)) return false;
+  // 收盘后有时个别票分时源缺失，重抓一遍仍是那几只近似。只要近似行不超过 1/4，
+  // 就复用已算好的定格，避免每次开页都等几十秒；用户点「刷新最新」仍会强制重算。
+  if (s.apx > Math.max(1, n * 0.1)
+      && !(s.hm >= 1500 && !s.qn && s.apx <= Math.max(3, Math.ceil(n * 0.25)))) return false;
   if (!s.rows.some(function(r){ return r && r[4] !== null && r[4] !== undefined; })) return false;
   var hm = new Date().getHours()*100 + new Date().getMinutes();
   if (s.qn && hm > 940) return false;      // 该定格只有行情口径（分时还没出）：9:40 之后分时能给真竞价额，作废重取
   return true;
 }
+function auc925Snap(d, codes){              // 发布包里的 9:25 静态快照：首开也不用逐只补分时
+  var a = window.AUC925;
+  if (!a || a.day !== d || !a.rows || !codes || !codes.length) return null;
+  var rows = [];
+  codes.forEach(function(c){
+    var x = a.rows[c]; if (!x) return;
+    rows.push([c, "", 1, +x[0], (x[5] === null || x[5] === undefined ? null : +x[5]), "",
+      (x[3] === null || x[3] === undefined ? null : +x[3]),
+      (x[4] === null || x[4] === undefined ? null : +x[4]), 0, "static",
+      (+x[1] || null), null, (+x[2] || null)]);
+  });
+  if (rows.length < Math.max(1, Math.floor(codes.length * 0.8))) return null;
+  return { v: 5, day: d, hm: 925, ts: (a.tm || "09:25"), rows: rows, apx: 0, qn: 0, static: true };
+}
 function load(){
   var seq = ++loadSeq;
+  window.__pf = { t0: performance.now() };
   $("btnRefresh").disabled = true;
   setStatus("正在读取 9:25 竞价快照…");
   var T = (STATE.picked && STATE.sel) ? new Date(STATE.sel + "T12:00:00") : guessDay();
@@ -4616,12 +4635,13 @@ function load(){
     $("btnRefresh").disabled = false;
   });
 }
+function ptime(n, p){ var t = performance.now(); return p.then(function(v){ if (window.__pf) window.__pf[n] = Math.round(performance.now() - t); return v; }, function(e){ if (window.__pf) window.__pf[n] = -1; throw e; }); }
 function attempt(T, round, seq){
   return findPool(T).then(function(res){
     if (!res.pool.length) return false;
     var codes = res.pool.map(function(x){ return x.c; });
     var done = 0;
-    var snap0 = STATE.force ? null : snapGet(ymdDash(ymd(T)));
+    var snap0 = STATE.force ? null : (auc925Snap(ymdDash(ymd(T)), codes) || snapGet(ymdDash(ymd(T))));
     if (!snapGood(snap0)) snap0 = null;     // 质量不合格的定格（比如退化成全天换手率）丢掉重取
     setStatus(snap0 ? "正在读取 " + ymdDash(ymd(T)) + " 的 9:25 定格数据…"
                     : "正在还原 " + ymdDash(ymd(T)) + " 的 9:25 快照…（0/" + codes.length + "）");
@@ -4629,8 +4649,8 @@ function attempt(T, round, seq){
     // 直接用行情里的「今开 + 成交额」还原竞价额，等 9:31 自动刷新再用分时校正。手机少发上百个请求。
     var skipMin = inAuction() && ymd(T) === ymd(new Date());
     return Promise.all([
-      fetchQuotes(codes),
-      prevPool(res.day).catch(function(){ return []; }),
+      ptime("q", fetchQuotes(codes)),
+      ptime("prev", prevPool(res.day).catch(function(){ return []; })),
       (snap0 || skipMin) ? Promise.resolve([]) : mapLimit(codes, 8, function(c){
         // 并发 8、只错开 12ms：腾讯分时单只是小请求，63 只从 ~6s 压到 ~1.5s
         return new Promise(function(res){ setTimeout(res, 12); }).then(function(){
@@ -4641,7 +4661,7 @@ function attempt(T, round, seq){
           return r;
         });
       }),
-      fetchTqQuotes(codes).catch(function(){ return {}; })          // 五档委买/委卖（只有腾讯有）
+      ptime("tq", fetchTqQuotes(codes).catch(function(){ return {}; }))          // 五档委买/委卖（只有腾讯有）
     ]).then(function(a){
       if (seq !== undefined && seq !== loadSeq) return false;
       var qs = a[0], mkt = qs.m, mktSrc = qs.src, poolPrev = a[1], mins = a[2], tqMap = a[3] || {};
@@ -4741,7 +4761,7 @@ function attempt(T, round, seq){
     hi: _pv.filter(function(r){ return r.chg >= 3; }).length / _pv.length * 100,
     low: _pv.filter(function(r){ return r.chg < 0; }).length / _pv.length * 100, n: _pv.length } : null;
       STATE.day = dayStr;
-      STATE.src = snap ? ("9:25 定格（" + (snap.ts || "") + " 采集）") : (live_win ? "9:25 实时竞价" : "9:25 快照还原");
+      STATE.src = snap ? (snap.static ? ("9:25 静态快照（" + (snap.ts || "") + "）") : ("9:25 定格（" + (snap.ts || "") + " 采集）")) : (live_win ? "9:25 实时竞价" : "9:25 快照还原");
       STATE.archived = false;
       if (!STATE.picked && STATE.rows.length && dayStr === ymdDash(ymd(new Date()))){            // 当天取到 → 定格（择优：近似行更少的那份赢）
         var _hmNow = new Date().getHours()*100 + new Date().getMinutes();
@@ -4760,6 +4780,7 @@ function attempt(T, round, seq){
       }
       if ($("dt") && STATE.day) $("dt").value = STATE.day;
       var apx = STATE.rows.filter(function(r){ return r.approx; }).length;
+      if (window.__pf) window.__pf.total = Math.round(performance.now() - window.__pf.t0);
       setBase("竞价日 " + STATE.day + "｜口径：" + STATE.src + "｜名单 " + res.pool.length + " 只"
         + (miss ? "，其中 " + miss + " 只无数据已跳过" : "")
         + "｜行情源：" + (mktSrc || "东财") + (mins.filter(function(r){ return !r; }).length ? "｜部分个股无分时，已按行情额还原" : "")
@@ -9587,6 +9608,11 @@ vfInit();
   document.addEventListener("keydown", function(e){ if(e.key === "Escape") close(); });
   window.__ldrOpen = open;
 })();
+</script>
+<script>
+(function(){ if(!/[?&]perf=1/.test(location.search)) return;
+  var t0=performance.now(), iv=setInterval(function(){ var tb=document.getElementById("tbl"); var n=tb?tb.querySelectorAll("tr").length:0;
+    if(n>3){ clearInterval(iv); var f=window.__pf||{}; var msg="⏱"+((performance.now()/1000).toFixed(2))+"s q"+((f.q||0)/1000).toFixed(1)+" p"+((f.prev||0)/1000).toFixed(1)+" t"+((f.tq||0)/1000).toFixed(1)+" · "+document.title.replace(/^⏱[^·]*· /,""); document.title=msg; } },100); })();
 </script>
 </body>
 </html>
