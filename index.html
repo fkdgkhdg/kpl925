@@ -4506,18 +4506,32 @@ function renderArchive(dateStr){
 }
 function selectDate(s){
   if (!s) return;
+  if (s === STATE.day && STATE.rows && STATE.rows.length && !STATE.picked){ return; }   // 同一天重复点：不重画
   loadSeq++;
-  if (renderArchive(s)) return;
+  try { if (renderArchive(s)) return; }
+  catch(e){
+    setBase("这一天的存档渲染失败：" + ((e && e.message) || e), true);
+    STATE.rows = STATE.rows || []; STATE.day = s; STATE.src = "历史存档（本地）";
+    try { render(); } catch(e2){}
+    return;
+  }
   STATE.picked = true; STATE.sel = s; STATE.archived = false;
   load();
 }
+var dayStepPending = 0, dayStepTimer = null;
 function stepDay(delta){
-  var keys = Object.keys(ARCDATA).sort();
-  var cur = ($("dt") && $("dt").value) || STATE.day;
-  var i = keys.indexOf(cur);
-  if (i < 0) i = keys.length;                 // cur 是还没进存档的当天 → 往回一步正好落在最后一个交易日
-  var j = Math.min(keys.length - 1, Math.max(0, i + delta));
-  selectDate(keys[j]);
+  dayStepPending += delta;                    // 连点合并成一次跳转，避免每点一次都整页重画
+  if (dayStepTimer) return;
+  dayStepTimer = setTimeout(function(){
+    var d = dayStepPending; dayStepPending = 0; dayStepTimer = null;
+    if (!d) return;
+    var keys = Object.keys(ARCDATA).sort();
+    var cur = ($("dt") && $("dt").value) || STATE.day;
+    var i = keys.indexOf(cur);
+    if (i < 0) i = keys.length;
+    var j = Math.min(keys.length - 1, Math.max(0, i + d));
+    selectDate(keys[j]);
+  }, 180);
 }
 function snapKey(d){ return "kpl_snap3_" + d; }
 function snapGet(d){ try { var s = localStorage.getItem(snapKey(d)); return s ? JSON.parse(s) : null; } catch(e) { return null; } }
