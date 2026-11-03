@@ -6403,7 +6403,7 @@ var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '', LDRTHX = false, LDRRUN = n
      var btn = document.getElementById("ldrReload"); 
      var old = btn ? btn.textContent : "\u5237\u65b0"; 
      if (btn){ btn.disabled = true; btn.textContent = "\u5237\u65b0\u4e2d\u2026"; } 
-     var files = ["kplthdata.js", "ztrsdata.js"], left = files.length, bad = false; 
+     var files = ["kplthdata.js", "ztrsdata.js", "auction925.js", "nvdata.js"], left = files.length, bad = false; 
      function finish(){ 
        if (--left > 0) return; 
        LDRRUN = null; LDRC = {}; LDRDS = ""; LDRTH = ""; 
@@ -6595,6 +6595,7 @@ function renderLdrTop5(ds){
   var box = document.getElementById("ldrTop5"); if (!box) return;
   var iso = ldrIso(ds);
   var nxt = ldrNextTradeIso(iso);
+  if (!nxt && typeof AUC925 !== "undefined" && AUC925 && AUC925.day && AUC925.day > iso) nxt = AUC925.day;
   var tgt = LDRT5NEXT ? nxt : iso;
   function tabBar(){
     return '<span style="display:inline-flex;gap:2px;margin-left:2px">'
@@ -6607,7 +6608,9 @@ function renderLdrTop5(ds){
       el.onclick = function(){ LDRT5NEXT = this.getAttribute("data-t5m") === "1"; renderLdrTop5(ds); };
     });
   }
-  if (typeof ARCDATA === "undefined" || !ARCDATA || !tgt || !ARCDATA[tgt]){
+  var _live925 = null;
+  if (tgt && (typeof ARCDATA === "undefined" || !ARCDATA || !ARCDATA[tgt]) && typeof AUC925 !== "undefined" && AUC925 && AUC925.day === tgt) _live925 = AUC925;
+  if (!tgt || ((typeof ARCDATA === "undefined" || !ARCDATA || !ARCDATA[tgt]) && !_live925)){
     var why = LDRT5NEXT
       ? "第二天（" + (nxt ? nxt : "下一个交易日") + "）还没有 9:25 榜单存档，只能先看当天。"
       : "这一天没有 9:25 榜单存档（存档从 2024-09 开始），看不到当天选出的 5 只。";
@@ -6615,7 +6618,20 @@ function renderLdrTop5(ds){
     mountTabs();
     return;
   }
-  var rows = buildRows(arcList(tgt));
+  var rows;
+  if (_live925){
+    var _A0 = ldrAgg(ds), _bm0 = {};
+    ((_A0 && _A0.rows) || []).forEach(function(x){ _bm0[x.c] = x.b; });
+    rows = Object.keys(_live925.rows || {}).map(function(c){
+      var q = _live925.rows[c] || [];
+      return { code:c, name:(typeof NAMEMAP !== "undefined" ? NAMEMAP[c] : "") || c, board:_bm0[c] || 1,
+               L:(typeof lim === "function" ? lim(c, (typeof NAMEMAP !== "undefined" ? NAMEMAP[c] : "") || c) : 10), approx:false,
+               chg:q[0], at:(q[5] === undefined ? null : q[5]), amount:q[1], px:q[2], bid:q[3], ask:q[4],
+               mc:null, dc:null, lu:null, t1o:null, t1c:null, sector:(typeof HY !== "undefined" ? HY[c] : "") || "" };
+    });
+  } else {
+    rows = buildRows(arcList(tgt));
+  }
   var hasAt = rows.some(function(r){ return !r.approx && r.at > 0; });
   var pick = (typeof pickTopRows === "function" ? pickTopRows(rows).list : rows).slice(0, 5);   // 和主榜单同一选股口径
   function cc(v, d){
