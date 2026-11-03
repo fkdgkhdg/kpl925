@@ -6478,7 +6478,8 @@ function ldrLiveFetch(){
   }).then(function(ok){ LDRLIVE.busy = false; return ok; });
 }
 function ldrLiveStart(){
-  ldrLiveFetch();
+  var _d = ldrTodayKey();
+  if (!(LDRLIVE.day === _d && LDRLIVE.rows.length && (Date.now() - LDRLIVE.ts) < 30000)) ldrLiveFetch();
   if (LDRLIVE.timer) return;
   LDRLIVE.timer = setInterval(function(){
     var w = document.getElementById("ldrWrap");
