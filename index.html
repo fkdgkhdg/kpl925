@@ -635,7 +635,7 @@
           <button id="ldrPrev" title="上一个交易日">◀</button>
           <input type="date" id="ldrPick" title="选一个交易日，看那天的连板梯队" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--fg)">
           <button id="ldrNext" title="下一个交易日">▶</button>
-          <button id="ldrLast" title="回到最近一个交易日">最新</button>
+          <button id="ldrLast" title="回到最近一个交易日">最新</button><button id="ldrReload" title="重新下载最新的连板数据（每天 15:10 后更新）">刷新</button>
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span>
         <span class="fineprint" style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
@@ -6396,6 +6396,40 @@ function renderTB(){
 }
 /* ===== 连板梯队 · 当晚复盘（开盘啦题材口径，主板）===== */
 var LDRC = {}, LDRTH = '', LDRTS = false, LDRDS = '', LDRTHX = false, LDRRUN = null;
+  var LDRLOADING = false; 
+   function ldrReloadData(){ 
+     if (LDRLOADING) return; 
+     LDRLOADING = true; 
+     var btn = document.getElementById("ldrReload"); 
+     var old = btn ? btn.textContent : "\u5237\u65b0"; 
+     if (btn){ btn.disabled = true; btn.textContent = "\u5237\u65b0\u4e2d\u2026"; } 
+     var files = ["kplthdata.js", "ztrsdata.js"], left = files.length, bad = false; 
+     function finish(){ 
+       if (--left > 0) return; 
+       LDRRUN = null; LDRC = {}; LDRDS = ""; LDRTH = ""; 
+       LDRLOADING = false; 
+       if (btn) btn.disabled = false; 
+       if (bad){ 
+         if (btn) btn.textContent = "\u5237\u65b0\u5931\u8d25"; 
+         setTimeout(function(){ if (btn) btn.textContent = old; }, 1800); 
+         return; 
+       } 
+       try { renderLDR(); } catch(e){} 
+       try { if (typeof renderTB === "function") renderTB(); } catch(e){} 
+       var ks = (typeof ldrDays === "function") ? ldrDays() : []; 
+       var last = ks.length ? ks[ks.length - 1] : ""; 
+       if (btn) btn.textContent = last ? ("\u5df2\u66f4\u65b0 " + last.slice(4,6) + "/" + last.slice(6,8)) : "\u5df2\u66f4\u65b0"; 
+       setTimeout(function(){ if (btn) btn.textContent = old; }, 2200); 
+     } 
+     files.forEach(function(f){ 
+       var sc = document.createElement("script"); 
+       sc.src = f + "?t=" + Date.now(); 
+       sc.onload = finish; 
+       sc.onerror = function(){ bad = true; finish(); }; 
+       document.body.appendChild(sc); 
+     }); 
+   } 
+ 
 function ldrDays(){                       // 可回看的交易日（早→晚）
   var ks = [], k;
   if (typeof KPLTH !== 'undefined' && KPLTH && KPLTH.days) ks = KPLTH.days.slice();
@@ -9643,6 +9677,7 @@ vfInit();
     if(t.id === "ldrPrev"){ if (typeof ldrNav === "function") ldrNav(-1); e.preventDefault(); return; }
     if(t.id === "ldrNext"){ if (typeof ldrNav === "function") ldrNav(1); e.preventDefault(); return; }
     if(t.id === "ldrLast"){ LDRDS = ""; LDRTH = ""; if (typeof renderLDR === "function") renderLDR(); e.preventDefault(); return; }
+    if(t.id === "ldrReload"){ if (typeof ldrReloadData === "function") ldrReloadData(); e.preventDefault(); return; }
     if(t.id === "ldrBig"){ toggleBig(); e.preventDefault(); return; }
     if(t.id === "ldrHigh"){
       LDRHIGH = !LDRHIGH;
