@@ -6406,7 +6406,7 @@ var LDRLIVE = { day: "", ts: 0, rows: [], busy: false, timer: 0, err: "" };
 function ldrPad2(n){ return (n < 10 ? "0" : "") + n; }
 function ldrBjNow(){ var b = new Date(Date.now() + 8 * 3600 * 1000); return { y:b.getUTCFullYear(), mo:b.getUTCMonth()+1, d:b.getUTCDate(), h:b.getUTCHours(), mi:b.getUTCMinutes(), s:b.getUTCSeconds(), wd:b.getUTCDay() }; }
 function ldrTodayKey(){ var n = ldrBjNow(); return "" + n.y + ldrPad2(n.mo) + ldrPad2(n.d); }
-function ldrClockOf(ts){ var d = new Date(ts || Date.now()); return ldrPad2(d.getHours()) + ":" + ldrPad2(d.getMinutes()) + ":" + ldrPad2(d.getSeconds()); }
+function ldrClockOf(ts){ try { return new Date(ts || Date.now()).toLocaleTimeString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch(e){ var d = new Date(ts || Date.now()); return ldrPad2(d.getHours()) + ":" + ldrPad2(d.getMinutes()) + ":" + ldrPad2(d.getSeconds()); } }
 function ldrLiveSession(){ var n = ldrBjNow(); if (n.wd === 0 || n.wd === 6) return false; var hm = n.h * 100 + n.mi; return (hm >= 925 && hm <= 1130) || (hm >= 1300 && hm <= 1500); }
 function ldrLiveAllowed(){ var n = ldrBjNow(); if (n.wd === 0 || n.wd === 6) return false; return (n.h * 100 + n.mi) >= 915; }
 function ldrLivePrevDay(day){ var ks = ldrStaticDays(), out = ""; for (var i = 0; i < ks.length; i++){ if (ks[i] < day) out = ks[i]; else break; } return out; }
@@ -6422,7 +6422,7 @@ function ldrFbtTs(day, fbt){
   var x = String(fbt || ""); while (x.length < 6) x = "0" + x;
   var hh = +x.slice(0,2), mm = +x.slice(2,4), ss = +x.slice(4,6);
   if (!(hh >= 0 && hh < 24)) return 0;
-  return Math.floor(new Date(+day.slice(0,4), +day.slice(4,6)-1, +day.slice(6,8), hh, mm, ss).getTime() / 1000) || 0;
+  return Math.floor(Date.UTC(+day.slice(0,4), +day.slice(4,6)-1, +day.slice(6,8), hh - 8, mm, ss) / 1000) || 0;
 }
 function ldrLiveNormalize(pool, day){
   var prevDs = ldrLivePrevDay(day);
