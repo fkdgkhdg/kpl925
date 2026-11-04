@@ -123,6 +123,22 @@
     table.appendChild(tbody); wrap.appendChild(table);
     grid.parentNode.replaceChild(wrap,grid);
   }
+  var paintQueued=false;
+  function queuePaint(){
+    if(paintQueued) return; paintQueued=true;
+    setTimeout(function(){ paintQueued=false; try{ paintTable(); }catch(e){} },0);
+  }
+  try{
+    new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){
+        var m=muts[i];
+        if(m.type==="childList" && (m.addedNodes.length || m.removedNodes.length)){
+          var card=document.getElementById("relayCard");
+          if(card && card.querySelector(".rlygrid")){ queuePaint(); return; }
+        }
+      }
+    }).observe(document.documentElement,{childList:true,subtree:true});
+  }catch(e){}
   var oldPaint=window.paintRelay;
   window.paintRelay=function(){
     try{ if(oldPaint) oldPaint.apply(this,arguments); }catch(e){}
