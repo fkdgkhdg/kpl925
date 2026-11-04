@@ -4705,6 +4705,7 @@ function attempt(T, round, seq){
       // 9:25~9:30：分时还没生成（第一根 K 线是 9:30），但行情里的「今开」就是竞价价、
       // 成交额就是竞价额（这段没有连续成交）——所以这个窗口照常用当天数据，不退回上一交易日。
       var _qN = 0, _qOpen = 0;
+      try { for (var _qc in (mkt || {})) { var _qv = mkt[_qc]; if (!_qv) continue; _qN++; if (_qv.f17 > 0) _qOpen++; } } catch(e) {}
       res.pool.forEach(function(x){ var q = mkt[x.c]; if (!q) return; _qN++; if ((q.f17 || q.open || 0) > 0) _qOpen++; });
       var live_today = inAuction() && ymd(T) === ymd(new Date()) && _qN > 0 && _qOpen >= _qN * 0.6;
       if (dmin && dmin !== ymd(T) && round === 1 && !live_today){
