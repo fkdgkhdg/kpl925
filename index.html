@@ -211,6 +211,24 @@
   .tpmk .cell{min-width:64px}
   .tpmk .v{font-size:21px;font-weight:800;line-height:1.1}
   .tpmk .d{font-size:11.5px;font-weight:700}
+  /* ===== 连板接力（9:25 自动更新） ===== */
+  #relayCard{padding:9px 11px}
+  #relayCard .rlyhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:1px 0 4px}
+  #relayCard .rlystate{font-size:19px;font-weight:900;line-height:1.1}
+  #relayCard .rlyact{font-size:12px;font-weight:700;color:var(--fg)}
+  #relayCard .rlytheme{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 5px}
+  #relayCard .rlytheme .chip{padding:2px 8px;font-size:11px}
+  #relayCard .rlylab{font-size:11px;color:var(--muted);font-weight:700}
+  #relayCard .rlygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:3px 10px}
+  #relayCard .rlycand{display:flex;align-items:baseline;gap:5px;font-size:11.5px;min-width:0;white-space:nowrap;overflow:hidden}
+  #relayCard .rlycand .bd{font-weight:800;color:#c02c2c;flex:none}
+  #relayCard .rlycand .stk{font-weight:700;flex:none;max-width:78px;overflow:hidden;text-overflow:ellipsis}
+  #relayCard .rlycand .kbtn{margin-left:0;padding:0 4px;font-size:10px;flex:none}
+  #relayCard .rlycand .rlyyi{font-size:9.5px;color:#e07a1f;border:1px solid rgba(224,122,31,.5);border-radius:3px;padding:0 3px;flex:none}
+  #relayCard .rlycand .th{color:var(--muted);font-size:10.5px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  #relayCard .rlycand .ch{margin-left:auto;font-weight:800;flex:none}
+  @media(max-width:520px){#relayCard .rlygrid{grid-template-columns:1fr}#relayCard .rlycand .stk{max-width:96px}}
+
   .minbar,.vbar{display:block;height:4px;border-radius:2px;background:rgba(128,128,128,.18);margin-top:3px}
   .minbar i,.vbar i{display:block;height:100%;border-radius:2px}  @media (prefers-color-scheme: dark){
     :root{ --bg:#14161a; --panel:#1c1f25; --fg:#e9ebee; --muted:#9aa0a6; --border:#2b3038; --head:#9ec1f0; --chip:#222933; }
@@ -2783,6 +2801,105 @@ function tpTopInHTML(){
   return H;
 }
 
+function tpRelayBlk(){
+  var d0 = (STATE.cyc && STATE.cyc.day) ? STATE.cyc.day : null;
+  if (!d0) return "";
+  var nd = (d0 === STATE.day) ? "下一交易日" : STATE.day;
+  var d0c = d0.replace(/-/g, "");
+  var auctionMode = (d0 !== STATE.day);
+  var RP = [];
+  if (!auctionMode){
+    try {
+      var A1 = (typeof ldrAgg === "function") ? ldrAgg(d0) : null;
+      if (A1 && A1.rows) RP = A1.rows.map(function(r){ return { code:r.c, name:r.n, board:r.b, chg:null, sector:"", at:0, L:10, lu:1 }; });
+    } catch(e){}
+  }
+  if (!RP.length) RP = STATE.rows || [];
+  if (!RP.length){
+    try {
+      var A0 = (typeof ldrAgg === "function") ? ldrAgg(d0) : null;
+      if (A0 && A0.rows) RP = A0.rows.map(function(r){ return { code:r.c, name:r.n, board:r.b, chg:null, sector:"", at:0, L:10, lu:1 }; });
+    } catch(e){}
+  }
+  if (!RP.length) return "";
+  var mb = 0, cnt = {};
+  RP.forEach(function(r){ var b = r.board || 1; if (b > mb) mb = b; cnt[b] = (cnt[b] || 0) + 1; });
+  var prevH = null;
+  try { var pd = prevTradeDay(d0); var pc = pd ? cycOf(pd) : null; if (pc) prevH = pc[2]; } catch(e){}
+  var st, act, col;
+  if (mb <= 3){ st = "低位重建"; act = "等换手3板，优先2→3"; col = "#1f7a3d"; }
+  else if (mb <= 5){ st = "正常接力"; act = "主做3→4、4→5"; col = "#c02c2c"; }
+  else if (mb === 6){ st = "高位分歧"; act = "只做绝对核心，不接杂毛"; col = "#e07a1f"; }
+  else { st = "高潮区"; act = "不新开，等断板"; col = "#c02c2c"; }
+  var dd = null; try { dd = ddOf(d0); } catch(e){}
+  var A = null; try { A = (typeof ldrAgg === "function") ? ldrAgg(d0) : null; } catch(e){}
+  var themes = [];
+  if (A && A.ths && A.ths.length){
+    themes = A.ths.filter(function(x){ return x.n >= 3 && !(typeof THBAD !== "undefined" && THBAD.test(x.t)); }).slice(0,3);
+    if (!themes.length) themes = A.ths.slice(0,3);
+  }
+  if (!themes.length){
+    var sc = {};
+    RP.forEach(function(r){ if (r.sector) sc[r.sector] = (sc[r.sector] || 0) + 1; });
+    themes = Object.keys(sc).map(function(t){ return { t:t, n:sc[t] }; }).sort(function(a,b){ return b.n - a.n; }).slice(0,3);
+  }
+  var tagMap = {};
+  if (A && A.rows) A.rows.forEach(function(r){ tagMap[r.c] = r.tags || []; });
+  function themeOf(r){
+    var ts = tagMap[r.code] || [];
+    if (ts.length) return { t:ts[0].t, n:ts[0].n };
+    try { var ht = (typeof hotThemeTags === "function") ? hotThemeTags(r.code) : null; if (ht && ht.length) return { t:ht[0], n:0 }; } catch(e){}
+    return { t:r.sector || "", n:0 };
+  }
+  var cand = RP.filter(function(r){
+    var b = r.board || 1;
+    if (b < 2 || b > 4) return false;
+    if (r.chg === null || r.chg === undefined) return true;
+    var L = r.L || 10;
+    return r.chg < L * 0.99;
+  });
+  if (!cand.length) cand = RP.filter(function(r){ var b = r.board || 1; return b >= 2 && b <= 4; });
+  var bp = { 4:0, 3:1, 2:2 };
+  cand.sort(function(a,b){
+    var pa = bp[a.board] === undefined ? 9 : bp[a.board], pb = bp[b.board] === undefined ? 9 : bp[b.board];
+    if (pa !== pb) return pa - pb;
+    var ca = (a.chg === null || a.chg === undefined) ? -99 : a.chg;
+    var cb = (b.chg === null || b.chg === undefined) ? -99 : b.chg;
+    if (cb !== ca) return cb - ca;
+    return (b.at || 0) - (a.at || 0);
+  });
+  var top = cand.slice(0, 6);
+  var H = '<div class="tpblk" id="relayCard" style="flex:1 1 100%;min-width:100%" title="只列2~4板非一字候选；点题材看当天涨停梯队，点K看日K。断板/炸板不回封/跌破分时均价即走。' + (cand.length > top.length ? ' 另有' + (cand.length - top.length) + '只未展开。' : '') + '">' +
+    '<div class="lb">连板接力（' + d0 + ' 收盘 → ' + nd + ' 9:25）<span style="float:right;font-weight:600;color:var(--muted)">9:25 自动更新</span></div>' +
+    '<div class="rlyhead">' +
+      '<span class="rlystate" style="color:' + col + '">' + st + '</span>' +
+      '<span class="rlyact">' + act + '</span>' +
+      '<span class="chip">涨停 <b>' + RP.length + '</b></span>' +
+      '<span class="chip">最高 <b>' + mb + '</b>板' + (prevH !== null && prevH !== mb ? '（' + prevH + '→' + mb + '）' : '') + '</span>' +
+      '<span class="chip">首板 <b>' + (cnt[1] || 0) + '</b> · 2板 <b>' + (cnt[2] || 0) + '</b> · 3板 <b>' + (cnt[3] || 0) + '</b>' + (cnt[4] ? ' · 4板 <b>' + cnt[4] + '</b>' : '') + '</span>' +
+      (dd ? '<span class="chip">跌停 <b>' + dd[1] + '</b></span>' : '') +
+    '</div>' +
+    '<div class="rlytheme"><span class="rlylab">主线</span>' +
+      themes.map(function(t){ return '<a class="chip thlink" data-th="' + esc(t.t) + '" data-ztd="' + d0c + '" title="看 ' + esc(t.t) + ' 在 ' + d0 + ' 的涨停梯队（' + t.n + ' 只）">' + esc(t.t) + ' <b>' + t.n + '</b>只</a>'; }).join("") +
+    '</div>' +
+    '<div class="rlygrid">' + top.map(function(r){
+      var th = themeOf(r);
+      var isYi = auctionMode && (r.chg !== null && r.chg !== undefined && r.chg >= (r.L || 10) * 0.99);
+      var chgTxt = !auctionMode ? "待竞价" : ((r.chg === null || r.chg === undefined) ? "—" : ((r.chg > 0 ? "+" : "") + r.chg.toFixed(2) + "%"));
+      var chgCol = !auctionMode ? "var(--muted)" : ((r.chg === null || r.chg === undefined) ? "var(--muted)" : (r.chg > 0 ? "#c02c2c" : (r.chg < 0 ? "#1f7a3d" : "var(--muted)")));
+      return '<div class="rlycand">' +
+        '<span class="bd">' + (r.board || 1) + '板</span>' +
+        '<a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener">' + esc(r.name) + '</a>' +
+        '<a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '" data-kd="' + d0 + '">K</a>' +
+        (isYi ? '<span class="rlyyi">一字</span>' : '') +
+        '<span class="th">' + esc(th.t || "—") + (th.n ? ' ' + th.n + '只' : '') + '</span>' +
+        '<span class="ch" style="color:' + chgCol + '">' + chgTxt + '</span>' +
+      '</div>';
+    }).join("") + '</div>' +
+    (top.length ? '' : '<div class="fineprint" style="font-size:11px;color:var(--muted);margin-top:3px">这一天没有 2~4 板非一字候选。</div>') +
+  '</div>';
+  return H;
+}
 function tpNodeBlk(){
   var d0 = (STATE.cyc && STATE.cyc.day) ? STATE.cyc.day : null;
   var _nd = (d0 === STATE.day) ? "下一交易日" : STATE.day;   // 判定所用收盘日＝竞价日时，服务下一交易日
@@ -3022,7 +3139,7 @@ function renderTop(){
         (envHitN ? '<div style="font-size:10.5px;color:#c02c2c;margin-top:3px">命中：' + esc(envHitNames) + '</div>' : '') +
         '<div class="fineprint" style="font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.45">口径：248 个交易日（2025-09-10 ~ 2026-09-17）· 主板昨日涨停股 · 当日池＝按实际换手取前 5（含一字；点「只看能买到的（剔一字）」可切换）· 9:25 竞价等权买 5 只；A 口径＝封板则持有到第一次断板当日收盘卖，买入日即断板则次日开盘卖。命中条数越多越该空仓（分档统计，非投资建议）。' +
         '挑选说明：五条都按 hit0 与 hit≥2 的差距筛出，已要求含/剔一字双口径同向；⑤ 与前四条重叠少（③ 0/7、④ 2/7），补的是「普涨过热」这一头，单条最重（7 日 A −6.01%、大跌率 71%）。剔一字对照：hit0 −0.05%、hit≥2 −3.67%。' +
-        '⚠ ④ 是纯数据里挑出来的，单条方向是「换手越高隔夜越差」（34 日、t=−2.49），不是先验逻辑，有过拟合风险；实际换手字段 2025-09-10 才有，样本仅 248 日、无真正样本外。必空档是本方案最结实的部分；出手档的正期望大部分来自买不到的一字板。</div></div>' + tpNodeBlk();
+        '⚠ ④ 是纯数据里挑出来的，单条方向是「换手越高隔夜越差」（34 日、t=−2.49），不是先验逻辑，有过拟合风险；实际换手字段 2025-09-10 才有，样本仅 248 日、无真正样本外。必空档是本方案最结实的部分；出手档的正期望大部分来自买不到的一字板。</div></div>' + tpRelayBlk();
       stp.className = "tpflex";
       stp.innerHTML = H;
     }
