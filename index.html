@@ -2900,6 +2900,13 @@ function tpRelayBlk(){
   '</div>';
   return H;
 }
+function paintRelay(){
+  var el = $("relayCard"); if (!el || !el.parentNode) return;
+  var tmp = document.createElement("div");
+  tmp.innerHTML = tpRelayBlk();
+  var nw = tmp.firstChild;
+  if (nw) el.parentNode.replaceChild(nw, el);
+}
 function tpNodeBlk(){
   var d0 = (STATE.cyc && STATE.cyc.day) ? STATE.cyc.day : null;
   var _nd = (d0 === STATE.day) ? "下一交易日" : STATE.day;   // 判定所用收盘日＝竞价日时，服务下一交易日
@@ -6769,6 +6776,7 @@ function renderLDR(){
   var A = ldrAgg(ds);
   var live = (ds === LDRLIVE.day && !kthDay(ds) && LDRLIVE.rows.length > 0);
   if (!A || !A.rows.length){ el.innerHTML = '<div class="empty" style="padding:10px 0">这一天没有涨停股</div>'; return; }
+  try { if (ds === STATE.day && $("relayCard")) paintRelay(); } catch(e){}
   var AF = null;                            // 开了「只看直线」时，题材条/全部数按筛后重算
   if (LDRHIGH || (LDRLINE && !LDRLSCANNING[ds])){
     var fr = A.rows.filter(function(r){ return (!LDRHIGH || r.b >= 3) && (!LDRLINE || !!ldrLineHit(ds, r.c)); });
