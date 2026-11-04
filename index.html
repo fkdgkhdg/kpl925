@@ -2428,7 +2428,7 @@ var DIRS = [
   ["数据要素", ["数据要素","信创","国产软件","网络安全","信息安全","量子科技","操作系统","鸿蒙","政务","国资云"]],
   ["有色资源", ["稀土","永磁","钨","锂矿","铜","黄金","有色","煤炭","石油","磷矿"]],
   ["化工", ["化工","氟化工","磷化工","钛白粉","农药","化肥","化学原料","胶粘","新材料"]],
-  ["基建地产", ["基建","地产","建筑","水利","工程机械","市政","输送机械","液压","混凝土","水泥","环卫"]],
+  ["基建地产", ["基建","基础建设","重建","地产","建筑","建设","水利","工程机械","市政","输送机械","液压","混凝土","水泥","环卫"]],
   ["金融", ["券商","银行","保险","多元金融","参股金融","金融科技","创投"]],
   ["交运物流", ["物流","航运","港口","快递","航空","铁路","公路","供应链"]],
   ["传媒", ["传媒","影视","游戏","出版","彩票"]],
@@ -2810,14 +2810,14 @@ function tpRelayBlk(){
   var RP = [];
   if (!auctionMode){
     try {
-      var A1 = (typeof ldrAgg === "function") ? ldrAgg(d0) : null;
+      var A1 = (typeof ldrAgg === "function") ? ldrAgg(d0c) : null;
       if (A1 && A1.rows) RP = A1.rows.map(function(r){ return { code:r.c, name:r.n, board:r.b, chg:null, sector:"", at:0, L:10, lu:1 }; });
     } catch(e){}
   }
   if (!RP.length) RP = STATE.rows || [];
   if (!RP.length){
     try {
-      var A0 = (typeof ldrAgg === "function") ? ldrAgg(d0) : null;
+      var A0 = (typeof ldrAgg === "function") ? ldrAgg(d0c) : null;
       if (A0 && A0.rows) RP = A0.rows.map(function(r){ return { code:r.c, name:r.n, board:r.b, chg:null, sector:"", at:0, L:10, lu:1 }; });
     } catch(e){}
   }
@@ -2832,7 +2832,7 @@ function tpRelayBlk(){
   else if (mb === 6){ st = "高位分歧"; act = "只做绝对核心，不接杂毛"; col = "#e07a1f"; }
   else { st = "高潮区"; act = "不新开，等断板"; col = "#c02c2c"; }
   var dd = null; try { dd = ddOf(d0); } catch(e){}
-  var A = null; try { A = (typeof ldrAgg === "function") ? ldrAgg(d0) : null; } catch(e){}
+  var A = null; try { A = (typeof ldrAgg === "function") ? ldrAgg(d0c) : null; } catch(e){}
   var themes = [];
   if (A && A.ths && A.ths.length){
     themes = A.ths.filter(function(x){ return x.n >= 3 && !(typeof THBAD !== "undefined" && THBAD.test(x.t)); }).slice(0,3);
@@ -2845,11 +2845,81 @@ function tpRelayBlk(){
   }
   var tagMap = {};
   if (A && A.rows) A.rows.forEach(function(r){ tagMap[r.c] = r.tags || []; });
+  var zTagMap = {};
+  try { (ZTRS && ZTRS.d && ZTRS.d[d0c] || []).forEach(function(a){ zTagMap[String(a[0])]=thTagsOf(a); }); } catch(e){}
+  function conceptTagsOf(code){
+    try{
+      var idx=(typeof thIdx==="function")?thIdx():null, bks=(idx&&idx[code])||[], out=[];
+      for(var i=0;i<bks.length;i++){ var nm=BNAME[bks[i]]; if(nm) out.push(String(nm)); }
+      return out;
+    }catch(e){ return []; }
+  }
+  function themeTagsOf(code){
+    var out=[], seen={};
+    function put(t){ t=String(t||"").trim(); if(t && !seen[t]){ seen[t]=1; out.push(t); } }
+    (tagMap[code]||[]).forEach(function(x){ put(x&&x.t); });
+    (zTagMap[code]||[]).forEach(put);
+    try{ (hotThemeTags(code)||[]).forEach(put); }catch(e){}
+    conceptTagsOf(code).forEach(put);
+    return out;
+  }
   function themeOf(r){
     var ts = tagMap[r.code] || [];
     if (ts.length) return { t:ts[0].t, n:ts[0].n };
     try { var ht = (typeof hotThemeTags === "function") ? hotThemeTags(r.code) : null; if (ht && ht.length) return { t:ht[0], n:0 }; } catch(e){}
+    var ct=conceptTagsOf(r.code).filter(function(t){ return typeof dirOfTag==="function" && dirOfTag(t); });
+    if(ct.length) return { t:ct[0], n:0 };
     return { t:r.sector || "", n:0 };
+  }
+  function dirOf(r){
+    var ts=themeTagsOf(r.code);
+    if(!ts.length || typeof dirOfTag!=="function") return "";
+    for(var i=0;i<ts.length;i++){ var d=dirOfTag(ts[i]); if(d) return d; }
+    return "";
+  }
+  function fmtAq(v){ return (v>0?"+":"")+v.toFixed(2)+"%"; }
+  function themeAuctionBlk(){
+    if(!auctionMode || !RP.length) return "";
+    var groups={}, all=[];
+    function add(key,name,kind,r){
+      var g=groups[key]||(groups[key]={name:name,kind:kind,vals:[],members:[]});
+      g.vals.push(+r.chg); g.members.push({name:r.name||r.code,chg:+r.chg});
+    }
+    RP.forEach(function(r){
+      if(!r || !r.code || r.chg===null || r.chg===undefined || isNaN(+r.chg)) return;
+      var chg=+r.chg; all.push(chg);
+      var seen={};
+      themeTagsOf(r.code).forEach(function(t){
+        if(!t) return;
+        var d=(typeof dirOfTag==="function")?dirOfTag(t):null;
+        if(d && !seen["d:"+d]){ seen["d:"+d]=1; add("d:"+d,d,"dir",{code:r.code,name:r.name,chg:chg}); }
+        var ft=(typeof thFamName==="function")?thFamName(t):null;
+        if(ft && !seen["f:"+ft]){ seen["f:"+ft]=1; add("f:"+ft,ft,"fam",{code:r.code,name:r.name,chg:chg}); }
+      });
+    });
+    var arr=Object.keys(groups).map(function(k){
+      var g=groups[k], sum=0, up=0, flat=0, down=0;
+      g.vals.forEach(function(v){ sum+=v; if(v>0)up++; else if(v<0)down++; else flat++; });
+      return {name:g.name,kind:g.kind,n:g.vals.length,avg:sum/g.vals.length,up:up,flat:flat,down:down,members:g.members};
+    }).filter(function(g){ return g.n>=2 || (g.kind==="fam" && g.n>=1); }).sort(function(a,b){ return b.avg-a.avg || b.n-a.n || (a.name<b.name?-1:1); });
+    if(!arr.length || !all.length) return "";
+    var trimmed=arr.length>6;
+    var fams=arr.filter(function(g){ return g.kind==="fam"; });
+    var dirs=arr.filter(function(g){ return g.kind!=="fam"; });
+    var shown=arr, picked=[];
+    if(trimmed){
+      picked=dirs.slice(0,3).concat(fams).concat(dirs.slice(-2));
+      var ps={}; shown=picked.filter(function(g){ var k=g.kind+":"+g.name; if(ps[k])return false; ps[k]=1; return true; });
+    }
+    var total=all.reduce(function(a,b){return a+b;},0)/all.length;
+    var up=all.filter(function(v){return v>0;}).length, down=all.filter(function(v){return v<0;}).length, flat=all.length-up-down;
+    var h='<div class="rlyaq"><span class="rlyalab">题材竞价'+(trimmed?('·强3弱2'+(fams.length?'+字辈':'')):'')+'</span><span class="rlyov">全池 '+fmtAq(total)+' · '+up+'红'+(flat?'/'+flat+'平':'')+'/'+down+'绿</span>';
+    shown.forEach(function(g){
+      var col=g.avg>0?"#c02c2c":(g.avg<0?"#1f7a3d":"var(--muted)");
+      var tip=esc(g.name+' 竞价强度 '+fmtAq(g.avg)+'；'+g.members.map(function(m){return m.name+' '+fmtAq(m.chg);}).join('、'));
+      h+='<a class="thlink rlyaqchip" data-th="'+esc(g.name)+'" data-ztd="'+d0c+'" style="color:'+col+'" title="'+tip+'">'+esc(g.name)+' '+fmtAq(g.avg)+'<small>'+g.n+'只 '+g.up+'红'+(g.flat?'/'+g.flat+'平':'')+'/'+g.down+'绿</small></a>';
+    });
+    return h+'</div>';
   }
   var cand = RP.filter(function(r){
     var b = r.board || 1;
@@ -2882,8 +2952,9 @@ function tpRelayBlk(){
     '<div class="rlytheme"><span class="rlylab">主线</span>' +
       themes.map(function(t){ return '<a class="chip thlink" data-th="' + esc(t.t) + '" data-ztd="' + d0c + '" title="看 ' + esc(t.t) + ' 在 ' + d0 + ' 的涨停梯队（' + t.n + ' 只）">' + esc(t.t) + ' <b>' + t.n + '</b>只</a>'; }).join("") +
     '</div>' +
+    themeAuctionBlk() +
     '<div class="rlygrid">' + top.map(function(r){
-      var th = themeOf(r);
+      var th = themeOf(r); var dir = dirOf(r);
       var isYi = auctionMode && (r.chg !== null && r.chg !== undefined && r.chg >= (r.L || 10) * 0.99);
       var chgTxt = !auctionMode ? "待竞价" : ((r.chg === null || r.chg === undefined) ? "—" : ((r.chg > 0 ? "+" : "") + r.chg.toFixed(2) + "%"));
       var chgCol = !auctionMode ? "var(--muted)" : ((r.chg === null || r.chg === undefined) ? "var(--muted)" : (r.chg > 0 ? "#c02c2c" : (r.chg < 0 ? "#1f7a3d" : "var(--muted)")));
@@ -2892,7 +2963,7 @@ function tpRelayBlk(){
         '<a class="stk" href="https://stockpage.10jqka.com.cn/' + r.code + '/" target="_blank" rel="noopener">' + esc(r.name) + '</a>' +
         '<a class="kbtn" data-kc="' + r.code + '" data-kn="' + esc(r.name) + '" data-kd="' + d0 + '">K</a>' +
         (isYi ? '<span class="rlyyi">一字</span>' : '') +
-        '<span class="th">' + esc(th.t || "—") + (th.n ? ' ' + th.n + '只' : '') + '</span>' +
+        '<span class="th" data-dir="' + esc(dir) + '">' + esc(th.t || "—") + (th.n ? ' ' + th.n + '只' : '') + '</span>' +
         '<span class="ch" style="color:' + chgCol + '">' + chgTxt + '</span>' +
       '</div>';
     }).join("") + '</div>' +

@@ -20,6 +20,11 @@
     "#relayCard .rlytbl .rj.ok{color:#1f7a3d;font-weight:700}",
     "#relayCard .rlytbl .ra{color:var(--fg)}",
     "#relayCard .rlytbl .fineprint{font-size:10px;color:var(--muted);margin-top:2px}",
+    "#relayCard .rlyaq{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:-1px 0 5px;font-size:10.5px;line-height:1.25}",
+    "#relayCard .rlyaq .rlyalab{color:var(--muted);font-weight:700;flex:none}",
+    "#relayCard .rlyaq .rlyov{color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:1px 4px;background:rgba(127,127,127,.06)}",
+    "#relayCard .rlyaq .rlyaqchip{border:1px solid var(--border);border-radius:4px;padding:1px 4px;text-decoration:none;font-weight:700;background:rgba(127,127,127,.04)}",
+    "#relayCard .rlyaq .rlyaqchip small{font-size:9.5px;color:var(--muted);font-weight:500;margin-left:2px}",
     "@media(max-width:520px){#relayCard .rlytbl{font-size:10.5px}#relayCard .rlytbl th,#relayCard .rlytbl td{padding:2px 3px}#relayCard .rlytbl th:nth-child(1),#relayCard .rlytbl td:nth-child(1){width:27%}#relayCard .rlytbl th:nth-child(2),#relayCard .rlytbl td:nth-child(2){width:14%}#relayCard .rlytbl th:nth-child(3),#relayCard .rlytbl td:nth-child(3){width:28%}#relayCard .rlytbl th:nth-child(4),#relayCard .rlytbl td:nth-child(4){width:31%}}"
   ].join("");
   if(!document.getElementById("relayTblCss")){
@@ -32,7 +37,13 @@
     return e;
   }
   function cleanTheme(s){ return String(s||"").replace(/\s+\d+只$/,"").trim(); }
-  function themeCount(s){ var m=String(s||"").match(/(\d+)只/); return m?+m[1]:1; }
+  function themeParts(e){
+    var primary=cleanTheme(e?e.textContent:"");
+    var dir=String((e&&e.getAttribute("data-dir"))||"").trim();
+    var group=dir||primary;
+    return {primary:primary, group:group, label:dir?(primary&&primary!==dir?dir+"（"+primary+"）":dir):primary};
+  }
+  function themeCount(s){ var m=String(s||"").match(/([0-9]+)只/); return m?+m[1]:1; }
   function mainMatch(theme, arr){
     if(!theme) return "";
     for(var i=0;i<arr.length;i++){
@@ -53,13 +64,14 @@
     if(board===3){
       if(chg<2) return ["3板弱竞价","观察，不买","bad"];
       if(chg>=7) return ["高开过多，兑现压力","不追；等回封，不回封放弃","warn"];
+      if(n>=2) return ["3板+同题材"+n+"只"+(main?"·主线":""),"只做最强，等开盘确认","ok"];
       return [main?"3板+主线，可试错":"3板题材孤立",main?"等开盘确认，强则做":"只做秒板，不板放弃",main?"ok":"warn"];
     }
     if(board===2){
       if(chg<0) return ["低开淘汰","不买","bad"];
       if(chg<2) return [n>=2?"2板弱竞价（同题材"+n+"只）":"2板弱竞价","只等弱转强，不竞价买","warn"];
+      if(n>=2) return ["2板+同题材"+n+"只"+(main?"·主线":""),n===2?"二选一，选开盘更强的":"选最强的，只做一只","ok"];
       if(main) return ["2板+主线","优先，等开盘确认","ok"];
-      if(n>=2) return ["2板+同题材"+n+"只","二选一，选更强","ok"];
       return ["2板题材孤立","只做确认，不追","warn"];
     }
     return ["—","—","wait"];
@@ -73,7 +85,7 @@
     var themeSeen={}, themeFirst={};
     cands.forEach(function(c){
       var e=c.querySelector(".th");
-      var t=cleanTheme(e?e.textContent:"");
+      var t=themeParts(e).group;
       if(t) themeSeen[t]=(themeSeen[t]||0)+1;
     });
     var d0="";
@@ -91,14 +103,14 @@
     cands.forEach(function(c){
       var bd=c.querySelector(".bd"); var board=parseInt((bd?bd.textContent:""),10)||0;
       var nEl=c.querySelector(".stk"); var name=nEl?nEl.textContent:"";
-      var thEl=c.querySelector(".th"); var thRaw=thEl?thEl.textContent:""; var theme=cleanTheme(thRaw); var n=Math.max(themeCount(thRaw),themeSeen[theme]||0);
+      var thEl=c.querySelector(".th"); var thRaw=thEl?thEl.textContent:""; var tp=themeParts(thEl); var primary=tp.primary; var theme=tp.group; var n=themeSeen[theme]||1;
       var chEl=c.querySelector(".ch"); var chTxt=chEl?chEl.textContent.trim():"";
       var chg=parseFloat(chTxt.replace("%","").replace("+","")); if(chTxt==="—" || chTxt==="待竞价") chg=NaN;
       var isYi=!!c.querySelector(".rlyyi");
       var main=mainMatch(theme,mainThemes);
       var firstOfTheme=!themeFirst[theme]; if(firstOfTheme) themeFirst[theme]=true;
       var j=judge(board,chg,n,!!main,isYi,auctionMode);
-      if(board===2 && n>=2 && !main && !isYi && chg>=2) j[1]=firstOfTheme?"二选一，选开盘更强的":"备选，不双买";
+      if(board===2 && n>=2 && !isYi && chg>=2) j[1]=firstOfTheme?(n===2?"二选一，选开盘更强的":"同题材"+n+"只，选最强的"):(n===2?"备选，不双买":"备选，不追多");
       var kb=c.querySelector(".kbtn");
       var code=kb?kb.getAttribute("data-kc"):"";
       var tr=E("tr");
@@ -109,9 +121,9 @@
       if(kb) td1.appendChild(kb.cloneNode(true));
       if(isYi) td1.appendChild(E("span","rlyyi","一字"));
       var div=E("div","rth");
-      var mainLabel=main ? (main===theme?" · 主线":"（"+main+"主线）") : (theme?" · 非主线":"");
-      var tl=E("a","thlink",(theme||"—")+(n>1?" "+n+"只":"")+mainLabel);
-      tl.setAttribute("data-th",theme); tl.setAttribute("data-ztd",d0.replace(/-/g,""));
+      var mainLabel=main ? ((main===theme||main===primary)?" · 主线":"（"+main+"主线）") : (theme?" · 非主线":"");
+      var tl=E("a","thlink",(tp.label||"—")+(n>1?" "+n+"只候选":"")+mainLabel);
+      tl.setAttribute("data-th",primary||theme); tl.setAttribute("data-ztd",d0.replace(/-/g,""));
       div.appendChild(tl); td1.appendChild(div);
       tr.appendChild(td1);
       var chgCol=auctionMode && !isNaN(chg) ? (chg>0?"#c02c2c":(chg<0?"#1f7a3d":"var(--muted)")) : "var(--muted)";
