@@ -447,7 +447,7 @@
     <div class="plBody"><p class="note">输入股票名或代码，点「分析」。</p></div>
   </div>
   <div class="card" id="mbCard">
-    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button><span class="optgrp" id="mbDateNav" style="margin-left:auto;flex-wrap:wrap;justify-content:flex-end"><button id="dPrev">◀ 前一交易日</button><input type="date" id="dt" class="dtin" min="2024-09-10" max="2026-09-14" aria-label="选择交易日"><button id="dNext">后一交易日 ▶</button></span></div>
+    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button><span class="optgrp" id="mbDateNav" style="margin-left:auto;flex-wrap:wrap;justify-content:flex-end"><button id="dPrev">◀ 前一交易日</button><input type="date" id="dt" class="dtin" min="2024-09-10" aria-label="选择交易日"><button id="dNext">后一交易日 ▶</button></span></div>
     <div id="mbMain">
     <div class="opts" id="ndBar" style="margin:4px 0 8px;align-items:center"><span style="color:var(--muted)">节点起算日</span><input id="ndAnchor" type="date" style="width:150px"><button id="ndClear">清除</button><button id="ndHelp">节点口径</button><span class="note" id="ndHint" style="margin:0"></span></div>
     <div class="kpirow"><div class="kpi" id="kpi"></div><div id="ndTix"></div></div>
@@ -1302,6 +1302,7 @@ function prevPool(P){                     // 取 P 之前一个交易日的涨�
 
 var STATE = { mode:"at", sort:"at", colSort:"", colDir:-1, noLimit:false, rows:[], day:"", src:"", cyc:null,
               archived:false, picked:false, sel:"" };
+var DAYROWS = {};   // 本页已经渲染过的交易日缓存：切走再切回时保持同一份名单/口径
 var DZTSET = null;   // 前一交易日（D 日）主板涨停股代码集合，用于算「当日同题材涨停家数」
 
 // ===== 当日同题材涨停家数（题材厚度）=====
@@ -1514,6 +1515,34 @@ function arcList(dateStr){                          // ARCDATA 的一天 → 与
              mc:(p[11] === undefined || p[11] === "" || isNaN(+p[11])) ? null : +p[11],
              px:(p[12] === undefined || p[12] === "" || isNaN(+p[12])) ? null : +p[12] };
   });
+}
+function snapRowsList(snap, dateStr){               // 把本机/发布包里的 9:25 快照还原成 buildRows 需要的原始行
+  var meta = {};
+  try {
+    (arcList(dateStr) || []).forEach(function(r){ if (r && r.code) meta[String(r.code)] = r; });
+  } catch(e) {}
+  return (snap && snap.rows ? snap.rows : []).map(function(s){
+    if (!s || s[0] === undefined || s[0] === null) return null;
+    var code = String(s[0]), p = meta[code] || {};
+    var name = s[1] || p.name || (typeof NAMEMAP !== "undefined" ? NAMEMAP[code] : "") || code;
+    var board = +s[2] || +p.board || 1;
+    var num = function(v, fallback){ return (v === undefined || v === null || v === "") ? fallback : v; };
+    var chg = +s[3];
+    if (s[3] === undefined || s[3] === null || s[3] === "" || isNaN(chg)) return null;
+    return {
+      code:code, name:name, board:board, chg:chg,
+      atOv:(s[4] === undefined || s[4] === null || s[4] === "" ? undefined : +s[4]),
+      approxSnap:(+s[8] === 1),
+      amount:num(s[10], (p.amount === undefined ? undefined : p.amount)),
+      hybk:(s[5] || p.sector || ""),
+      bid:num(s[6], (p.bid === undefined ? null : p.bid)),
+      ask:num(s[7], (p.ask === undefined ? null : p.ask)),
+      atSrc:(s[9] || "snap"),
+      mc:num(s[11], (p.mc === undefined ? null : p.mc)),
+      px:num(s[12], (p.px === undefined ? null : p.px)),
+      dc:p.dc, lu:p.lu, t1o:p.t1o, t1c:p.t1c
+    };
+  }).filter(Boolean);
 }
 function pickTopRows(rows){                         // 「5 只榜单」「逐日决策」「今日竞价建议」共用的唯一选股口径：
                                                     // 主板 + 剔 ST 已在 buildRows 里做过；这里再叠 剔一字 → 按当前名单口径排序 → 前 5 / 全部
@@ -4755,27 +4784,47 @@ function tradeDays(){                      // CYCDATA + 自拓日期的全部交
   for (var i = 0; i < ks.length; i++){ if (ks[i] < dateStr) lo = ks[i]; else break; }
   return lo;
 }
-function renderArchive(dateStr){
-  var list = arcList(dateStr);
-  if (list === null) return false;
-  STATE.rows = buildRows(list);
-  // 昨日涨停股今天的平均竞价溢价（9:25 就能看到的情绪读数）
+function applyDayRows(dateStr, rows, src, archived){
+  STATE.rows = rows || [];
   var _pv = STATE.rows.filter(function(r){ return r.chg !== null && r.chg !== undefined && !isNaN(r.chg); });
   STATE.prem = _pv.length ? { avg: avgOf(_pv.map(function(r){ return r.chg; })),
     hi: _pv.filter(function(r){ return r.chg >= 3; }).length / _pv.length * 100,
     low: _pv.filter(function(r){ return r.chg < 0; }).length / _pv.length * 100, n: _pv.length } : null;
-  STATE.day = dateStr; STATE.src = "历史存档（本地）"; STATE.archived = true;
-  // 情绪周期只能用「前一交易日收盘」的信息——9:25 开盘时当天的家数/晋级率还不知道，
-  // 用当天收盘去标阶段＝未来函数（会让历史的阶段判断整体偏移）。
+  STATE.day = dateStr; STATE.src = src || "历史存档（本地）"; STATE.archived = !!archived;
+  // 情绪周期只能用「前一交易日收盘」的信息——9:25 开盘时当天的家数/晋级率还不知道。
   var c = cycRow(prevTradeDay(dateStr)) || cycRow(dateStr);
   if (c){
     var comp = 100 * (0.50*pctRank(ZSORT, c[1]) + 0.30*pctRank(PSORT, c[3]) + 0.20*Math.min(c[2]/15, 1));
     STATE.cyc = mkCyc(c[1], c[2], c[3], comp, c[0]);
   } else STATE.cyc = null;
   if ($("dt")) $("dt").value = dateStr;
-  setBase("竞价日 " + dateStr + "｜口径：" + STATE.src + "｜名单 " + list.length + " 只");
+  try { DAYROWS[dateStr] = { rows: STATE.rows.slice(), src: STATE.src, archived: STATE.archived }; } catch(e) {}
+  setBase("竞价日 " + dateStr + "｜口径：" + STATE.src + "｜名单 " + STATE.rows.length + " 只");
   render(); renderCycle();
   return true;
+}
+function renderArchive(dateStr){
+  // 9:25 快照和收盘存档可能差几只（盘后补录/接口口径）──历史回看优先用当天 9:25 的快照，
+  // 没有快照才退回 ARCDATA，避免「新鲜打开」和「切回同一天」看到两份不同名单。
+  var snap = null;
+  try {
+    if (!STATE.force){
+      snap = snapGet(dateStr);
+      if (!snapGood(snap)) snap = null;
+      if (!snap && window.AUC925 && AUC925.day === dateStr && AUC925.rows && typeof auc925Snap === "function"){
+        snap = auc925Snap(dateStr, Object.keys(AUC925.rows));
+        if (!snapGood(snap)) snap = null;
+      }
+    }
+  } catch(e) { snap = null; }
+  var cached = DAYROWS[dateStr];
+  if (cached && cached.rows && cached.rows.length) return applyDayRows(dateStr, cached.rows.slice(), cached.src, cached.archived);
+  var list = snap ? snapRowsList(snap, dateStr) : null;
+  if (!list || !list.length){ snap = null; list = arcList(dateStr); }
+  if (list === null) return false;
+  return applyDayRows(dateStr, buildRows(list),
+    snap ? (snap.static ? ("9:25 静态快照（" + (snap.ts || "") + "）") : ("9:25 定格（" + (snap.ts || "") + " 采集）")) : "历史存档（本地）",
+    !snap);
 }
 function selectDate(s){
   if (!s) return;
@@ -5005,6 +5054,7 @@ function attempt(T, round, seq){
       STATE.day = dayStr;
       STATE.src = snap ? (snap.static ? ("9:25 静态快照（" + (snap.ts || "") + "）") : ("9:25 定格（" + (snap.ts || "") + " 采集）")) : (live_win ? "9:25 实时竞价" : "9:25 快照还原");
       STATE.archived = false;
+      try { DAYROWS[dayStr] = { rows: STATE.rows.slice(), src: STATE.src, archived:false }; } catch(e) {}
       if (!STATE.picked && STATE.rows.length && dayStr === ymdDash(ymd(new Date()))){            // 当天取到 → 定格（择优：近似行更少的那份赢）
         var _hmNow = new Date().getHours()*100 + new Date().getMinutes();
         var apxN = STATE.rows.filter(function(r){ return r.approx; }).length;
@@ -5023,7 +5073,7 @@ function attempt(T, round, seq){
       if ($("dt") && STATE.day) $("dt").value = STATE.day;
       var apx = STATE.rows.filter(function(r){ return r.approx; }).length;
       if (window.__pf) window.__pf.total = Math.round(performance.now() - window.__pf.t0);
-      setBase("竞价日 " + STATE.day + "｜口径：" + STATE.src + "｜名单 " + res.pool.length + " 只"
+      setBase("竞价日 " + STATE.day + "｜口径：" + STATE.src + "｜名单 " + STATE.rows.length + " 只"
         + (miss ? "，其中 " + miss + " 只无数据已跳过" : "")
         + "｜行情源：" + (mktSrc || "东财") + (mins.filter(function(r){ return !r; }).length ? "｜部分个股无分时，已按行情额还原" : "")
         + (apx >= STATE.rows.length * 0.3
@@ -9810,10 +9860,15 @@ $("wlClear").addEventListener("click", function(){ if (confirm("清空关注池�
 function arcRangeSync(){                        // 日期选择器范围 + 副标题跟着存档走，不用每次手改
   try {
     var ks = Object.keys(ARCDATA).sort();
-    if (!ks.length) return;                     // 存档块还在后台加载 → 等它到了再补，别把 min/max 写成 undefined
-    var first = ks[0], last = ks[ks.length - 1];
-    if ($("dt")){ $("dt").min = first; $("dt").max = last; }
-    if ($("arcRange")) $("arcRange").textContent = ks.length + " 个交易日（" + first + " ~ " + last + "）";
+    var first = ks.length ? ks[0] : "";
+    var last = ks.length ? ks[ks.length - 1] : "";
+    // ARCDATA 还在后台加载时，先用发布包里最新的 9:25 快照日期；否则日期框会卡在旧 max，11-04 这种新日期会选不了。
+    if (window.AUC925 && AUC925.day && (!last || AUC925.day > last)) last = AUC925.day;
+    if ($("dt")){
+      if (first) $("dt").min = first;
+      if (last) $("dt").max = last;
+    }
+    if (ks.length && $("arcRange")) $("arcRange").textContent = ks.length + " 个交易日（" + first + " ~ " + last + "）";
   } catch(e) {}
 }
 arcRangeSync();
