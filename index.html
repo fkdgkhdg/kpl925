@@ -2913,7 +2913,8 @@ function tpRelayBlk(){
     }
     var total=all.reduce(function(a,b){return a+b;},0)/all.length;
     var up=all.filter(function(v){return v>0;}).length, down=all.filter(function(v){return v<0;}).length, flat=all.length-up-down;
-    var h='<div class="rlyaq"><span class="rlyalab">题材竞价'+(trimmed?('·强3弱2'+(fams.length?'+字辈':'')):'')+'</span><span class="rlyov">全池 '+fmtAq(total)+' · '+up+'红'+(flat?'/'+flat+'平':'')+'/'+down+'绿</span>';
+    var dayLab=/^d{4}-d{2}-d{2}$/.test(String(nd||''))?String(nd).slice(5)+' 9:25题材竞价':'9:25题材竞价';
+    var h='<div class="rlyaq"><span class="rlyalab">'+dayLab+(trimmed?('·强3弱2'+(fams.length?'+字辈':'')):'')+'</span><span class="rlyov" title="所选竞价日 9:25 最终竞价涨幅；样本=上一交易日涨停股">昨涨停池 '+fmtAq(total)+' · '+up+'红'+(flat?'/'+flat+'平':'')+'/'+down+'绿</span>';
     shown.forEach(function(g){
       var col=g.avg>0?"#c02c2c":(g.avg<0?"#1f7a3d":"var(--muted)");
       var tip=esc(g.name+' 竞价强度 '+fmtAq(g.avg)+'；'+g.members.map(function(m){return m.name+' '+fmtAq(m.chg);}).join('、'));
