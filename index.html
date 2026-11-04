@@ -219,6 +219,11 @@
   #relayCard .rlytheme{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 5px}
   #relayCard .rlytheme .chip{padding:2px 8px;font-size:11px}
   #relayCard .rlylab{font-size:11px;color:var(--muted);font-weight:700}
+  #relayCard .rlyaq{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 6px;line-height:1.55}
+  #relayCard .rlyalab{font-size:11px;color:var(--muted);font-weight:700}
+  #relayCard .rlyov{font-size:11px;color:var(--muted);font-weight:600}
+  #relayCard .rlyaqchip{display:inline-flex;align-items:baseline;gap:4px;padding:2px 7px;border:1px solid var(--border);border-radius:999px;font-size:11px;text-decoration:none;background:rgba(128,128,128,.07);white-space:nowrap}
+  #relayCard .rlyaqchip small{color:var(--muted);font-size:10px;font-weight:400}
   #relayCard .rlygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:3px 10px}
   #relayCard .rlycand{display:flex;align-items:baseline;gap:5px;font-size:11.5px;min-width:0;white-space:nowrap;overflow:hidden}
   #relayCard .rlycand .bd{font-weight:800;color:#c02c2c;flex:none}
@@ -1301,7 +1306,7 @@ var DZTSET = null;   // 前一交易日（D 日）主板涨停股代码集合，
 
 // ===== 当日同题材涨停家数（题材厚度）=====
 // 只用主板、剔除「昨日涨停/最近多板/东财热股/百日新高」这类伪题材，口径与回测脚本一致。
-var THBAD = /昨日|ST|B股|股通|重仓|融资|融券|MSCI|富时|标准普尔|标普|次新|预盈|预亏|预增|预减|扭亏|破净|含可转债|风格|小盘|大盘|中盘|百元股|低价股|高价股|市净率|市盈率|专精特新|机构|社保|QFII|基金|举牌|东财|热股|题材股|多板|新高|趋势股|反转股|涨停|连板|炸板|触板|换手|振幅|解禁|回购|增持|减持|指数|板块|高送转|送转|含H股|AB股|同花顺|深证|上证|中证|中报|季报|年报|业绩|首亏|预亏|预盈|商誉|重组|摘帽/;
+var THBAD = /昨日|ST|B股|股通|重仓|融资|融券|MSCI|富时|标准普尔|标普|次新|预盈|预亏|预增|预减|扭亏|破净|含可转债|风格|小盘|大盘|中盘|百元股|低价股|高价股|市净率|市盈率|专精特新|机构|社保|QFII|基金|举牌|东财|热股|题材股|多板|新高|趋势股|反转股|涨停|连板|炸板|触板|换手|振幅|解禁|回购|增持|减持|指数|板块|高送转|送转|含H股|AB股|同花顺|深证|上证|中证|中报|季报|年报|业绩|首亏|预亏|预盈|商誉|重组|摘帽|连续亏损|破增发价|破发|亏损股/;
 var THIDX = null;
 function thIdx(){
   if (THIDX) return THIDX;
@@ -2881,44 +2886,51 @@ function tpRelayBlk(){
   function themeAuctionBlk(){
     if(!auctionMode || !RP.length) return "";
     var groups={}, all=[];
-    function add(key,name,kind,r){
-      var g=groups[key]||(groups[key]={name:name,kind:kind,vals:[],members:[]});
+    function auctionThemeTags(code){
+      var out=[], seen={};
+      function put(t){ t=String(t||"").trim(); if(t && !seen[t]){ seen[t]=1; out.push(t); } }
+      (tagMap[code]||[]).forEach(function(x){ put(x&&x.t); });
+      (zTagMap[code]||[]).forEach(function(t){ if(typeof thFamName==="function" && thFamName(t)) put(t); });
+      if(!out.length) (zTagMap[code]||[]).forEach(put);
+      return out;
+    }
+    function add(key,name,kind,r,raw){
+      var g=groups[key]||(groups[key]={name:name,kind:kind,vals:[],members:[],exact:""});
+      if(!g.exact) g.exact=raw||name;
       g.vals.push(+r.chg); g.members.push({name:r.name||r.code,chg:+r.chg});
     }
     RP.forEach(function(r){
       if(!r || !r.code || r.chg===null || r.chg===undefined || isNaN(+r.chg)) return;
       var chg=+r.chg; all.push(chg);
       var seen={};
-      themeTagsOf(r.code).forEach(function(t){
+      auctionThemeTags(r.code).forEach(function(t){
         if(!t) return;
-        var d=(typeof dirOfTag==="function")?dirOfTag(t):null;
-        if(d && !seen["d:"+d]){ seen["d:"+d]=1; add("d:"+d,d,"dir",{code:r.code,name:r.name,chg:chg}); }
         var ft=(typeof thFamName==="function")?thFamName(t):null;
-        if(ft && !seen["f:"+ft]){ seen["f:"+ft]=1; add("f:"+ft,ft,"fam",{code:r.code,name:r.name,chg:chg}); }
+        if(ft){ if(!seen["f:"+ft]){ seen["f:"+ft]=1; add("f:"+ft,ft,"fam",{code:r.code,name:r.name,chg:chg},t); } return; }
+        var nt=(typeof ldrThNorm==="function")?ldrThNorm(t):t;
+        if(!nt || (typeof THBAD!=="undefined" && THBAD.test(nt)) || (typeof LDREVENT!=="undefined" && LDREVENT[nt])) return;
+        if(!seen["t:"+nt]){ seen["t:"+nt]=1; add("t:"+nt,nt,"th",{code:r.code,name:r.name,chg:chg},t); }
       });
     });
     var arr=Object.keys(groups).map(function(k){
       var g=groups[k], sum=0, up=0, flat=0, down=0;
       g.vals.forEach(function(v){ sum+=v; if(v>0)up++; else if(v<0)down++; else flat++; });
-      return {name:g.name,kind:g.kind,n:g.vals.length,avg:sum/g.vals.length,up:up,flat:flat,down:down,members:g.members};
-    }).filter(function(g){ return g.n>=2 || (g.kind==="fam" && g.n>=1); }).sort(function(a,b){ return b.avg-a.avg || b.n-a.n || (a.name<b.name?-1:1); });
+      return {name:g.name,kind:g.kind,exact:g.exact,n:g.vals.length,avg:sum/g.vals.length,up:up,flat:flat,down:down,members:g.members};
+    });
     if(!arr.length || !all.length) return "";
-    var trimmed=arr.length>6;
-    var fams=arr.filter(function(g){ return g.kind==="fam"; });
-    var dirs=arr.filter(function(g){ return g.kind!=="fam"; });
-    var shown=arr, picked=[];
-    if(trimmed){
-      picked=dirs.slice(0,3).concat(fams).concat(dirs.slice(-2));
-      var ps={}; shown=picked.filter(function(g){ var k=g.kind+":"+g.name; if(ps[k])return false; ps[k]=1; return true; });
-    }
+    var ths=arr.filter(function(g){ return g.kind==="th" && g.n>=2; }).sort(function(a,b){ return b.n-a.n || b.avg-a.avg || (a.name<b.name?-1:1); });
+    var fams=arr.filter(function(g){ return g.kind==="fam" && g.n>=2; }).sort(function(a,b){ return b.n-a.n || b.avg-a.avg || (a.name<b.name?-1:1); });
+    var shown=ths.slice(0,7).concat(fams.slice(0,3));
+    if(!shown.length) return "";
     var total=all.reduce(function(a,b){return a+b;},0)/all.length;
     var up=all.filter(function(v){return v>0;}).length, down=all.filter(function(v){return v<0;}).length, flat=all.length-up-down;
-    var dayLab=/^d{4}-d{2}-d{2}$/.test(String(nd||''))?String(nd).slice(5)+' 9:25题材竞价':'9:25题材竞价';
-    var h='<div class="rlyaq"><span class="rlyalab">'+dayLab+(trimmed?('·强3弱2'+(fams.length?'+字辈':'')):'')+'</span><span class="rlyov" title="所选竞价日 9:25 最终竞价涨幅；样本=上一交易日涨停股">昨涨停池 '+fmtAq(total)+' · '+up+'红'+(flat?'/'+flat+'平':'')+'/'+down+'绿</span>';
+    var dayLab=/^\d{4}-\d{2}-\d{2}$/.test(String(nd||''))?String(nd).slice(5)+' 9:25 · 昨涨停题材':'9:25 · 昨涨停题材';
+    var h='<div class="rlyaq"><span class="rlyalab">'+dayLab+'</span><span class="rlyov" title="所选竞价日 9:25 最终竞价涨幅；样本=上一交易日涨停股；按昨日涨停家数排序">池 '+fmtAq(total)+' '+up+'红'+(flat?'/'+flat+'平':'')+'/'+down+'绿</span>';
     shown.forEach(function(g){
       var col=g.avg>0?"#c02c2c":(g.avg<0?"#1f7a3d":"var(--muted)");
-      var tip=esc(g.name+' 竞价强度 '+fmtAq(g.avg)+'；'+g.members.map(function(m){return m.name+' '+fmtAq(m.chg);}).join('、'));
-      h+='<a class="thlink rlyaqchip" data-th="'+esc(g.name)+'" data-ztd="'+d0c+'" style="color:'+col+'" title="'+tip+'">'+esc(g.name)+' '+fmtAq(g.avg)+'<small>'+g.n+'只 '+g.up+'红'+(g.flat?'/'+g.flat+'平':'')+'/'+g.down+'绿</small></a>';
+      var mem=g.members.slice(0,12).map(function(m){return m.name+' '+fmtAq(m.chg);}).join('、')+(g.members.length>12?' 等'+g.members.length+'只':'');
+      var tip=esc(g.name+' 9:25竞价 '+fmtAq(g.avg)+'；'+mem);
+      h+='<a class="thlink rlyaqchip" data-th="'+esc(g.exact||g.name)+'" data-ztd="'+d0c+'" style="color:'+col+'" title="'+tip+'">'+esc(g.name)+' '+fmtAq(g.avg)+'<small>'+g.n+'只 '+g.up+'红'+(g.flat?g.flat+'平':'')+g.down+'绿</small></a>';
     });
     return h+'</div>';
   }
@@ -2950,10 +2962,9 @@ function tpRelayBlk(){
       '<span class="chip">首板 <b>' + (cnt[1] || 0) + '</b> · 2板 <b>' + (cnt[2] || 0) + '</b> · 3板 <b>' + (cnt[3] || 0) + '</b>' + (cnt[4] ? ' · 4板 <b>' + cnt[4] + '</b>' : '') + '</span>' +
       (dd ? '<span class="chip">跌停 <b>' + dd[1] + '</b></span>' : '') +
     '</div>' +
-    '<div class="rlytheme"><span class="rlylab">主线</span>' +
+    (themeAuctionBlk() || ('<div class="rlytheme"><span class="rlylab">主线</span>' +
       themes.map(function(t){ return '<a class="chip thlink" data-th="' + esc(t.t) + '" data-ztd="' + d0c + '" title="看 ' + esc(t.t) + ' 在 ' + d0 + ' 的涨停梯队（' + t.n + ' 只）">' + esc(t.t) + ' <b>' + t.n + '</b>只</a>'; }).join("") +
-    '</div>' +
-    themeAuctionBlk() +
+    '</div>')) +
     '<div class="rlygrid">' + top.map(function(r){
       var th = themeOf(r); var dir = dirOf(r);
       var isYi = auctionMode && (r.chg !== null && r.chg !== undefined && r.chg >= (r.L || 10) * 0.99);
@@ -6790,7 +6801,8 @@ var LDRALIAS = {
   "固态电池": "锂电池",
   "乳业": "食品饮料",
   "农药": "农业",
-  "AI营销": "AI应用"
+  "AI营销": "AI应用", "新零售": "零售",
+  "机器人概念": "机器人", "人形机器人": "机器人", "工业机器人": "机器人", "灵巧手": "机器人", "减速器": "机器人", "机器人执行器": "机器人", "具身智能": "机器人", "机械臂": "机器人", "伺服": "机器人", "谐波": "机器人", "丝杠": "机器人", "空心杯": "机器人"
 };
 var LDREVENT = { "三季报增长":1, "中报增长":1, "年报增长":1, "一季报增长":1, "业绩预增":1, "扭亏为盈":1, "高送转":1, "回购":1, "增持":1, "中标":1, "股权转让":1, "重组":1, "实控人变更":1, "举牌":1 };
 function ldrThNorm(t){                       // 开盘啦常给同一板块起好几个名字，这里并成一个
