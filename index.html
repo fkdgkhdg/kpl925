@@ -5912,7 +5912,7 @@ function mbApply(v){
   if (MB.view === "nv" && typeof renderNewTop5 === "function"){ try { renderNewTop5(); } catch(e){} }
 }
 var NVZT = null;
-function nvKeyOf(d){ return "kpl_nv1_" + d; }
+function nvKeyOf(d){ return "kpl_nv2_" + d; }
 function nvLoadCache(d){
   try {
     var s = localStorage.getItem(nvKeyOf(d));
@@ -5924,24 +5924,30 @@ function nvLoadCache(d){
     return o;
   } catch(e){ return null; }
 }
-function nvSaveCache(o){ var _t = new Date((o && o.ts) || Date.now()); var _hm = ("0"+_t.getHours()).slice(-2) + ":" + ("0"+_t.getMinutes()).slice(-2); if (_hm < "09:15" || _hm >= "09:34") return; try { localStorage.setItem(nvKeyOf(o.day), JSON.stringify(o)); } catch(e){} }
+function nvSaveCache(o){ if (!(o && o.ztn >= 5)) return; var _t = new Date((o && o.ts) || Date.now()); var _hm = ("0"+_t.getHours()).slice(-2) + ":" + ("0"+_t.getMinutes()).slice(-2); if (_hm < "09:15" || _hm >= "09:34") return; try { localStorage.setItem(nvKeyOf(o.day), JSON.stringify(o)); } catch(e){} }
 function nvHM(){ var n = new Date(); return ("0"+n.getHours()).slice(-2) + ":" + ("0"+n.getMinutes()).slice(-2); }
 function nvInWin(){ var h = nvHM(); return h >= "09:15" && h < "09:30"; }
-function nvLastZT(day){                 // 竞价日（STATE.day）的前一个交易日主板涨停股集合（这一栏要剔除的对象）
-  if (NVZT && NVZT.day === day) return Promise.resolve(NVZT.set);
+function nvLastZT(day, retry){       // 竞价日（STATE.day）的前一个交易日主板涨停股集合（这一栏要剔除的对象）
+  if (NVZT && NVZT.day === day && Object.keys(NVZT.set || {}).length) return Promise.resolve(NVZT.set);
   var PZ = day ? new Date(day + "T00:00:00") : new Date();
-  return Promise.race([
-    prevPool(PZ).catch(function(){ return []; }),
-    new Promise(function(res){ setTimeout(function(){ res(null); }, 8000); })
-  ]).then(function(pool){
-    pool = pool || [];
-    var s = {};
+  function once(){
+    return Promise.race([
+      prevPool(PZ).catch(function(){ return []; }),
+      new Promise(function(res){ setTimeout(function(){ res(null); }, 12000); })
+    ]);
+  }
+  return once().then(function(pool){
+    var s = {}, n = 0;
     (pool || []).forEach(function(x){
       var c = String(x.c || x.code || ""), nm = String(x.n || x.name || "");
       if (!/^(60|00)/.test(c)) return;
       if (/ST|退/.test(nm)) return;
-      s[c] = 1;
+      s[c] = 1; n++;
     });
+    if (!n){
+      if (!retry) return new Promise(function(res){ setTimeout(res, 800); }).then(function(){ return nvLastZT(day, 1); });
+      return null;                     // 抓不到就返回 null：不缓存空集合，避免把昨日涨停股混进「未涨停前5」
+    }
     NVZT = { day:day, set:s };
     return s;
   });
@@ -6010,6 +6016,7 @@ function nvScan(gated){
   var codes = yzUniverse();
   nvProg("1/3 正在取上一交易日涨停名单…");
   return nvLastZT(day).then(function(zt){
+    if (!zt) throw new Error("昨日涨停名单没取到（东财接口超时），点右上「重新扫描」重试");
     nvProg("2/3 已剔除昨日涨停 " + Object.keys(zt).length + " 只，正在取全市场 " + codes.length + " 只行情…");
     // 腾讯批量大且快（实测 3017 只 0.3~0.5 秒），先它；只有它稀疏时才走东财（全量，慢一些）。
     return fetchTqQuotes(codes, !!gated).catch(function(){ return {}; }).then(function(tq){
