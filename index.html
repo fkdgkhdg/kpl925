@@ -4890,6 +4890,12 @@ function auc925Snap(d, codes){              // 发布包里的 9:25 静态快照
   if (rows.length < Math.max(1, Math.floor(codes.length * 0.8))) return null;
   return { v: 5, day: d, hm: 925, ts: (a.tm || "09:25"), rows: rows, apx: 0, qn: 0, static: true };
 }
+function auc925Amt(d, code){                // 9:25 定格里的竞价成交额（元）；没有就返回 null
+  var a = window.AUC925;
+  if (!a || a.day !== d || !a.rows) return null;
+  var x = a.rows[code]; if (!x) return null;
+  var v = +x[1]; return v > 0 ? v : null;
+}
 function load(){
   var seq = ++loadSeq;
   window.__pf = { t0: performance.now() };
@@ -5011,9 +5017,11 @@ function attempt(T, round, seq){
       res.pool.forEach(function(x, i){
         var r = mins[i], q = mkt[x.c] || null;
         var chg = null, amt = null, hs = null, atSrc = null;
+        var a925 = (typeof auc925Amt === "function") ? auc925Amt(dayStr, x.c) : null;
+        if (a925 > 0){ amt = a925; atSrc = "925"; }   // 竞价金额统一取 9:25 定格，和开盘啦同口径
         var rPre = (r && r.pre) || (q && (q.f18 || q.pre)) || null;
         var rOk = !!(r && r.price && rPre && r.date === ymd(T));   // 分时必须是当天的，否则会误用上一交易日的分时
-        if (rOk){ chg = (r.price / rPre - 1) * 100; amt = r.amount; atSrc = "min"; }   // 分时首根＝真竞价额（最准）
+        if (rOk){ chg = (r.price / rPre - 1) * 100; if (!(amt > 0)){ amt = r.amount; atSrc = "min"; } }   // 首分钟只在没有 9:25 定时才兜底
         else if (q && q.f17 && q.f18){ chg = (q.f17 / q.f18 - 1) * 100; }
         else if (q && q.pre && q.open){ chg = (q.open / q.pre - 1) * 100; }
         if (!amt && q && q.f6 && live_win){ amt = q.f6; atSrc = atSrc || "q"; }          // 东财：9:25 成交额（元）
@@ -6246,10 +6254,16 @@ function nvFinish(cand, day, codes, zt, src){
   var refined = mapLimit(picks, 6, function(x){ return fetchMinute(x.code); }).then(function(mins){
     picks.forEach(function(x, i){
       var r = mins[i];
-      if (r && r.date === todayS && r.price > 0 && r.amount > 0){
+      var a925 = (typeof auc925Amt === "function") ? auc925Amt(day, x.code) : null;
+      if (r && r.date === todayS && r.price > 0){
         var pr = (r.pre > 0 ? r.pre : x.pre);
         if (pr > 0) x.chg = (r.price / pr - 1) * 100;
-        x.amt = r.amount;
+      }
+      if (a925 > 0){
+        x.amt = a925;                                  // 与开盘啦一致：竞价金额按 9:25 定格，不用 9:30 首分钟
+        if (typeof FF !== "undefined" && FF[x.code]){ x.at = a925 / FF[x.code] * 100; x.approx = false; }
+      } else if (r && r.date === todayS && r.amount > 0){
+        x.amt = r.amount;                              // 没有 9:25 定格才退回首分钟（近似）
         if (typeof FF !== "undefined" && FF[x.code]){ x.at = r.amount / FF[x.code] * 100; x.approx = false; }
       }
     });
@@ -8012,7 +8026,7 @@ function autoRefreshWatch(){
   try { done = !!sessionStorage.getItem(key); } catch(e) {}
   if (done){ el.style.display = "none"; return; }
   var s = n.getHours() * 3600 + n.getMinutes() * 60 + n.getSeconds();
-  var t1 = 9 * 3600 + 25 * 60 + 15;      // 9:25:15 集合竞价结果已出
+  var t1 = 9 * 3600 + 25 * 60 + 45;      // 9:25:45：等竞价定格文件生成完（9:25:42）再刷新，金额统一按 9:25 收盘口径
   var t2 = 9 * 3600 + 31 * 60;           // 9:31:00 9:30 那根分时（实际换手）已生成
   var target = null, why = "";
   if (s < t1 && s >= 8 * 3600){ target = t1; why = "9:25 竞价结果"; }
