@@ -8029,7 +8029,10 @@ function autoRefreshWatch(){
   var t1 = 9 * 3600 + 25 * 60 + 45;      // 9:25:45：等竞价定格文件生成完（9:25:42）再刷新，金额统一按 9:25 收盘口径
   var t2 = 9 * 3600 + 31 * 60;           // 9:31:00 9:30 那根分时（实际换手）已生成
   var target = null, why = "";
+  var _aucToday = false;
+  try { _aucToday = !!(window.AUC925 && window.AUC925.day === ymdDash(ymd(n))); } catch(e) {}
   if (s < t1 && s >= 8 * 3600){ target = t1; why = "9:25 竞价结果"; }
+  else if (s >= t1 && s < t1 + 180 && !_aucToday){ target = s + 15; why = "9:25 定格文件（还没同步到，15 秒后重试）"; }   // 等 auction925.js 线上生效，金额只认 9:25
   else if (s >= t1 && s < t2){ target = t2; why = "9:30 分时（实际换手）数据"; }
   if (target === null){ el.style.display = "none"; return; }
   function tick(){
