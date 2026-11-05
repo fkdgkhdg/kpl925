@@ -1398,7 +1398,7 @@ function kplPool(ds){
   var D = kthDay(ds); if (!D) return (KPLPOOL[ds] = null);
   return (KPLPOOL[ds] = D.st.map(function(s){
     var tags = (s[3] || []).map(function(i){ return D.th[i]; }).filter(Boolean);
-    return [s[0], s[1], tags.join("+"), "", kplRun(ds, s[0]), String(s[2] || ""), +s[4] || 0];
+    return [s[0], s[1], tags.join("+"), "", kplRun(ds, s[0]), String(s[2] || ""), +s[4] || 0, (+s[5] || 0) * 1e4, (+s[6] || 0) * 1e4, String(s[7] || "")];
   }));
 }
 function poolOfDs(ds){ if (kthDay(ds)) return kplPool(ds); if (LDRLIVE.day === ds && LDRLIVE.rows && LDRLIVE.rows.length) return LDRLIVE.rows; if (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d) return ZTRS.d[ds] || []; return []; }
@@ -6873,6 +6873,47 @@ var LDRALIAS = {
   "机器人概念": "机器人", "人形机器人": "机器人", "工业机器人": "机器人", "灵巧手": "机器人", "减速器": "机器人", "机器人执行器": "机器人", "具身智能": "机器人", "机械臂": "机器人", "伺服": "机器人", "谐波": "机器人", "丝杠": "机器人", "空心杯": "机器人"
 };
 var LDREVENT = { "三季报增长":1, "中报增长":1, "年报增长":1, "一季报增长":1, "业绩预增":1, "扭亏为盈":1, "高送转":1, "回购":1, "增持":1, "中标":1, "股权转让":1, "重组":1, "实控人变更":1, "举牌":1 };
+/* 题材梯队归族：开盘啦常把同一条主线拆成很多细分名（光伏硅片/组件/支架、AI视频/营销、光刻胶/光芯片…）。
+   这里按「主涨停原因」归到文章那样的一个大题材；只影响梯队的展示分组，不改原始题材标签。 */
+var LDRFAMILY = {
+  "光伏硅片":"光伏","光伏组件":"光伏","太空光伏":"光伏","分布式光伏":"光伏","光伏支架":"光伏","石英坩埚":"光伏","石英材料":"光伏","TOPCon":"光伏","POE胶膜":"光伏","钙钛矿电池":"光伏","HJT":"光伏","光伏设备":"光伏","光伏概念":"光伏","太阳能":"光伏","光伏发电":"光伏","硅料":"光伏","逆变器":"光伏",
+  "AI视频":"AI应用","AI营销":"AI应用","AI智能体":"AI应用","AI医疗":"AI应用","人工智能":"AI应用","DeepSeek":"AI应用","AI教育":"AI应用","AI政务":"AI应用","多模态AI":"AI应用","AI语料":"AI应用",
+  "光刻胶":"芯片","光芯片":"芯片","光刻机":"芯片","洁净室":"芯片","电子气体":"芯片","靶材":"芯片","半导体设备":"芯片","先进封装":"芯片","存储":"芯片","芯片":"芯片",
+  "机器人":"机器人概念","灵巧手":"机器人概念","人形机器人":"机器人概念","工业机器人":"机器人概念","减速器":"机器人概念","机器人执行器":"机器人概念","具身智能":"机器人概念","机械臂":"机器人概念","伺服":"机器人概念","谐波":"机器人概念","丝杠":"机器人概念","空心杯":"机器人概念","机器视觉":"机器人概念",
+  "AI眼镜":"端侧AI","端侧芯片":"端侧AI","eSIM":"端侧AI","端侧AI":"端侧AI",
+  "旅游":"消费","酒店":"消费","乳业":"消费","食品饮料":"消费","酿酒":"消费","白酒":"消费","零售":"消费","家电":"消费","服装家纺":"消费","商业百货":"消费","免税":"消费","电商":"消费","影视院线":"消费",
+  "房地产":"地产链","物业服务":"地产链","建材":"地产链","装修家具":"地产链",
+  "锂电池":"锂电池","固态电池":"锂电池","铝箔":"锂电池","电解液":"锂电池","锂矿":"锂电池","钠电池":"锂电池","磷酸铁锂":"锂电池",
+  "医药":"医药","创新药":"医药","基因疗法":"医药","阿尔茨海默":"医药","中药":"医药","医疗器械":"医药","医药零售":"医药","CRO":"医药","减肥药":"医药","医美":"医药","病毒防治":"医药","流感":"医药",
+  "农业":"农业","猪肉":"农业","水产品":"农业","农机":"农业","农药":"农业","种业":"农业","鸡肉":"农业","饲料":"农业",
+  "卫星导航":"商业航天","商业航天":"商业航天",
+  "算力租赁":"算力","算力调度":"算力","液冷":"算力",
+  "核电":"核电","可控核聚变":"核电",
+  "黄金":"黄金",
+  "股权转让":"其他","并购重组":"其他","重组":"其他","实控人变更":"其他","基础建设":"其他","钢铁":"其他","专精特新":"其他","ST摘帽":"其他","中报增长":"其他","一季报增长":"其他","三季报增长":"其他","年报增长":"其他","业绩预增":"其他"
+};
+function ldrFam(t){
+  var x = String(t || "").replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+  x = LDRALIAS[x] || LDRALIAS[t] || x;
+  return LDRFAMILY[x] || x || "其他";
+}
+function ldrInTheme(r, th){
+  if (!th) return true;
+  var p = r.prim || ((r.tags[0] || {}).t) || "";
+  return ldrFam(p) === th;
+}
+function ldrThemeCounts(rows){
+  var c = {};
+  (rows || []).forEach(function(r){ var f = ldrFam(r.prim || ((r.tags[0] || {}).t) || ""); if (f) c[f] = (c[f] || 0) + 1; });
+  return c;
+}
+function ldrThemeList(c){
+  return Object.keys(c).map(function(t){ return { t: t, n: c[t] }; }).sort(function(x, y){
+    if (x.t === '其他' && y.t !== '其他') return 1;
+    if (y.t === '其他' && x.t !== '其他') return -1;
+    return y.n - x.n || (x.t < y.t ? -1 : 1);
+  });
+}
 function ldrThNorm(t){                       // 开盘啦常给同一板块起好几个名字，这里并成一个
   var x = String(t || "").replace(/（[^）]*）|\([^)]*\)/g, "").trim();
   return LDRALIAS[x] || LDRALIAS[t] || x || String(t || "");
@@ -6911,6 +6952,8 @@ function ldrAgg(ds){
     });
   });
   pool.forEach(function(a){
+    var rawTags = thTagsOf(a);
+    var primRaw = String(rawTags[0] || '');
     rows.push({
       c: String(a[0]),
       n: a[1] || ((typeof NAMEMAP !== 'undefined' && NAMEMAP[a[0]]) || String(a[0])),
@@ -6919,8 +6962,12 @@ function ldrAgg(ds){
       bt: String((fromKpl ? '' : a[5]) || ''),
       ts: +a[6] || 0,
       live: live,
+      prim: ldrThNorm(primRaw),
+      amt: fromKpl ? (+a[7] || 0) : (live ? (+a.amt || 0) : 0),
+      ffmc: fromKpl ? (+a[8] || 0) : 0,
+      reason: fromKpl ? String(a[9] || '') : '',
       tagSrc: live ? String(a.tagSrc || '') : '',
-      tags: (function(){ var seen = {}, out = []; thTagsOf(a).forEach(function(t){ var k = ldrThNorm(t); if (!k || seen[k]) return; seen[k] = 1; out.push({ t: k, n: cnt[k] || 1, raw: String(t) }); }); return out.sort(function(x, y){ var ex = LDREVENT[x.t] ? 1 : 0, ey = LDREVENT[y.t] ? 1 : 0; return ex - ey || y.n - x.n || (x.t < y.t ? -1 : 1); }); })()
+      tags: (function(){ var seen = {}, out = []; rawTags.forEach(function(t){ var k = ldrThNorm(t); if (!k || seen[k]) return; seen[k] = 1; out.push({ t: k, n: cnt[k] || 1, raw: String(t) }); }); return out.sort(function(x, y){ var ex = LDREVENT[x.t] ? 1 : 0, ey = LDREVENT[y.t] ? 1 : 0; return ex - ey || y.n - x.n || (x.t < y.t ? -1 : 1); }); })()
     });
   });
   rows.sort(function(x, y){ return y.b - x.b || (x.ts || 86400) - (y.ts || 86400) || (x.c < y.c ? -1 : 1); });
@@ -6940,20 +6987,21 @@ function renderLDR(){
   var AF = null;                            // 开了「只看直线」时，题材条/全部数按筛后重算
   if (LDRHIGH || (LDRLINE && !LDRLSCANNING[ds])){
     var fr = A.rows.filter(function(r){ return (!LDRHIGH || r.b >= 3) && (!LDRLINE || !!ldrLineHit(ds, r.c)); });
-    var c2 = {}, b2 = {}, max2 = 0, lian2 = 0;
+    var tagCnt = {}, b2 = {}, max2 = 0, lian2 = 0;
     fr.forEach(function(r){
-      r.tags.forEach(function(x){ c2[x.t] = (c2[x.t] || 0) + 1; });
+      r.tags.forEach(function(x){ tagCnt[x.t] = (tagCnt[x.t] || 0) + 1; });
       b2[r.b] = (b2[r.b] || 0) + 1; if (r.b > max2) max2 = r.b; if (r.b >= 2) lian2++;
     });
     fr = fr.map(function(r){                     // 悬停描述里的题材家数也跟着筛后走
       var o = {}; for (var q in r) o[q] = r[q];
-      o.tags = r.tags.map(function(x){ return { t: x.t, n: c2[x.t] || 1, raw: x.raw }; });
+      o.tags = r.tags.map(function(x){ return { t: x.t, n: tagCnt[x.t] || 1, raw: x.raw }; });
       return o;
     });
-    AF = { ds: ds, rows: fr, cnt: c2, cntB: b2, maxB: max2, lian: lian2, n: fr.length,
-      ths: Object.keys(c2).map(function(t){ return { t: t, n: c2[t] }; }).sort(function(x, y){ return y.n - x.n || (x.t < y.t ? -1 : 1); }) };
+    var famCnt2 = ldrThemeCounts(fr);
+    AF = { ds: ds, rows: fr, cnt: famCnt2, cntB: b2, maxB: max2, lian: lian2, n: fr.length,
+      ths: ldrThemeList(famCnt2) };
   }
-  var CV = AF ? AF.cnt : A.cnt, TV = AF ? AF.ths : A.ths;
+  var CV = AF ? AF.cnt : ldrThemeCounts(A.rows), TV = AF ? AF.ths : ldrThemeList(CV);
   if (LDRTH && !CV[LDRTH]) LDRTH = '';
   var dd = ldrIso(ds);
   var de = document.getElementById('ldrDate'); if (de) de.textContent = dd + (live ? ' · 实时' : '');
@@ -6966,7 +7014,7 @@ function renderLDR(){
     + '<span class="chip">连板 <b>' + A.lian + '</b> 只</span>'
     + '<span class="chip">首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>'
     + (nodeIsDay(ds) ? '<span class="chip" id="ldrNdKpi" style="background:#c02c2c">节点日 · 首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>' : '')
-    + '<span class="chip">题材 <b>' + TV.length + '</b> 个（≥2只 <b>' + TV.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
+    + '<span class="chip">题材组 <b>' + TV.length + '</b> 个（≥2只 <b>' + TV.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
     + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (CV[LDRTH] || 0) + ' 只）</span>' : '')
     + (LDRLINE ? '<span class="chip" style="background:#fff1f0;color:#c02c2c">分时直线 <b>' + ldrLineNum(ds, 'line') + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '');
   var te = document.getElementById('ldrTh');
@@ -6994,9 +7042,9 @@ function renderLDR(){
   if (typeof renderLdrTop5 === "function") renderLdrTop5(ds);
   var note = document.getElementById('ldrNote');
   if (note) note.textContent = live
-    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。')
+    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族：光伏硅片/组件/支架/石英坩埚等→光伏，AI视频/营销/智能体等→AI应用，光刻胶/光芯片/半导体设备等→芯片，机器人细分→机器人概念，AI眼镜/端侧芯片→端侧AI，零售/酒店/乳业/白酒→消费。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。')
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材当天涨停家数）。点上面的题材条只列该题材的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、≥3板、分时拉板叠加。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
+    + '，主板、剔 ST／退市。题材按主动因归族：光伏硅片/组件/支架/石英坩埚等→光伏，AI视频/营销/智能体等→AI应用，光刻胶/光芯片/半导体设备等→芯片，机器人细分→机器人概念，AI眼镜/端侧芯片→端侧AI，零售/酒店/乳业/白酒→消费，房地产/物业/建材→地产链，锂电/固态电池/铝箔→锂电池。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、≥3板、分时拉板叠加。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
@@ -7346,11 +7394,7 @@ function ldrPaint(){
   var tb = document.getElementById('ldrLv'); if (!tb) return;
   var ds = ldrCur(); if (!ds){ tb.innerHTML = ''; return; }
   var A = ldrAgg(ds);
-  var rows = A.rows.filter(function(r){
-    if (!LDRTH) return true;
-    for (var i = 0; i < r.tags.length; i++){ if (r.tags[i].t === LDRTH) return true; }
-    return false;
-  });
+  var rows = A.rows.filter(function(r){ return ldrInTheme(r, LDRTH); });
   var scanning = LDRLINE && LDRLSCANNING[ds];
   if (LDRHIGH) rows = rows.filter(function(r){ return r.b >= 3; });
   if (LDRLINE) rows = rows.filter(function(r){ return !!ldrLineHit(ds, r.c); });
@@ -7373,15 +7417,19 @@ function ldrPaint(){
     if (!poolOfDs(prevDs) || !poolOfDs(prevDs).length) return;   // 上一天没有涨停池就不算，免得显示成 -N
     var PA = ldrAgg(prevDs); if (!PA || !PA.rows.length) return;
     var pr = PA.rows.filter(function(r){
-      if (!LDRTH) return true;
-      for (var q = 0; q < r.tags.length; q++){ if (r.tags[q].t === LDRTH) return true; }
-      return false;
+      if (!ldrInTheme(r, LDRTH)) return false;
+      if (LDRHIGH && r.b < 3) return false;
+      if (LDRLINE && !ldrLineHit(prevDs, r.c)) return false;
+      return true;
     });
-    if (LDRHIGH) pr = pr.filter(function(r){ return r.b >= 3; });
-    if (LDRLINE) pr = pr.filter(function(r){ return !!ldrLineHit(prevDs, r.c); });
     prevLv = {};
     pr.forEach(function(r){ prevLv[r.b] = (prevLv[r.b] || 0) + 1; });
   })();
+  var famCnt = ldrThemeCounts(rows);
+  function famTagsOf(r){
+    var f = ldrFam(r.prim || ((r.tags[0] || {}).t) || '');
+    return f ? [{ t: f, n: famCnt[f] || 1 }] : [];
+  }
   var keys = Object.keys(lv).map(Number).sort(function(a, x){ return x - a; });
   var h = '';
   keys.forEach(function(b){
@@ -7395,8 +7443,9 @@ function ldrPaint(){
     h += '<div class="lv"><span class="lvTag t' + Math.min(b, 5) + '">' + (b === 1 ? '首板' : b + '板') + ' ×' + arr.length + dlt + '</span><span class="lvList">';
     arr.forEach(function(r){
       var ln = ldrLineHit(ds, r.c);
+      var fts = famTagsOf(r);
       var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b === 1 ? '首板' : b + '连板') ? '（' + (r.live ? '实时' : (kthDay(ds) ? '开盘啦' : '同花顺')) + '原标 ' + r.ty + (r.bt ? ' / ' + r.bt : '') + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
-        + ' · 题材：' + (r.tags.map(function(x){ return x.t + x.n + (x.raw && x.raw !== x.t ? '（原标 ' + x.raw + '）' : ''); }).join(' / ') || '—')
+        + ' · 题材：' + (fts.map(function(x){ return x.t + x.n; }).join(' / ') || '—')
         + (ln ? ' · 分时直线：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟 +' + ln.g + '%，最大回撤 ' + ln.dd + '%' : '')
         + (r.live ? ' · 盘中实时（题材' + (r.tagSrc === '行业' ? '用东财行业兜底' : '沿用昨日开盘啦') + '）' : '')
         + '（点开看K线）';
@@ -7404,7 +7453,7 @@ function ldrPaint(){
       if (ndm) ttl += ' · ◆节点票（节点日首板，今天 ' + b + ' 板）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + (b === 1 ? ' lv1' : '') + (ndm ? ' nd' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" data-lb="' + b + '" title="' + esc(ttl) + '">'
         + '<b>' + esc(r.n) + '</b>' + (ndm ? '<em class="ndb">◆节点</em>' : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
-        + (LDRTS ? '<em>' + esc(r.tags.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (r.tags.length > 2 ? ' +' + (r.tags.length - 2) : '')) + '</em>' : '')
+        + (LDRTS ? '<em>' + esc(fts.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (fts.length > 2 ? ' +' + (fts.length - 2) : '')) + '</em>' : '')
         + (ln ? '<em style="color:#c02c2c;font-style:normal;background:#fff1f0;border-radius:6px;padding:0 3px;margin-left:2px" title="' + esc('分时直线拉板：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟拉 ' + ln.g + '% 到涨停，最大回撤 ' + ln.dd + '%') + '">直线' + ldrHM(ln.s) + '</em>' : '')
         + '</a>';
     });
