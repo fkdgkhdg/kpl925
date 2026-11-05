@@ -447,7 +447,7 @@
     <div class="plBody"><p class="note">输入股票名或代码，点「分析」。</p></div>
   </div>
   <div class="card" id="mbCard">
-    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button><span class="optgrp" id="mbDateNav" style="margin-left:auto;flex-wrap:wrap;justify-content:flex-end"><button id="dPrev">◀ 前一交易日</button><input type="date" id="dt" class="dtin" min="2024-09-10" aria-label="选择交易日"><button id="dNext">后一交易日 ▶</button></span></div>
+    <div class="optgrp" id="mbBar" style="margin:4px 0 8px;flex-wrap:wrap"><span>名单</span><button id="mAT" class="active">实际换手前5</button><button id="mAMT" title="昨日涨停股按 9:25 竞价成交额从高到低取前5，只看总市值≤200亿">成交额前5</button><button id="mALL" title="只看昨日涨停股里的节点票，按 9:25 竞价成交额从高到低取前5，只看总市值≤200亿；节点日先在连板梯队里标记">节点票成交额前5</button><button id="mbNV">未涨停前5</button><span class="optgrp" id="mbDateNav" style="margin-left:auto;flex-wrap:wrap;justify-content:flex-end"><button id="dPrev">◀ 前一交易日</button><input type="date" id="dt" class="dtin" min="2024-09-10" aria-label="选择交易日"><button id="dNext">后一交易日 ▶</button></span></div>
     <div id="mbMain">
     <div class="opts" id="ndBar" style="margin:4px 0 8px;align-items:center"><span style="color:var(--muted)">节点起算日</span><input id="ndAnchor" type="date" style="width:150px"><button id="ndClear">清除</button><button id="ndHelp">节点口径</button><span class="note" id="ndHint" style="margin:0"></span></div>
     <div class="kpirow"><div class="kpi" id="kpi"></div><div id="ndTix"></div></div>
@@ -1559,11 +1559,14 @@ function pickTopRows(rows){                         // 「5 只榜单」「逐�
     return (b.at || 0) - (a.at || 0);
   });
   byAt.forEach(function(r, i){ r._rankAT = i + 1; });
+  var MC_MAX = 200 * 1e8;                            // 成交额前5 / 节点票：只取总市值 ≤200亿（市值缺失的老存档保留）
+  var capRows = rows;
+  if (nodeMode || mode === "amt") capRows = rows.filter(function(r){ return !(r.mc > MC_MAX); });
   var out = byAt, list;
   if (nodeMode){
     var ns = {};
     try { ns = (typeof nodeSet === "function") ? nodeSet() : {}; } catch(e){}
-    var nodeRows = rows.filter(function(r){ return !!ns[r.code]; });
+    var nodeRows = capRows.filter(function(r){ return !!ns[r.code]; });
     var rankAmt = nodeRows.some(function(r){ return (r.amtA || r.amount || 0) > 0; });
     if (rankAmt){
       out = nodeRows.slice().sort(function(a, b){ return (b.amtA || b.amount || 0) - (a.amtA || a.amount || 0); });
@@ -1576,7 +1579,7 @@ function pickTopRows(rows){                         // 「5 只榜单」「逐�
              nodeMode:true, rankAmt:rankAmt, nodeCount:nodeRows.length };
   }
   if (mode === "amt" && !useBase){
-    out = rows.slice().sort(function(a, b){ return (b.amtA || b.amount || 0) - (a.amtA || a.amount || 0); });
+    out = capRows.slice().sort(function(a, b){ return (b.amtA || b.amount || 0) - (a.amtA || a.amount || 0); });
     out.forEach(function(r, i){ r._rankAMT = i + 1; });
     list = out.slice(0, 5);
   } else {
@@ -7889,7 +7892,7 @@ function renderCore(){
   var amtMode = (_pk.mode === "amt" && !useBase);
   var nodeMode = !!_pk.nodeMode;
   var rankAmt = nodeMode ? !!_pk.rankAmt : amtMode;
-  var modeLabel = nodeMode ? (rankAmt ? "节点票成交额前5" : "节点票（按实际换手）") : (amtMode ? "成交额前5" : (useBase ? "全部昨日涨停股" : "实际换手前5"));
+  var modeLabel = nodeMode ? (rankAmt ? "节点票成交额前5（≤200亿）" : "节点票（按实际换手，≤200亿）") : (amtMode ? "成交额前5（≤200亿）" : (useBase ? "全部昨日涨停股" : "实际换手前5"));
   if ($("mAT") && $("mALL")){ var _mbMain = (typeof MB === "undefined" || MB.view === "zt"); $("mAT").classList.toggle("active", _mbMain && !nodeMode && !useBase && !amtMode); $("mAMT") && $("mAMT").classList.toggle("active", _mbMain && !nodeMode && amtMode); $("mALL").classList.toggle("active", _mbMain && nodeMode); }
   if (!rows.length){
     $("tbl").innerHTML = '<tbody><tr><td class="empty">' +
@@ -7981,7 +7984,7 @@ function renderCore(){
     "「热度#N」＝该股所属行业在「板块热度」榜（口径＝近3日涨停家数×3 + 近3日涨幅 + (放量-1)×10，截至前一交易日）排进前 10，鼠标悬停看明细。" +
     "「题材厚度」＝该股按「开盘啦人气版」题材逐条列出，并标注每个题材在前一交易日同题材一起涨停的主板家数（开盘啦口径）。大标签＝它最厚的题材（红＝≥5 只爆发档，蓝＝2-4 只，灰＝≤1 只），后面的小标签是它的其他题材，鼠标悬停可看全部；没有任何题材数据时才显示「独苗」。题材越厚说明昨天同题材一起涨停的主板家数越多（同题材共振更强），但这只是结构描述，本页没有它相对独苗的 A 口径验证数据，不按它加减分。" +
     "「昨日席位」＝该股昨天涨停那天上龙虎榜的营业部（同一席位取当天最大的一笔，最多显示 3 个，多的用「＋N 席未显示」标出，具体日期见表头）。每行开头一个字标、右边是净额，鼠标悬停看席位全称与样本数。席位底色＝类型：散＝散户通道（东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网，橙底）、游＝游资/营业部（红底）、机＝机构专用（蓝底）、北＝北向沪深股通（紫底），其余营业部席位都归「游」；净额字色：绿＝净买、红＝净卖。左侧竖条：红＝该席位「买入后次日大面率」≥45%（或在你自选的爆头席位名单里；命中且它当天在买→逐票竞价建议一票否决），橙＝33~44%。口径＝该席位每次净买入上榜后，下一交易日收盘≤-5% 的比例（样本≥20 笔）。没上龙虎榜就显示「无龙虎榜」。席位列最上方出现红/橙「散户接盘 +X万」标签＝该股涨停（或上榜）那天，龙虎榜上「散户通道」（拉萨天团：东财拉萨/昌都/山南/林芝/日喀则系 + 国信浙江互联网）合计净买 ≥500 万（红＝≥1000 万），同日非散户席位净额在悬停提示里。历史口径（2024-09~2026-10 主板龙虎榜全量）：上榜日散户通道净买的票，次日收盘下跌 61%（全体上榜股基率 52%）、次日平均 -1.5%、次日跌超 5% 的概率 34%（基率 24%）；若当天本身就跌停被散户接盘，次日下跌概率 73%、平均 -3.4%。读法＝散户大额接盘，次日基本没有溢价。点上方「龙虎榜席位 ▸」按钮＝整页席位结构对照（榜单日席位结构 / 席位特征×次日表现 / 买一占比条件拆解 / 最新一档龙虎榜明细 / 最近高连板活跃席位）。提醒：昨天净买的大席位＝今天最可能的抛压，他次日反手就是砸盘主力（例：西陇科学 9-16 国新北京分公司 +8561万，9-17 反手净卖 9385万）。" +
-    "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : (rankAmt ? "今日 9:25 竞价成交额，从高到低" : "今日 9:25 竞价的实际换手率，从高到低")) + "（本组名单＝" + modeLabel + "）" +
+    "排名依据＝" + (STATE.sort === "ret" ? "历史统计的断板卖出(A均值)" : (rankAmt ? "今日 9:25 竞价成交额，从高到低（总市值≤200亿）" : "今日 9:25 竞价的实际换手率，从高到低")) + "（本组名单＝" + modeLabel + "）" +
     (STATE.colSort ? "；表格当前按「" + (STATE.colSort === "at" ? "实际换手" : "竞价成交额") + "」" + (STATE.colDir === 1 ? "升序" : "降序") + "排列，点表头可切换" : "") +
     (STATE.noLimit ? "，已先剔一字（买不到的）再按当前名单口径重排名次" : "") + "，不代表当天结果。刷新时间 " +
     new Date().toLocaleTimeString("zh-CN", { hour12:false }) + "。";
