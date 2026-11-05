@@ -122,7 +122,13 @@
   #ldrLv .lvS.nd i{color:#c9793f}
   #ldrLv .lvS .ndb{font-style:normal;font-size:10px;font-weight:700;background:#c02c2c;color:#fff;border-radius:6px;padding:0 4px;line-height:1.5}
   #ldrNode.active{background:#c02c2c;color:#fff;border-color:#c02c2c}
-  #ldrHigh.active{background:#c02c2c;color:#fff;border-color:#c02c2c}
+  #ldrChip.active{background:#1f3864;color:#fff;border-color:#1f3864}
+  #ldrLv .lvS .cht{font-style:normal;font-size:10px;font-weight:700;border-radius:6px;padding:0 4px;line-height:1.55;margin-left:1px;white-space:nowrap}
+  #ldrLv .lvS .cht0{background:#e5e7eb;color:#6b7280}
+  #ldrLv .lvS .cht1{background:#3b6fd4;color:#fff}
+  #ldrLv .lvS .cht2{background:#e07a1f;color:#fff}
+  #ldrLv .lvS .cht3{background:#c02c2c;color:#fff}
+  #ldrLv .lvS .chtq{background:transparent;color:#9aa3b2;border:1px dashed #cbd5e1}
   .kpirow{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
   .kpirow>.kpi{flex:1 1 320px;min-width:0}
   #ndTix{margin:0 0 8px auto;max-width:560px}
@@ -667,7 +673,7 @@
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span><span id="ldrLive" style="display:none;font-size:11.5px;font-weight:700;color:#c02c2c;white-space:nowrap"></span>
         <span class="fineprint" style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
-        <button id="ldrHigh" title="只显示 3 板及以上的股票，可与题材、分时拉板叠加">≥3板</button><button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+        <button id="ldrChip" title="显示首板筹码标签：首板收盘站上主峰、主峰占比＜5%、上方无明显近峰；只加标签，不筛选也不改梯队">首板筹码</button><button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
@@ -6994,8 +7000,8 @@ function renderLDR(){
   if (!A || !A.rows.length){ el.innerHTML = '<div class="empty" style="padding:10px 0">这一天没有涨停股</div>'; return; }
   try { if (ds === STATE.day && $("relayCard")) paintRelay(); } catch(e){}
   var AF = null;                            // 开了「只看直线」时，题材条/全部数按筛后重算
-  if (LDRHIGH || (LDRLINE && !LDRLSCANNING[ds])){
-    var fr = A.rows.filter(function(r){ return (!LDRHIGH || r.b >= 3) && (!LDRLINE || !!ldrLineHit(ds, r.c)); });
+  if (LDRLINE && !LDRLSCANNING[ds]){
+    var fr = A.rows.filter(function(r){ return (!LDRLINE || !!ldrLineHit(ds, r.c)); });
     var tagCnt = {}, b2 = {}, max2 = 0, lian2 = 0;
     fr.forEach(function(r){
       r.tags.forEach(function(x){ tagCnt[x.t] = (tagCnt[x.t] || 0) + 1; });
@@ -7018,6 +7024,11 @@ function renderLDR(){
   if (typeof paintNodeBtn === "function") paintNodeBtn();
   var topB = A.cntB[A.maxB] || 0;
   var k = document.getElementById('ldrKpi');
+  var chipKpi = '';
+  if (LDRCHIP){
+    var chc = ldrChipCounts(AF ? AF.rows : A.rows, ds);
+    chipKpi = '<span class="chip" style="background:#fff1f0;color:#c02c2c" title="3分＝三条件全满足；2分／1分依次递减；0分 ' + chc.c[0] + ' 只；待生成 ' + chc.miss + ' 只">首板筹码 <b>3分' + chc.c[3] + '</b> · 2分' + chc.c[2] + ' · 1分' + chc.c[1] + '</span>';
+  }
   if (k) k.innerHTML = (live ? '<span class="chip" style="background:#3b6fd4">● 盘中实时 <b>' + ldrClockOf(LDRLIVE.ts) + '</b></span>' : '') + '<span class="chip big" style="background:#c02c2c">涨停 ' + A.n + ' 家</span>'
     + '<span class="chip">最高 <b>' + A.maxB + '</b> 板' + (topB > 1 ? '（' + topB + ' 只）' : '') + '</span>'
     + '<span class="chip">连板 <b>' + A.lian + '</b> 只</span>'
@@ -7025,7 +7036,7 @@ function renderLDR(){
     + (nodeIsDay(ds) ? '<span class="chip" id="ldrNdKpi" style="background:#c02c2c">节点日 · 首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>' : '')
     + '<span class="chip">题材组 <b>' + TV.length + '</b> 个（≥2只 <b>' + TV.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
     + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (CV[LDRTH] || 0) + ' 只）</span>' : '')
-    + (LDRLINE ? '<span class="chip" style="background:#fff1f0;color:#c02c2c">分时直线 <b>' + ldrLineNum(ds, 'line') + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '');
+    + (LDRLINE ? '<span class="chip" style="background:#fff1f0;color:#c02c2c">分时直线 <b>' + ldrLineNum(ds, 'line') + '</b> 只' + (AF ? '（当天共 ' + A.n + ' 只）' : '') + '</span>' : '') + chipKpi;
   var te = document.getElementById('ldrTh');
   if (te){
     var multi = TV.filter(function(x){ return x.n >= 2; });
@@ -7053,7 +7064,7 @@ function renderLDR(){
   if (note) note.textContent = live
     ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族：光伏硅片/组件/支架/石英坩埚等→光伏，AI视频/营销/智能体等→AI应用，光刻胶/光芯片/半导体设备等→芯片，机器人细分→机器人概念，AI眼镜/端侧芯片→端侧AI，零售/酒店/乳业/白酒→消费。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。')
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族：芯片、通信、黄金、机器人概念、医药、光伏、AI应用等直接用开盘啦 ZSName 大类；零售/酒店/乳业/白酒/冰雪等并入消费，燃气轮机/电源/算力并入算力基建。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、≥3板、分时拉板叠加。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
+    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族：芯片、通信、黄金、机器人概念、医药、光伏、AI应用等直接用开盘啦 ZSName 大类；零售/酒店/乳业/白酒/冰雪等并入消费，燃气轮机/电源/算力并入算力基建。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
@@ -7186,7 +7197,83 @@ function renderLdrTop5(ds){
    一字／秒板（开盘就封）不算。
    起拉点＝封板前一根起算：封板前那根的小回踩不计入拉升，2 根直拉也能判成直线。 */
 var LDRLINE = false, LDRLN = null, LDRLSEEN = {}, LDRLSCANNING = {};
-var LDRHIGH = false;
+var LDRCHIP = false, CHIPTAGIDX = null, LDRCHIPLOAD = null;
+function ldrChipIndex(){
+  if (CHIPTAGIDX) return CHIPTAGIDX;
+  CHIPTAGIDX = {};
+  if (typeof CHIPTAG !== 'undefined' && CHIPTAG){
+    Object.keys(CHIPTAG).forEach(function(k){
+      var p = k.split('|'), c = p[0], d = p[1];
+      (CHIPTAGIDX[c] = CHIPTAGIDX[c] || []).push(d);
+    });
+    Object.keys(CHIPTAGIDX).forEach(function(c){ CHIPTAGIDX[c].sort(); });
+  }
+  return CHIPTAGIDX;
+}
+function ldrChipEnsure(cb){
+  if (typeof CHIPTAG !== 'undefined' && CHIPTAG){ ldrChipIndex(); if (cb) cb(true); return; }
+  if (!LDRCHIPLOAD){
+    var load = LDRCHIPLOAD = { cbs: [] };
+    if (cb) load.cbs.push(cb);
+    var sc = document.createElement('script');
+    var bj = new Date(Date.now() + 8 * 3600 * 1000);
+    sc.src = 'chiptagdata.js?v=' + bj.toISOString().slice(0,10).replace(/-/g,'');
+    sc.async = true;
+    sc.onload = function(){
+      var ok = !!(typeof CHIPTAG !== 'undefined' && CHIPTAG);
+      if (ok) ldrChipIndex();
+      LDRCHIPLOAD = null;
+      load.cbs.forEach(function(f){ try { f(ok); } catch(e){} });
+    };
+    sc.onerror = function(){
+      LDRCHIPLOAD = null;
+      load.cbs.forEach(function(f){ try { f(false); } catch(e){} });
+    };
+    document.head.appendChild(sc);
+    return;
+  }
+  if (cb) LDRCHIPLOAD.cbs.push(cb);
+}
+function ldrChipInfo(code, ds, board){
+  var idx = ldrChipIndex(), ks = ldrDays(), i = ks.indexOf(ds);
+  if (i < 0) return null;
+  board = Math.max(1, +board || 1);
+  var j = i - (board - 1), d0 = j >= 0 ? ks[j] : '';
+  var v = (d0 && typeof CHIPTAG !== 'undefined' && CHIPTAG) ? CHIPTAG[String(code) + '|' + ldrIso(d0)] : null;
+  if (!v && idx[String(code)]){
+    var a = idx[String(code)];
+    for (var n = a.length - 1; n >= 0; n--){
+      var cand = String(a[n]).replace(/-/g, '');
+      var k = ks.indexOf(cand);
+      if (k >= 0 && k <= i && i - k === board - 1){ d0 = cand; v = CHIPTAG[code + '|' + a[n]]; break; }
+    }
+  }
+  return v ? { v:v, d0:d0 } : null;
+}
+function ldrChipBadge(info){
+  if (!info) return '<em class="cht chtq" title="首板筹码待生成：若今天是首板，需收盘后更新">筹?</em>';
+  var v = info.v, sc = Math.max(0, Math.min(3, +v[6] || 0));
+  var od = +v[3] < 0 ? '无' : '+' + (+v[3]).toFixed(1) + '%';
+  var nl = String.fromCharCode(10);
+  var tt = '首板 ' + ldrIso(info.d0) + ' 收盘筹码（东财三角分布模型）' + nl
+    + '首板收盘较主峰：' + (v[0] >= 0 ? '+' : '') + v[0] + '%' + nl
+    + '主峰筹码占比：' + v[1] + '%（<5% 达标）' + nl
+    + '90%筹码带宽：' + v[2] + '%' + nl
+    + '上方最近峰：' + od + '（无峰达标）' + nl
+    + '获利盘：' + v[4] + '%' + nl
+    + '首板换手：' + v[5] + '%' + nl
+    + '三条件：' + sc + '/3';
+  return '<em class="cht cht' + sc + '" title="' + esc(tt) + '">筹' + sc + '</em>';
+}
+function ldrChipCounts(rows, ds){
+  var c = [0,0,0,0], miss = 0;
+  (rows || []).forEach(function(r){
+    var info = ldrChipInfo(r.c, ds, r.b);
+    if (info) c[Math.max(0, Math.min(3, +info.v[6] || 0))]++;
+    else miss++;
+  });
+  return { c:c, miss:miss };
+}
 function ldrLineCache(){
   if (LDRLN) return LDRLN;
   LDRLN = {};
@@ -7405,14 +7492,12 @@ function ldrPaint(){
   var A = ldrAgg(ds);
   var rows = A.rows.filter(function(r){ return ldrInTheme(r, LDRTH); });
   var scanning = LDRLINE && LDRLSCANNING[ds];
-  if (LDRHIGH) rows = rows.filter(function(r){ return r.b >= 3; });
   if (LDRLINE) rows = rows.filter(function(r){ return !!ldrLineHit(ds, r.c); });
   if (!rows.length){
     if (scanning){ tb.innerHTML = '<div class="empty" style="padding:10px 0">正在扫这一天的分时，识别「直线拉板」…</div>'; return; }
-    var highWhy = LDRHIGH ? '这一天筛选下没有 3 板及以上的股票' : '';
     tb.innerHTML = '<div class="empty" style="padding:10px 0">'
       + (LDRLINE ? (ldrLineMissAll(ds) ? '这一天分时取不到（分钟线只保留最近 5 个交易日），换近几天的日期再看' : '这一天没有识别到分时直线拉到涨停的股票')
-                 : (highWhy || '这一天这个题材没有涨停股')) + '</div>';
+                 : '这一天这个题材没有涨停股') + '</div>';
     return;
   }
   var lv = {};
@@ -7427,7 +7512,6 @@ function ldrPaint(){
     var PA = ldrAgg(prevDs); if (!PA || !PA.rows.length) return;
     var pr = PA.rows.filter(function(r){
       if (!ldrInTheme(r, LDRTH)) return false;
-      if (LDRHIGH && r.b < 3) return false;
       if (LDRLINE && !ldrLineHit(prevDs, r.c)) return false;
       return true;
     });
@@ -7453,6 +7537,7 @@ function ldrPaint(){
     arr.forEach(function(r){
       var ln = ldrLineHit(ds, r.c);
       var fts = famTagsOf(r);
+      var ci = LDRCHIP ? ldrChipInfo(r.c, ds, b) : null;
       var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b === 1 ? '首板' : b + '连板') ? '（' + (r.live ? '实时' : (kthDay(ds) ? '开盘啦' : '同花顺')) + '原标 ' + r.ty + (r.bt ? ' / ' + r.bt : '') + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
         + ' · 题材：' + (fts.map(function(x){ return x.t + x.n; }).join(' / ') || '—')
         + (ln ? ' · 分时直线：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟 +' + ln.g + '%，最大回撤 ' + ln.dd + '%' : '')
@@ -7461,7 +7546,7 @@ function ldrPaint(){
       var ndm = !nodeIsDay(ds) && !!nodeSet()[r.c];   // 节点日当天不重复打标（当天首板本来就全是节点）
       if (ndm) ttl += ' · ◆节点票（节点日首板，今天 ' + b + ' 板）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + (b === 1 ? ' lv1' : '') + (ndm ? ' nd' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" data-lb="' + b + '" title="' + esc(ttl) + '">'
-        + '<b>' + esc(r.n) + '</b>' + (ndm ? '<em class="ndb">◆节点</em>' : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
+        + '<b>' + esc(r.n) + '</b>' + (ndm ? '<em class="ndb">◆节点</em>' : '') + (LDRCHIP ? ldrChipBadge(ci) : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
         + (LDRTS ? '<em>' + esc(fts.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (fts.length > 2 ? ' +' + (fts.length - 2) : '')) + '</em>' : '')
         + (ln ? '<em style="color:#c02c2c;font-style:normal;background:#fff1f0;border-radius:6px;padding:0 3px;margin-left:2px" title="' + esc('分时直线拉板：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟拉 ' + ln.g + '% 到涨停，最大回撤 ' + ln.dd + '%') + '">直线' + ldrHM(ln.s) + '</em>' : '')
         + '</a>';
@@ -10177,11 +10262,25 @@ vfInit();
     if(t.id === "ldrLast"){ LDRDS = ""; LDRTH = ""; if (typeof renderLDR === "function") renderLDR(); e.preventDefault(); return; }
     if(t.id === "ldrReload"){ if (typeof ldrReloadData === "function") ldrReloadData(); e.preventDefault(); return; }
     if(t.id === "ldrBig"){ toggleBig(); e.preventDefault(); return; }
-    if(t.id === "ldrHigh"){
-      LDRHIGH = !LDRHIGH;
-      t.classList.toggle("active", LDRHIGH);
-      t.textContent = LDRHIGH ? "只看≥3板" : "≥3板";
-      if (typeof renderLDR === "function") renderLDR();
+    if(t.id === "ldrChip"){
+      if (LDRCHIP){
+        LDRCHIP = false;
+        t.classList.remove("active");
+        t.textContent = "首板筹码";
+        if (typeof renderLDR === "function") renderLDR();
+      } else {
+        t.disabled = true;
+        t.textContent = "加载筹码…";
+        if (typeof ldrChipEnsure === "function") ldrChipEnsure(function(ok){
+          var b = document.getElementById("ldrChip"); if (!b) return;
+          b.disabled = false;
+          if (!ok){ b.textContent = "首板筹码"; b.title = "筹码数据加载失败，请刷新页面重试"; return; }
+          LDRCHIP = true;
+          b.classList.add("active");
+          b.textContent = "隐藏筹码";
+          if (typeof renderLDR === "function") renderLDR();
+        });
+      }
       e.preventDefault(); return;
     }
     if(t.id === "ldrLine"){
