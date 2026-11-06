@@ -2482,10 +2482,25 @@ var THFOLD = {
   "光伏边框":"光伏", "光伏支架":"光伏", "光伏组件":"光伏", "光伏硅片":"光伏", "光伏设备":"光伏", "光伏电池":"光伏", "光伏概念":"光伏", "光伏发电":"光伏", "光伏玻璃":"光伏", "光伏胶膜":"光伏",
   "太阳能":"光伏", "钙钱矿电池":"光伏", "HJT":"光伏", "TOPCon":"光伏", "逆变器":"光伏", "硅料":"光伏", "硅片":"光伏", "电池片":"光伏", "胶膜":"光伏"
 };
-function thFoldTag(t){ t = String(t || "").trim(); return THFOLD[t] || t; }
+function thFoldTag(t){
+  t = String(t || "").trim().replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+  if (THFOLD[t]) return THFOLD[t];
+  var AG = "农业";
+  if (t && typeof LDRFAMILY !== "undefined" && LDRFAMILY && LDRFAMILY[t] === AG) return AG;
+  if (AGRIEXTRA[t]) return AG;
+  return t;
+}
+var AGRIEXTRA = { "化肥":1, "棉花":1, "尿素":1, "白糖":1, "兽药":1, "玉米":1, "小麦":1, "大豆":1, "养殖":1, "渔业":1, "林业":1, "猪肉":1, "农化制品":1, "种植业":1, "养殖业":1, "农产品加工":1, "水产品":1, "农机":1, "农药":1, "种业":1, "鸡肉":1, "饲料":1 };
 var THCORE = {};
 var THDIR = {};
-function thFamName(t){ var s = String(t).replace(/[\u201c\u201d"'\u2018\u2019]/g, ""); var m = s.match(/^(.+)\u5b57\u8f88$/); return m ? m[1] + "\u5b57\u8f88" : null; }
+function thFamName(t){
+  var raw = String(t == null ? "" : t).trim();
+  var s = raw.replace(/[\u201c\u201d"'\u2018\u2019]/g, "");
+  var m = s.match(/^(.+)\u5b57\u8f88$/);
+  if (m) return m[1] + "\u5b57\u8f88";
+  if (s.length >= 2 && s.length <= 8 && /^[\u201c\u2018"']/.test(raw) && /[\u201d\u2019"']$/.test(raw)) return s + "\u5b57\u8f88";
+  return null;
+}
 function thTagsOf(a){ return String(a[2]).split("+").map(function(x){ return x.trim(); }).filter(function(x){ return x; }); }
 function dirOfTag(tag){
   var t = String(tag);
@@ -2537,7 +2552,10 @@ function thGroups(dstr){
   pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ var f = thFamName(t); if (f){ (fams[f] || (fams[f] = [])).push(a[0]); } }); });
   Object.keys(fams).forEach(function(f){
     var u = {}; fams[f].forEach(function(c){ u[c] = 1; });
-    list.push({ n: f, kw: [], codes: Object.keys(u), tags: [f], kind: "fam" });
+    var codes = Object.keys(u), pre = f.replace(/\u5b57\u8f88$/, ""), hit = 0;
+    codes.forEach(function(c){ var a = byCode[c]; var nm = a ? String(a[1] || "") : ((typeof NAMEMAP !== "undefined" && NAMEMAP[c]) || ""); if (nm.indexOf(pre) >= 0) hit++; });
+    if (codes.length < 2 && !hit) return;
+    list.push({ n: f, kw: [], codes: codes, tags: [f], kind: "fam" });
   });
   list.sort(function(x,y){ return ((x.kind === "kpl") ? 0 : 1) - ((y.kind === "kpl") ? 0 : 1) || y.codes.length - x.codes.length; });
   THDIR[dstr] = { list: list, byCode: byCode, pool: pool };
@@ -6924,9 +6942,24 @@ function boardLbl(r, day, exact){
   return b === 1 ? "首板" : (b + "板");
 }
 function ldrFam(t){
-  var x = String(t || "").replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+  var raw = String(t || "").trim();
+  if (typeof thFamName === "function"){ var fm = thFamName(raw); if (fm) return fm; }
+  var x = raw.replace(/（[^）]*）|\([^)]*\)/g, "").trim();
   x = LDRALIAS[x] || LDRALIAS[t] || x;
+  if (typeof AGRIEXTRA !== "undefined" && AGRIEXTRA[x]) return "农业";
   return LDRFAMILY[x] || x || "其他";
+}
+function ldrRowFam(r){                       // 当天涨停原因里带 “东方”/“羊” 这类字辈标签时，额外归一族（不改主动因）
+  var ts = (r && r.tags) || [];
+  if (typeof thFamName === "function"){
+    for (var i = 0; i < ts.length; i++){
+      var f = thFamName(ts[i].raw || ts[i].t);
+      if (f) return f;
+    }
+  }
+  var nm = String((r && r.n) || "");
+  if (nm.indexOf("东方") >= 0) return "东方字辈";   // 名字带「东方」的也算，开盘啦只给其中几只打了标签
+  return "";
 }
 function ldrGroupOf(a, powerDay){
   // 开盘啦接口的 ZSName 已经是文章口径的大类；旧缓存没有第 9 项时退回主涨停原因。
@@ -6939,11 +6972,18 @@ function ldrGroupOf(a, powerDay){
 function ldrInTheme(r, th){
   if (!th) return true;
   var p = r.prim || ((r.tags[0] || {}).t) || "";
-  return ldrFam(p) === th;
+  if (ldrFam(p) === th) return true;
+  if (ldrRowFam(r) === th) return true;
+  return false;
 }
 function ldrThemeCounts(rows){
   var c = {};
-  (rows || []).forEach(function(r){ var f = ldrFam(r.prim || ((r.tags[0] || {}).t) || ""); if (f) c[f] = (c[f] || 0) + 1; });
+  (rows || []).forEach(function(r){
+    var f = ldrFam(r.prim || ((r.tags[0] || {}).t) || "");
+    if (f) c[f] = (c[f] || 0) + 1;
+    var fam = ldrRowFam(r);
+    if (fam && fam !== f) c[fam] = (c[fam] || 0) + 1;
+  });
   return c;
 }
 function ldrThemeList(c){
