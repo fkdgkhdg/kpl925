@@ -2478,6 +2478,11 @@ var DIRS = [
   ["农业", ["种业","农业","养殖","转基因","猪价","禽"]],
   ["海南自贸", ["海南自贸港","自贸区","海南","海峡两岸","对台"]]
 ];
+var THFOLD = {
+  "光伏边框":"光伏", "光伏支架":"光伏", "光伏组件":"光伏", "光伏硅片":"光伏", "光伏设备":"光伏", "光伏电池":"光伏", "光伏概念":"光伏", "光伏发电":"光伏", "光伏玻璃":"光伏", "光伏胶膜":"光伏",
+  "太阳能":"光伏", "钙钱矿电池":"光伏", "HJT":"光伏", "TOPCon":"光伏", "逆变器":"光伏", "硅料":"光伏", "硅片":"光伏", "电池片":"光伏", "胶膜":"光伏"
+};
+function thFoldTag(t){ t = String(t || "").trim(); return THFOLD[t] || t; }
 var THCORE = {};
 var THDIR = {};
 function thFamName(t){ var s = String(t).replace(/[\u201c\u201d"'\u2018\u2019]/g, ""); var m = s.match(/^(.+)\u5b57\u8f88$/); return m ? m[1] + "\u5b57\u8f88" : null; }
@@ -2519,7 +2524,7 @@ function thGroups(dstr){
   var zpool = (typeof ZTRS !== "undefined" && ZTRS && ZTRS.d && ZTRS.d[dstr]) || [];
   zpool.forEach(function(a){ if (!byCode[a[0]]) byCode[a[0]] = a; });
   var list = [], _thm = {};
-  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ (_thm[t] || (_thm[t] = [])).push(a[0]); }); });
+  pool.forEach(function(a){ thTagsOf(a).forEach(function(t){ t = thFoldTag(t); (_thm[t] || (_thm[t] = [])).push(a[0]); }); });
   Object.keys(_thm).forEach(function(t){
     var u = {}; _thm[t].forEach(function(c){ u[c] = 1; });
     var codes = Object.keys(u);
