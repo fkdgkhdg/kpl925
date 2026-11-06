@@ -559,7 +559,7 @@
   </div>
 
   <div class="card" id="pbCard" hidden>
-    <h2>涨停回踩5日线池 · 近日涨停过、现在贴着5日线（数据截至 <span id="pbDate"></span>）
+    <h2>涨停回踩5日线池 · 近5日涨停过、现在贴着5日线（数据截至 <span id="pbDate"></span>）
       <span style="float:right"><button class="mini" id="pbRefresh">刷新</button><button class="mini" id="pbDeep">加大窗口</button></span></h2>
     <div class="chips" id="pbTop"></div>
     <div class="tablewrap"><table id="pbTbl"><tbody><tr><td class="empty">正在自抓…</td></tr></tbody></table></div>
@@ -5677,7 +5677,7 @@ function renderYizi(){
 // ===== 涨停回踩5日线池（打开网页自抓 + 随时刷新）=====
 // 口径：最近 N 个交易日里有涨停过的主板股（非 ST、流通市值≥20 亿）→ 逐只取日K算 5 日线 →
 //       只留「现价贴着 5 日线（-0.5% ~ +2%）」的，按距 5 日线由近到远排。日K 用同花顺、腾讯兜底。
-var PB = { cal:"", day:"", rows:null, loading:false, ts:0, err:"", src:"", candN:0, lb:11, force:false, q:{}, qt:0, tried:false };
+var PB = { cal:"", day:"", rows:null, loading:false, ts:0, err:"", src:"", candN:0, lb:5, force:false, q:{}, qt:0, tried:false };
 var PBK = null;
 function pbKeyOf(d){ return "kpl_pb1_" + d; }
 function pbLoadCache(d){
@@ -5685,7 +5685,7 @@ function pbLoadCache(d){
     var t = localStorage.getItem(pbKeyOf(d));
     if (!t) return null;
     var o = JSON.parse(t);
-    return (o && o.v === 1 && o.cal === d && o.rows) ? o : null;
+    return (o && o.v === 2 && o.cal === d && o.rows) ? o : null;
   } catch(e){ return null; }
 }
 function pbSaveCache(o){ try { localStorage.setItem(pbKeyOf(o.cal), JSON.stringify(o)); } catch(e){} }
@@ -5962,7 +5962,7 @@ function ensureLiveMkt(){
   }).catch(function(){ LIVEMKTBUSY = false; LIVEMKTDONE = true; return 0; });
 }
 function pbScan(force){
-  var n = PB.lb || 11;
+  var n = PB.lb || 5;
   return pbPoolDays(n, force).then(function(days){
     if (!days.length) throw new Error("涨停池取不到（接口没回应）");
     var D0 = days[0], cand = {}, order = [];
@@ -6040,7 +6040,7 @@ function pbScan(force){
                     hy:((typeof HY !== "undefined" && HY[c]) || "") });
       });
       pass.sort(function(a, b){ return a.dist - b.dist; });
-      return { v:1, cal:ymd(new Date()), day:gateDay, D0raw:gate, candN:order.length,
+      return { v:2, cal:ymd(new Date()), day:gateDay, D0raw:gate, candN:order.length,
         lb:days.length, rows:pass.slice(0, 40), ts:Date.now(),
         src:(todo.length ? ("内置日K " + seedN + "只 + 联网补 " + todo.length + "只") : "内置日K（不联网）"),
         fresh:fresh, seedN:seedN };
@@ -6075,7 +6075,7 @@ function renderPB(){
   if ($("pbDeep") && !$("pbDeep").dataset.bound){
     $("pbDeep").dataset.bound = "1";
     $("pbDeep").onclick = function(){
-      PB.lb = (PB.lb === 11 ? 21 : 11);
+      PB.lb = (PB.lb === 5 ? 11 : 5);
       PB.rows = null; PB.loading = false; PB.tried = false;
       renderPB();
     };
@@ -6113,7 +6113,7 @@ function renderPB(){
   var rows = PB.rows || [];
   if (dt) dt.textContent = PB.day ? (PB.day + (PB.lb ? "（近 " + PB.lb + " 个交易日窗口）" : "")) : "—";
   if (PB.loading && !rows.length){
-    if (el) el.innerHTML = '<span class="chip">正在算：近 ' + (PB.lb || 11) + ' 个交易日涨停过的主板股 → 5 日线（日K已内置，秒出、不联网）</span>';
+    if (el) el.innerHTML = '<span class="chip">正在算：近 ' + (PB.lb || 5) + ' 个交易日涨停过的主板股 → 5 日线（日K已内置，秒出、不联网）</span>';
     tb.innerHTML = '<tbody><tr><td class="empty">扫描中…</td></tr></tbody>';
     if (nt) nt.textContent = "口径：近日涨停过、现在贴着 5 日线的票（现价距 5 日线 -0.5% ~ +2%）。";
     return;
@@ -6121,7 +6121,7 @@ function renderPB(){
   if (!rows.length){
     if (el) el.innerHTML = '<span class="chip">' + (PB.err ? ("扫描失败：" + esc(PB.err)) : "没有符合条件的票") + '</span>';
     tb.innerHTML = '<tbody><tr><td class="empty">' + (PB.err ? ("取不到数据：" + esc(PB.err) + "，点右上「刷新」重试") : "这一天没有「涨停后回踩到 5 日线附近」的主板股") + '</td></tr></tbody>';
-    if (nt) nt.textContent = "口径：最近 " + (PB.lb || 11) + " 个交易日涨停过 · 主板 · 非 ST · 流通市值≥20 亿 · 现价距 5 日线 -0.5%~+2%。";
+    if (nt) nt.textContent = "口径：最近 " + (PB.lb || 5) + " 个交易日涨停过 · 主板 · 非 ST · 流通市值≥20 亿 · 现价距 5 日线 -0.5%~+2%。";
     return;
   }
   var HS = pbHotSet();
@@ -6133,7 +6133,7 @@ function renderPB(){
     el.innerHTML = '<span class="chip big" style="background:#1f3864">命中 <b>' + rows.length + '</b> 只</span>'
       + '<span class="chip">已站上5日线 ' + m1 + ' 只</span>'
       + '<span class="chip">缩量（量<5日均）' + m2 + ' 只</span>'
-      + '<span class="chip">候选（近日涨停过的票）' + (PB.candN || 0) + ' 只</span>'
+      + '<span class="chip">候选（近' + (PB.lb || 5) + '日涨停过）' + (PB.candN || 0) + ' 只</span>'
       + '<span class="chip">扫描时间 ' + freshTxt + '</span>';
   }
   var h = '<thead><tr><th>#</th><th>股票</th><th>现价</th><th>今日涨幅</th><th>5日线</th><th>距5日线</th><th>量比</th><th>换手</th><th>近5日涨幅</th><th>涨停日（几板）</th><th>所属行业</th><th>K线</th></tr></thead><tbody>';
@@ -6159,7 +6159,7 @@ function renderPB(){
       + '</tr>';
   }).join("");
   tb.innerHTML = h + '</tbody>';
-  if (nt) nt.textContent = "口径：最近 " + (PB.lb || 11) + " 个交易日里涨停过的主板股（非 ST、流通市值≥20 亿、价>2 元），"
+  if (nt) nt.textContent = "口径：最近 " + (PB.lb || 5) + " 个交易日里涨停过的主板股（非 ST、流通市值≥20 亿、价>2 元），"
     + "算 5 日线只留现价距 5 日线 -0.5% ~ +2% 的（贴着 5 日线，回踩不破），按距 5 日线由近到远排前 40。"
     + "数据截至 " + (PB.day || "—") + " 收盘（日K已内置进页面，打开即出、手机不再逐只联网；只有内置没有的票才补抓）。"
     + "现价/涨幅/量比/换手＝实时行情：9:25 打开看到的就是竞价价和竞价涨幅；开盘后每 60 秒自动更新。"
