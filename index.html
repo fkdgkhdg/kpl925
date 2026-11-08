@@ -4050,7 +4050,7 @@ function klOpen(code, name, day, day2){
     if (rng) klIdxDraw(rng.d0, rng.d1, day, day2, (rng.r0 > 0 ? (rng.r1 / rng.r0 - 1) * 100 : null));
     else { var ib0 = $("klIdx"); if (ib0) ib0.innerHTML = ""; }
     klHoverBind();
-    $("klTip").textContent = "鼠标在图上划过看每一天的开高低收；「← 前一日 / 后一日 →」可以一天天看持仓过程；「以这天为卖出日」直接按这天重算。";
+    $("klTip").textContent = "鼠标在图上划过看每一天的开高低收；下面的上证指数图会同步对齐同一天（在上证图上划也能反过来带动这里）。「← 前一日 / 后一日 →」可以一天天看持仓过程；「以这天为卖出日」直接按这天重算。";
     var row = null;
     (STATE.rows || []).forEach(function(x){ if (x.code === code) row = x; });
     if (row){
