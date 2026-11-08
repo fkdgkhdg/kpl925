@@ -1241,20 +1241,39 @@ function fetchMinuteThs(code){               // 同花顺分时：第一根 09:3
     document.body.appendChild(s);
   });
 }
-function fetchMinute(code){                  // 腾讯分时（单次，5s 超时）→ 同花顺 → 东财 trends2
+function fetchMinute(code){                  // 腾讯分时（单次，5s 超时）→ 同花顺 → 腾讯 5 日分时
   return fetchMinuteOnce(code).catch(function(){ return null; }).then(function(r){
     if (r) return r;
     return fetchMinuteThs(code).catch(function(){ return null; });
   }).then(function(r){
     if (r) return r;
-    var u = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get?secid=" + secid(code) +
-            "&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=1&iscr=0&iscca=0";
-    return jsonp(u, 3000).then(function(d){
-      var tr = (d && d.data && d.data.trends) ? d.data.trends : null;
-      if (!tr || !tr.length) return null;
-      var q = tr[0].split(",");
-      return { date: q[0].slice(0,10).replace(/-/g,""), price:+q[1], amount:+q[6], pre:d.data.prePrice };
-    }).catch(function(){ return null; });
+    return fetchMinuteTx5(code).catch(function(){ return null; });
+  });
+}
+function fetchMinuteTx5(code){                 // 腾讯 5 日分时（备用主机）：取最近一日 09:30 那根的成交额＝竞价额
+  var pref = tPrefix(code), nm = "__tq5" + (++cbid);
+  return new Promise(function(resolve){
+    var s = document.createElement("script"), done = false;
+    var t = setTimeout(function(){ if(!done){ done = true; fin(null); } }, 5000);
+    function fin(v){ if (s.parentNode) s.parentNode.removeChild(s); clearTimeout(t); resolve(v); }
+    s.onload = function(){
+      if (done) return; done = true;
+      var out = null;
+      try {
+        var d = window[nm], o = d && d.data && d.data[pref + code], list = (o && o.data) || [];
+        var dd = list[0] || null;
+        if (dd && dd.data && dd.data.length){
+          var q = String(dd.data[0]).split(" "), qt = (o.qt && o.qt[pref + code]) || null;
+          if (+q[1] > 0) out = { date: String(dd.date || "").replace(/-/g,""), price: +q[1],
+                                 amount: +q[3] || 0, pre: (qt && +qt[4] > 0 ? +qt[4] : null) };
+        }
+      } catch(e){ out = null; }
+      try { delete window[nm]; } catch(e){ window[nm] = null; }
+      fin(out);
+    };
+    s.onerror = function(){ if(!done){ done = true; fin(null); } };
+    s.src = "https://ifzq.gtimg.cn/appstock/app/day/query?code=" + pref + code + "&_var=" + nm + "&_=" + Date.now();
+    document.body.appendChild(s);
   });
 }
 function mapLimit(items, limit, fn){
@@ -2077,7 +2096,7 @@ function fetchMa5(code){                     // 新浪日线自带 ma_price5
       fin(out);
     };
     s.onerror = function(){ if (!done){ done = true; fin(null); } };
-    s.src = "https://money.finance.sina.com.cn/quotes_service/api/jsonp.php/var%20" + vn +
+    s.src = "https://money.finance.sina.com.cn/quotes_service/api/jsonp_v2.php/" + vn +
             "=/CN_MarketData.getKLineData?symbol=" + tPrefix(code) + code + "&scale=240&ma=5&datalen=3&_=" + Date.now();
     document.body.appendChild(s);
   });
@@ -3600,22 +3619,45 @@ function klLoadScript(url, cbName, cb, timeoutMs){
   s.src = url;
   document.body.appendChild(s);
 }
-function klCleanBars(bars){                     // 脏数据清洗：开/收非正、单日 3 倍以上跳变
+function klCleanBars(bars){                     // 脏数据清洗：开/收非正、孤立坏点、按日期排序去重（不再按“相邻 3 倍跳变”整段砍，长历史里的老价格/拆股会把后面几万根全丢掉）
   if (!bars || !bars.length) return [];
-  var out = [], prev = 0;
+  var out = [];
   bars.forEach(function(b){
     if (!b) return;
     var o = +b.o, h = +b.h, l = +b.l, c = +b.c;
-    if (!(o > 0) || !(c > 0)) return;
-    if (!(h > 0)) h = Math.max(o, c);
-    if (!(l > 0)) l = Math.min(o, c);
+    if (!isFinite(o) || !isFinite(c) || !(o > 0) || !(c > 0)) return;
+    if (!(h > 0) || !isFinite(h)) h = Math.max(o, c);
+    if (!(l > 0) || !isFinite(l)) l = Math.min(o, c);
     if (h < Math.max(o, c)) h = Math.max(o, c);
     if (l > Math.min(o, c)) l = Math.min(o, c);
-    if (prev > 0 && (c / prev < 0.33 || c / prev > 3)) return;
-    prev = c;
     out.push({ d: String(b.d || ""), o: o, h: h, l: l, c: c, v: (+b.v > 0 ? +b.v : 0) });
   });
-  return out;
+  out.sort(function(x, y){ var a = klKey(x.d), b2 = klKey(y.d); return a < b2 ? -1 : (a > b2 ? 1 : 0); });
+  var ded = [];
+  for (var i = 0; i < out.length; i++){
+    if (i && klKey(out[i].d) === klKey(ded[ded.length - 1].d)) ded[ded.length - 1] = out[i]; else ded.push(out[i]);
+  }
+  if (ded.length < 3) return ded;
+  var keep = [];
+  for (var k = 0; k < ded.length; k++){
+    var pv = ded[k - 1], nx = ded[k + 1], bad = false;
+    if (pv && nx && pv.c > 0 && nx.c > 0){
+      var r1 = ded[k].c / pv.c, r2 = ded[k].c / nx.c;
+      if ((r1 > 6 || r1 < 1 / 6) && (r2 > 6 || r2 < 1 / 6)) bad = true;   // 前后都差 6 倍 → 单根坏点
+    }
+    if (!bad) keep.push(ded[k]);
+  }
+  return keep;
+}
+function klOk(r, k){                             // 数据合不合格：够长 + 够新（避免把一段远古数据当成最新一根）
+  if (!r || !r.bars || r.bars.length < 10) return false;   // 新股只有几根也算，但不能是空/一两根
+  var last = klKey(r.bars[r.bars.length - 1].d);
+  if (!/^[0-9]{8}$/.test(last)) return false;
+  var t = new Date();
+  var now = "" + t.getFullYear() + ("0" + (t.getMonth() + 1)).slice(-2) + ("0" + t.getDate()).slice(-2);
+  if (+last > +now) return false;
+  if (+now - +last > 400) return false;          // 400 天没 K 线基本就是停牌或脏数据
+  return true;
 }
 function klWrap(bars, name){
   var c = klCleanBars(bars);
@@ -3638,6 +3680,7 @@ function klParseAny(j, k){
     var ds = String(j.dates || "").split(","), pr = String(j.price || "").split(",").map(Number);
     var vo = String(j.volumn || "").split(",").map(Number);
     if (!ds.length || !pr.length) return null;
+    if (pr.length < ds.length * 4) return null;               // 列数对不上就换源，避免价格错位
     var y = +String(j.start || "").slice(0, 4), prev = 0, out = [];
     for (var i = 0; i < ds.length; i++){
       var md = ds[i], mm = +md.slice(0, 2);
@@ -3669,7 +3712,7 @@ function klFetch(code, cb){
   var nm0 = "quotebridge_v6_line_hs_" + code + "_00_all", nm1 = "EMCB" + seq, nm2 = "SINACB" + seq;
   var urls = [
     "https://d.10jqka.com.cn/v6/line/hs_" + code + "/00/all.js?_=" + Date.now(),
-    "https://push2delay.eastmoney.com/api/qt/stock/kline/get?secid=" + secid +
+    "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=" + secid +
       "&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56&klt=101&fqt=0&end=20500101&lmt=800&cb=" + nm1,
     "https://quotes.sina.cn/cn/api/jsonp_v2.php/" + nm2 + "/CN_MarketDataService.getKLineData?symbol=" + pref + code + "&scale=240&ma=no&datalen=800"
   ];
@@ -3679,7 +3722,7 @@ function klFetch(code, cb){
     var k = i++;
     klLoadScript(urls[k], names[k], function(j){
       var r = klParseAny(j, k);
-      if (r && r.bars && r.bars.length) cb(r, label[k]); else next();
+      if (klOk(r, k)) cb(r, label[k]); else next();
     }, k === 0 ? 5000 : 9000);
   }
   next();
@@ -3701,32 +3744,60 @@ function klParse(j){
   return { bars: out, name: j.name || "" };
 }
 function klIdxDraw(d0, d1, day, day2, stockRet){
-  var box = $("klIdx"); if (!box) return;
+  var box = document.getElementById("klIdx"); if (!box) return;
   box.innerHTML = '<div class="chartnote">大盘（上证指数）：正在取…</div>';
   simFetchIndex().then(function(ib){
     if (KLST.mode === "min"){ klIdxMinDraw(day2 || day || KLST.day); return; }
     if (!ib || !ib.length){ box.innerHTML = ''; return; }
     var arr = ib.filter(function(b){ return b.d >= d0 && b.d <= d1; });
     if (arr.length < 2){ box.innerHTML = ''; return; }
-    var w = 980, hh = 120, padL = 6, padR = 62, padT = 10, padB = 16;
-    var hi = -1e9, lo = 1e9;
-    arr.forEach(function(b){ if (b.h > hi) hi = b.h; if (b.l < lo) lo = b.l; });
-    var yOf = function(v){ return padT + (hi - v) / (hi - lo) * (hh - padT - padB); };
+    var w = 980, h = 200, padL = 6, padR = 62, padT = 12, PH = 146, VT = 162, VB = 188;
+    var hi = -1e9, lo = 1e9, vmax = 0;
+    arr.forEach(function(b){
+      var bl = (b.l === undefined || !(b.l > 0)) ? Math.min(b.o, b.c) : b.l;
+      if (b.h > hi) hi = b.h;
+      if (bl < lo) lo = bl;
+      if (b.v > vmax) vmax = b.v;
+    });
+    if (!(hi > lo)) hi = lo + 0.01;
+    var yOf = function(v){ return padT + (hi - v) / (hi - lo) * (PH - padT); };
+    var yV = function(v){ return VB - (vmax > 0 ? Math.max(0, Math.min(1, v / vmax)) : 0) * (VB - VT); };
     var bw = (w - padL - padR) / arr.length;
-    var pts = arr.map(function(b, k){ return (padL + k * bw + bw / 2).toFixed(1) + "," + yOf(b.c).toFixed(1); }).join(" ");
+    var body = arr.map(function(b, k){
+      var up = b.c >= b.o, col = up ? "#c02c2c" : "#1f7a3d";
+      var x = padL + k * bw, cen = x + bw / 2;
+      var bl2 = (b.l === undefined || !(b.l > 0)) ? Math.min(b.o, b.c) : b.l;
+      var yo = yOf(b.o), yc = yOf(b.c), yh = yOf(b.h), yl = yOf(bl2);
+      var top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
+      var vh = (b.v > 0) ? Math.max(0.8, VB - yV(b.v)) : 0;
+      var vbar = vh > 0 ? '<rect x="' + (x + bw * 0.18).toFixed(1) + '" y="' + (VB - vh).toFixed(1) + '" width="' + (bw * 0.64).toFixed(1) + '" height="' + vh.toFixed(1) + '" fill="' + col + '" opacity="0.6"></rect>' : "";
+      return '<line x1="' + cen.toFixed(1) + '" y1="' + yh.toFixed(1) + '" x2="' + cen.toFixed(1) + '" y2="' + yl.toFixed(1) + '" stroke="' + col + '"></line>' +
+        '<rect x="' + (x + bw * 0.18).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + (bw * 0.64).toFixed(1) + '" height="' + bh.toFixed(1) + '" fill="' + col + '"></rect>' + vbar;
+    }).join("");
+    var grid = "", tk = "";
+    for (var t = 0; t < 5; t++){
+      var vv = hi - (hi - lo) * t / 4, yq = yOf(vv);
+      grid += '<line x1="' + padL + '" y1="' + yq.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + yq.toFixed(1) + '" stroke="' + (t === 2 ? "#e3e8f0" : "#f1f4f9") + '"></line>';
+      tk += '<text x="' + (w - padR + 5) + '" y="' + (yq + 3.5).toFixed(1) + '" font-size="10" fill="#8a94a6">' + vv.toFixed(0) + '</text>';
+    }
+    var volLab = '<line x1="' + padL + '" y1="' + (VT - 4) + '" x2="' + (w - padR) + '" y2="' + (VT - 4) + '" stroke="#e3e8f0"></line>' +
+      '<text x="' + padL + '" y="' + (VT + 10) + '" font-size="10" fill="#a3adbd">成交量</text>' +
+      (vmax > 0 ? '<text x="' + (w - padR + 5) + '" y="' + (VT + 10) + '" font-size="10" fill="#8a94a6">' + klVolFmt(vmax) + '</text><text x="' + (w - padR + 5) + '" y="' + (VB + 3) + '" font-size="10" fill="#8a94a6">0</text>' : '');
     var idxOf = function(dd){ var r = -1; arr.forEach(function(b, k){ if (b.d <= dd) r = k; }); return r; };
     var m1 = idxOf(day), m2 = day2 ? idxOf(day2) : -1, mk = "";
-    if (m1 >= 0) mk += '<line x1="' + (padL + m1 * bw + bw / 2).toFixed(1) + '" y1="' + padT + '" x2="' + (padL + m1 * bw + bw / 2).toFixed(1) + '" y2="' + (hh - padB) + '" stroke="#1f3864" stroke-width="1.2" stroke-dasharray="4 3"></line>';
-    if (m2 >= 0) mk += '<line x1="' + (padL + m2 * bw + bw / 2).toFixed(1) + '" y1="' + padT + '" x2="' + (padL + m2 * bw + bw / 2).toFixed(1) + '" y2="' + (hh - padB) + '" stroke="#2f6f9f" stroke-width="1.2" stroke-dasharray="4 3"></line>';
-    var tk = [hi, (hi + lo) / 2, lo].map(function(v){ return '<text x="' + (w - padR + 5) + '" y="' + (yOf(v) + 3.5).toFixed(1) + '" font-size="10" fill="#8a94a6">' + v.toFixed(0) + '</text>'; }).join("");
+    if (m1 >= 0) mk += '<line x1="' + (padL + m1 * bw + bw / 2).toFixed(1) + '" y1="' + padT + '" x2="' + (padL + m1 * bw + bw / 2).toFixed(1) + '" y2="' + VB + '" stroke="#1f3864" stroke-width="1.2" stroke-dasharray="4 3"></line>';
+    if (m2 >= 0) mk += '<line x1="' + (padL + m2 * bw + bw / 2).toFixed(1) + '" y1="' + padT + '" x2="' + (padL + m2 * bw + bw / 2).toFixed(1) + '" y2="' + VB + '" stroke="#2f6f9f" stroke-width="1.2" stroke-dasharray="4 3"></line>';
+    var dates = [arr[0].d, arr[Math.floor(arr.length / 2)].d, arr[arr.length - 1].d].map(function(d, k){
+      return '<text x="' + (k === 0 ? padL : (k === 1 ? w / 2 : w - padR) - 24) + '" y="' + (h - 6) + '" font-size="10" fill="#8a94a6">' + d.slice(2) + '</text>';
+    }).join("");
     var chg = (arr[arr.length - 1].c / arr[0].c - 1) * 100;
     var head = '大盘（上证指数）· 图上这段 ' + (chg > 0 ? "+" : "") + chg.toFixed(2) + '%';
     if (stockRet !== null && stockRet !== undefined){
       head += '　个股 ' + (stockRet > 0 ? "+" : "") + stockRet.toFixed(2) + '%　相对强弱 ' + ((stockRet - chg) > 0 ? "+" : "") + (stockRet - chg).toFixed(2) + ' 个点';
     }
     box.innerHTML = '<div class="chartnote">' + head + '</div>' +
-      '<svg viewBox="0 0 ' + w + ' ' + hh + '" preserveAspectRatio="none" style="width:100%;height:120px;display:block">' +
-      mk + '<polyline points="' + pts + '" fill="none" stroke="#e07a1f" stroke-width="1.6"></polyline>' + tk + '</svg>';
+      '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:200px;display:block">' +
+      grid + body + mk + tk + volLab + dates + '</svg>';
   });
 }
 var KLST = { code: null, name: null, bars: null, day: null, day2: null, buyDay: null, buyPrice: null, mode: "day", dayNote: "", dayTip: "" };
@@ -3931,7 +4002,7 @@ function klMinLoad(cb){                           // 腾讯：_var 赋值式脚�
     clearTimeout(tm);
     var j = null; try { j = window[nm]; } catch(e){}
     if (sc.parentNode) sc.parentNode.removeChild(sc);
-    fin(j || null);
+    fin(j ? klMinParseTx(j, code) : null);
   };
   sc.onerror = function(){ clearTimeout(tm); if (sc.parentNode) sc.parentNode.removeChild(sc); fin(null); };
   sc.src = "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=" + pref + code + "&_var=" + nm + "&_=" + Date.now();
@@ -7387,7 +7458,7 @@ function ldrLineMissAll(ds){
   return any > 0 && any === miss;
 }
 function ldrHM(t){ t = +t || 0; if (!t) return ''; var h = Math.floor(t / 100), m = t % 100; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
-var LDRMIN = {};                                   // code -> {at, days{日期:[{t,p}]}, prec{日期:昨收}}：东财 trends2 一次给最近 5 个交易日
+var LDRMIN = {};                                   // code -> {at, days{日期:[{t,p}]}, prec{日期:昨收}}：新浪 1 分钟优先，腾讯 5 日分时兜底
 function sinaMinSym(code){ var s = secid(code); return (String(s).charAt(0) === '1' ? 'sh' : 'sz') + code; }
 function ldrMin5(code, cb){                        // 新浪 1 分钟线（最近约 4 个交易日，约 1023 根）；东财在浏览器里常被拦，留作备用
   var c = LDRMIN[code];
@@ -7425,46 +7496,49 @@ function ldrMin5(code, cb){                        // 新浪 1 分钟线（最�
   s.onload = function(){ finish(window[nm]); };
   s.onerror = function(){ finish(null); };
   s.src = 'https://quotes.sina.cn/cn/api/jsonp_v2.php/' + nm + '=/CN_MarketDataService.getKLineData?symbol=' + sinaMinSym(code)
-        + '&scale=1&ma=no&datalen=1023&_=' + Date.now();
+        + '&scale=1&ma=no&datalen=1210&_=' + Date.now();
   document.body.appendChild(s);
 }
-function ldrMin5EM(code, cb){
+function ldrMin5EM(code, cb){                  // 备用：腾讯 5 日分时（_var 脚本，一次给最近 5 个交易日）
   var c = LDRMIN[code];
   if (c && (Date.now() - c.at) < 600000){ cb(c); return; }
-  var nm = 'LDT' + (++KLSEQ), done = false;
+  var pref = tPrefix(code), nm = 'LDT' + (++KLSEQ), done = false, s = null;
   var to = setTimeout(function(){ if (!done){ done = true; cb(null); } }, 12000);
-  var u = 'https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=' + secid(code)
-        + '&fields1=f1,f2,f3,f4&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=5&iscr=0&iscca=0'
-        + '&cb=' + nm + '&_=' + Date.now();
-  klLoadScript(u, nm, function(j){
+  function finish(d){
     if (done) return; done = true; clearTimeout(to);
+    try { if (s && s.parentNode) s.parentNode.removeChild(s); } catch(e){}
+    try { delete window[nm]; } catch(e){ window[nm] = null; }
     var out = null;
     try {
-      var tr = (j && j.data && j.data.trends) || [];
-      if (tr.length){
-        var days = {}, seen = {};
-        tr.forEach(function(line){
-          var q = String(line).split(','), sv = q[0] || '';
-          var d = klFmtDate8(sv.slice(0, 10)), hm = sv.slice(11, 16).replace(':', '');
-          var tt = +hm, p = +q[1] || +q[2] || 0;
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !tt || !(p > 0)) return;
+      var o = d && d.data && d.data[pref + code], list = (o && o.data) || [], days = {}, seen = {};
+      list.forEach(function(day){
+        var dd = klFmtDate8(day && day.date);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dd)) return;
+        (day.data || []).forEach(function(line){
+          var q = String(line).split(' '), tt = +q[0], p = +q[1] || 0;
+          if (!tt || !(p > 0)) return;
           if (!((tt >= 930 && tt <= 1130) || (tt >= 1300 && tt <= 1500))) return;
-          var kk = d + tt; if (seen[kk]) return; seen[kk] = 1;
-          (days[d] = days[d] || []).push({ t: tt, p: p });
+          var kk = dd + tt; if (seen[kk]) return; seen[kk] = 1;
+          (days[dd] = days[dd] || []).push({ t: tt, p: p });
         });
-        var ks = Object.keys(days).sort();
-        if (ks.length){
-          var prec = {};
-          ks.forEach(function(d, k){
-            if (k > 0){ var pb = days[ks[k - 1]]; if (pb && pb.length) prec[d] = pb[pb.length - 1].p; }
-          });
-          out = { at: Date.now(), days: days, prec: prec };
-          LDRMIN[code] = out;
-        }
+      });
+      var ks = Object.keys(days).sort();
+      if (ks.length){
+        var prec = {};
+        ks.forEach(function(dd, k){
+          if (k > 0){ var pb = days[ks[k - 1]]; if (pb && pb.length) prec[dd] = pb[pb.length - 1].p; }
+        });
+        out = { at: Date.now(), days: days, prec: prec };
+        LDRMIN[code] = out;
       }
     } catch(e){ out = null; }
     cb(out);
-  }, 12000);
+  }
+  s = document.createElement('script');
+  s.onload = function(){ finish(window[nm]); };
+  s.onerror = function(){ finish(null); };
+  s.src = 'https://ifzq.gtimg.cn/appstock/app/day/query?code=' + pref + code + '&_var=' + nm + '&_=' + Date.now();
+  document.body.appendChild(s);
 }
 function ldrMinGet(code, ds, cb){                  // 先查本地存档，再退回最近 5 个交易日接口
   var d8 = klFmtDate8(ds);
