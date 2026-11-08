@@ -3747,7 +3747,7 @@ function klIdxDraw(d0, d1, day, day2, stockRet){
   var box = document.getElementById("klIdx"); if (!box) return;
   box.innerHTML = '<div class="chartnote">大盘（上证指数）：正在取…</div>';
   simFetchIndex().then(function(ib){
-    if (KLST.mode === "min"){ klIdxMinDraw(day2 || day || KLST.day); return; }
+    if (KLST.mode === "min"){ KLIDX = null; klIdxMinDraw(day2 || day || KLST.day); return; }
     if (!ib || !ib.length){ box.innerHTML = ''; return; }
     var arr = ib.filter(function(b){ return b.d >= d0 && b.d <= d1; });
     if (arr.length < 2){ box.innerHTML = ''; return; }
@@ -3796,9 +3796,108 @@ function klIdxDraw(d0, d1, day, day2, stockRet){
       head += '　个股 ' + (stockRet > 0 ? "+" : "") + stockRet.toFixed(2) + '%　相对强弱 ' + ((stockRet - chg) > 0 ? "+" : "") + (stockRet - chg).toFixed(2) + ' 个点';
     }
     box.innerHTML = '<div class="chartnote">' + head + '</div>' +
+      '<div id="klIdxWrap" style="position:relative">' +
       '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:200px;display:block">' +
-      grid + body + mk + tk + volLab + dates + '</svg>';
+      grid + body + mk + tk + volLab + dates + '</svg>' +
+      '<div id="klIdxLine" style="display:none;position:absolute;top:0;bottom:0;width:1px;background:#e07a1f;opacity:.85;pointer-events:none"></div>' +
+      '<div id="klIdxTag" style="display:none;position:absolute;top:0;left:0;padding:1px 5px;font-size:11px;line-height:16px;color:#fff;background:rgba(31,56,100,.88);border-radius:4px;white-space:nowrap;pointer-events:none;z-index:2"></div>' +
+      '</div>';
+    KLIDX = { arr: arr, bw: bw, padL: padL, w: w };
+    klIdxBind();
   });
+}
+var KLIDX = null;                            // 上证图这次画出来的日期序列，竖线联动靠它（按日期对，不按像素）
+function klIdxPaint(k){
+  var wrap = $("klIdxWrap");
+  if (!wrap || !KLIDX || !KLIDX.arr) return;
+  var arr = KLIDX.arr, b = arr[k];
+  if (!b) return;
+  var rc = wrap.getBoundingClientRect();
+  if (!(rc.width > 0)) return;
+  var px = (KLIDX.padL + k * KLIDX.bw + KLIDX.bw / 2) / KLIDX.w * rc.width;
+  var line = $("klIdxLine"), tag = $("klIdxTag");
+  if (line){ line.style.display = "block"; line.style.left = px.toFixed(1) + "px"; }
+  if (!tag) return;
+  var pv = k > 0 ? arr[k - 1].c : 0;
+  var pct = pv > 0 ? (b.c / pv - 1) * 100 : null;
+  tag.style.display = "block";
+  tag.textContent = b.d.slice(5) + " 上证 " + b.c.toFixed(2) + (pct === null ? "" : " " + (pct > 0 ? "+" : "") + pct.toFixed(2) + "%");
+  var tw = tag.offsetWidth || 0;
+  tag.style.left = Math.max(0, Math.min(Math.max(0, rc.width - tw), px - tw / 2)).toFixed(1) + "px";
+}
+function klIdxHide(){
+  var line = $("klIdxLine"), tag = $("klIdxTag");
+  if (line) line.style.display = "none";
+  if (tag) tag.style.display = "none";
+}
+function klIdxByDay(d){                      // 个股图上的某天 → 上证图同一交易日
+  if (!KLIDX || !KLIDX.arr || !KLIDX.arr.length) return;
+  var dk = klKey(d), k = -1;
+  for (var i = 0; i < KLIDX.arr.length; i++){ if (klKey(KLIDX.arr[i].d) === dk){ k = i; break; } }
+  if (k < 0){ klIdxHide(); return; }
+  klIdxPaint(k);
+}
+function klStockSpan(){                      // 个股图当前可视区间，和 klHoverBind 用同一套算法
+  var bars = KLST && KLST.bars;
+  if (!bars || !bars.length) return null;
+  var i0 = -1;
+  for (var k = 0; k < bars.length; k++) if (klKey(bars[k].d) <= klKey(klDay)) i0 = k;
+  if (i0 < 0) i0 = bars.length - 1;
+  var i2 = -1;
+  if (KLST.day2) for (var k2 = 0; k2 < bars.length; k2++) if (klKey(bars[k2].d) <= klKey(KLST.day2)) i2 = k2;
+  var s, e;
+  if (i2 >= 0 && Math.abs(i2 - i0) <= 400){ s = Math.max(0, Math.min(i0, i2) - 6); e = Math.min(bars.length - 1, Math.max(i0, i2) + 6); }
+  else { s = Math.max(0, i0 - 39); e = Math.min(bars.length - 1, i0 + 20); }
+  return { s: s, e: e, bw: (980 - 6 - 62) / (e - s + 1) };
+}
+function klStockMarkDay(d, withTip){          // 上证图上划到某天 → 个股图那根竖线跟着走
+  var sp = klStockSpan();
+  if (!sp || !$("klSvg")) return;
+  var bars = KLST.bars, dk = klKey(d), bi = -1;
+  for (var k = sp.s; k <= sp.e; k++) if (klKey(bars[k].d) === dk){ bi = k; break; }
+  if (bi < 0) return;
+  var mk = $("klHover");
+  if (mk){ var hx = (6 + (bi - sp.s) * sp.bw + sp.bw / 2).toFixed(1); mk.setAttribute("x1", hx); mk.setAttribute("x2", hx); mk.setAttribute("visibility", "visible"); }
+  if (withTip) klTipAt(bi);
+}
+function klStockClear(){
+  var mk = $("klHover"); if (mk) mk.setAttribute("visibility", "hidden");
+}
+function klTipAt(bi){
+  var bars = KLST && KLST.bars; if (!bars) return;
+  var b = bars[bi]; if (!b) return;
+  var prev = bars[bi - 1];
+  var pct = prev ? (b.c / prev.c - 1) * 100 : 0;
+  var txt = b.d + "　开 " + b.o.toFixed(2) + "　高 " + b.h.toFixed(2) + "　低 " + b.l.toFixed(2) + "　收 " + b.c.toFixed(2) + "　当日 " + (pct > 0 ? "+" : "") + pct.toFixed(2) + "%" + (b.v > 0 ? "　量 " + klVolFmt(b.v) : "");
+  if (KLST.buyDay && KLST.buyPrice && b.d >= KLST.buyDay){
+    var r = (b.c / KLST.buyPrice - 1) * 100;
+    var hold = bi - (function(){ for (var z = 0; z < bars.length; z++) if (bars[z].d >= KLST.buyDay) return z; return bi; })();
+    txt += "　｜　相对买入价 " + (r > 0 ? "+" : "") + r.toFixed(2) + "%（持有 " + hold + " 个交易日）";
+  }
+  var el = $("klTip"); if (el) el.textContent = txt;
+}
+function klIdxBind(){                        // 上证图自己也能悬停/点按，反过来带动个股图
+  var box = $("klIdx");
+  if (!box || box.dataset.ixbound) return;
+  box.dataset.ixbound = "1";
+  function at(clientX){
+    var wrap = $("klIdxWrap");
+    if (!wrap || !KLIDX || !KLIDX.arr) return -1;
+    var rc = wrap.getBoundingClientRect();
+    if (!(rc.width > 0)) return -1;
+    var x = (clientX - rc.left) / rc.width * KLIDX.w;
+    var k = Math.floor((x - KLIDX.padL) / KLIDX.bw);
+    if (k < 0) k = 0;
+    if (k > KLIDX.arr.length - 1) k = KLIDX.arr.length - 1;
+    return k;
+  }
+  box.addEventListener("mousemove", function(e){
+    var k = at(e.clientX); if (k < 0) return;
+    klIdxPaint(k);
+    klStockMarkDay(KLIDX.arr[k].d, true);
+  });
+  box.addEventListener("mouseleave", function(){ klIdxHide(); klStockClear(); });
+  box.addEventListener("click", function(e){ var k = at(e.clientX); if (k >= 0) klIdxPaint(k); });
 }
 var KLST = { code: null, name: null, bars: null, day: null, day2: null, buyDay: null, buyPrice: null, mode: "day", dayNote: "", dayTip: "" };
 function klNormDay(v){                      // 统一日期口径：20261030 -> 2026-10-30（连板梯队的按钮传的是紧凑格式）
@@ -3858,19 +3957,12 @@ function klHoverBind(){
     var idx = Math.floor((x - 6) / bw); if (idx < 0) idx = 0; if (idx > cnt - 1) idx = cnt - 1;
     var bi = s + idx, b = bars[bi];
     if (!b) return;
-    var prev = bars[bi - 1];
-    var pct = prev ? (b.c / prev.c - 1) * 100 : 0;
     var mk = $("klHover");
     if (mk){ var hx = (6 + idx * bw + bw / 2).toFixed(1); mk.setAttribute("x1", hx); mk.setAttribute("x2", hx); mk.setAttribute("visibility", "visible"); }
-    var txt = b.d + "　开 " + b.o.toFixed(2) + "　高 " + b.h.toFixed(2) + "　低 " + b.l.toFixed(2) + "　收 " + b.c.toFixed(2) + "　当日 " + (pct > 0 ? "+" : "") + pct.toFixed(2) + "%" + (b.v > 0 ? "　量 " + klVolFmt(b.v) : "");
-    if (KLST.buyDay && KLST.buyPrice && b.d >= KLST.buyDay){
-      var r = (b.c / KLST.buyPrice - 1) * 100;
-      var hold = bi - (function(){ for (var z = 0; z < bars.length; z++) if (bars[z].d >= KLST.buyDay) return z; return bi; })();
-      txt += "　｜　相对买入价 " + (r > 0 ? "+" : "") + r.toFixed(2) + "%（持有 " + hold + " 个交易日）";
-    }
-    $("klTip").textContent = txt;
+    klTipAt(bi);
+    klIdxByDay(b.d);
   });
-  svg.addEventListener("mouseleave", function(){ var mk = $("klHover"); if (mk) mk.setAttribute("visibility", "hidden"); });
+  svg.addEventListener("mouseleave", function(){ var mk = $("klHover"); if (mk) mk.setAttribute("visibility", "hidden"); klIdxHide(); });
 }
 function klStep(dir){                       // 前后翻一个交易日
   if (!KLST.bars || !KLST.bars.length) return;
