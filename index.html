@@ -182,6 +182,7 @@
   .thdirs .dchip{cursor:pointer;border:1px solid #d7dde6;border-radius:12px;padding:2px 9px;font-size:12px;background:#fff;color:#33415c;white-space:nowrap}
   .thdirs .dchip b{color:#c0392b;font-weight:600;margin-left:4px}
   .thdirs .dchip.fam{background:#f7f2ff;border-color:#dccdf7}
+  #ldrTh .dchip[data-ldf="东方字辈"],.thdirs .dchip[data-ldf="东方字辈"]{background:#f7f2ff;border-color:#dccdf7;font-weight:600}
   .thdirs .dchip.on{background:#2b3a55;color:#fff;border-color:#2b3a55}
   .thdirs .dchip.on b{color:#ffd9c2}
   .tag2{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:#2f6f9f;color:#fff;font-size:10.5px;font-weight:700;cursor:help}
@@ -7118,7 +7119,7 @@ function ldrFam(t){
   if (typeof AGRIEXTRA !== "undefined" && AGRIEXTRA[x]) return "农业";
   return LDRFAMILY[x] || x || "其他";
 }
-function ldrRowFam(r){ return ""; }          // 梯队只按开盘啦文章的一级题材归类，不再额外拆「东方字辈」等标签
+function ldrRowFam(name){ return /东方/.test(String(name || "")) ? "东方字辈" : ""; }   // 「东方字辈」＝并列标签，不覆盖文章分类
 function ldrIsMedia(a){                   // 传媒线：影视/院线/出版/短剧/漫剧/广告营销 归一个族
   var nm = String((a && a[1]) || "");
   var tags = (typeof thTagsOf === "function") ? thTagsOf(a) : [];
@@ -7143,6 +7144,7 @@ function ldrGroupOf(a, powerDay){
 }
 function ldrInTheme(r, th){
   if (!th) return true;
+  if (th === "东方字辈") return !!(r && r.fam === "东方字辈");
   return String((r && (r.cat || r.prim)) || "") === th;
 }
 function ldrThemeCounts(rows){
@@ -7150,6 +7152,7 @@ function ldrThemeCounts(rows){
   (rows || []).forEach(function(r){
     var f = r.cat || r.prim || "";
     if (f) c[f] = (c[f] || 0) + 1;
+    if (r.fam === "东方字辈") c["东方字辈"] = (c["东方字辈"] || 0) + 1;
   });
   return c;
 }
@@ -7221,6 +7224,7 @@ function ldrAgg(ds){
   var catCnt = {};                                    // 文章口径：只保留 ≥2 只的题材组，其余并入「其他」
   rows.forEach(function(r){ r.cat = r.prim; catCnt[r.cat] = (catCnt[r.cat] || 0) + 1; });
   rows.forEach(function(r){ if ((catCnt[r.cat] || 0) < 2) r.cat = "其他"; });
+  rows.forEach(function(r){ r.fam = ldrRowFam(r.n); });
   var cntB = {}, maxB = 0, lian = 0;
   rows.forEach(function(r){ cntB[r.b] = (cntB[r.b] || 0) + 1; if (r.b > maxB) maxB = r.b; if (r.b >= 2) lian++; });
   var ths = Object.keys(cnt).map(function(t){ return { t: t, n: cnt[t] }; }).sort(function(x, y){ return y.n - x.n || (x.t < y.t ? -1 : 1); });
@@ -7299,7 +7303,7 @@ function renderLDR(){
   if (note) note.textContent = live
     ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。')
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；不再额外拆「东方字辈」等名字组。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
+    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
