@@ -1707,7 +1707,7 @@ function loadTrendUp(){                     // 突破池：蓄势池里今天放
     }
     var h = '<thead><tr><th>#</th><th>股票</th><th>今日涨幅</th><th>量比</th><th>换手</th><th>近3日涨幅</th><th>所属行业</th></tr></thead><tbody>';
     h += up.map(function(x, i){
-      var _hi = hotOf(r);
+      var _hi = -1;
     return '<tr class="' + (i === 0 ? 'top ' : '') + (_hi >= 0 ? 'hot' : '') + '">'
         + '<td>' + (i + 1) + '</td>'
         + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + x.c + '/" target="_blank" rel="noopener" title="在同花顺看K线">' + esc(x.n) + '</a><span class="tag">' + x.c + '</span></td>'
