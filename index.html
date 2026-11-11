@@ -8412,34 +8412,46 @@ function renderCore(){
   }, 300000);
 }
 
-// ===== 9:25 自动刷新：打开页面后到点自己刷一次，保证看到的是当天竞价 =====
+// ===== 9:25 自动刷新：只在两个时点各刷一次，避免 9:25~9:31 反复自刷 =====
 var ARTIMER = null;
 function autoRefreshWatch(){
   if (ARTIMER) return;
   var n = new Date(), wd = n.getDay();
   if (wd === 0 || wd === 6) return;
   var el = $("autoNote"); if (!el) return;
-  var key = "kpl_ar_" + ymd(n), done = false;
+  var today = ymd(n), key = "kpl_ar_" + today, done = false;
   try { done = !!sessionStorage.getItem(key); } catch(e) {}
   if (done){ el.style.display = "none"; return; }
   var s = n.getHours() * 3600 + n.getMinutes() * 60 + n.getSeconds();
   var t1 = 9 * 3600 + 25 * 60 + 45;      // 9:25:45：等竞价定格文件生成完（9:25:42）再刷新，金额统一按 9:25 收盘口径
   var t2 = 9 * 3600 + 31 * 60;           // 9:31:00 9:30 那根分时（实际换手）已生成
-  var target = null, why = "";
-  var _aucToday = false;
-  try { _aucToday = !!(window.AUC925 && window.AUC925.day === ymdDash(ymd(n))); } catch(e) {}
-  if (s < t1 && s >= 8 * 3600){ target = t1; why = "9:25 竞价结果"; }
-  else if (s >= t1 && s < t1 + 180 && !_aucToday){ target = s + 15; why = "9:25 定格文件（还没同步到，15 秒后重试）"; }   // 等 auction925.js 线上生效，金额只认 9:25
-  else if (s >= t1 && s < t2){ target = t2; why = "9:30 分时（实际换手）数据"; }
+  var target = null, why = "", phase = "";
+  function aucToday(){ try { return !!(window.AUC925 && window.AUC925.day === ymdDash(ymd(new Date()))); } catch(e){ return false; } }
+  function pageToday(){ try { return !!(STATE.day && STATE.day === ymdDash(ymd(new Date()))); } catch(e){ return false; } }
+  if (s < t1 && s >= 8 * 3600){ phase = "t1"; target = t1; why = "9:25 竞价结果"; }
+  else if (s >= t1 && s < t1 + 180 && !aucToday()){ phase = "retry"; target = s + 45; why = "9:25 定格文件（还没同步到，45 秒后确认一次）"; }
+  else if (s >= t1 && s < t2){ phase = "t2"; target = t2; why = "9:30 分时（实际换手）数据"; }
   if (target === null){ el.style.display = "none"; return; }
+  function toT2(){ phase = "t2"; target = t2; why = "9:30 分时（实际换手）数据"; tick(); }
   function tick(){
     var nn = new Date(), s2 = nn.getHours() * 3600 + nn.getMinutes() * 60 + nn.getSeconds();
     var left = target - s2;
     if (left <= 0){
-      if (target === t2){ try { sessionStorage.setItem(key, "1"); } catch(e) {} }   // 9:25 那次只刷一次，9:31 再刷一次才收工
-      el.innerHTML = "⏱ 到点了，正在自动刷新（拿 " + why + "）…";
-      clearInterval(ARTIMER); ARTIMER = null;
-      location.reload();
+      if (phase === "t2"){
+        try { sessionStorage.setItem(key, "1"); } catch(e) {}   // 9:31 刷完收工，今天不再自动刷
+        el.innerHTML = "⏱ 到点了，正在自动刷新（拿 " + why + "）…";
+        clearInterval(ARTIMER); ARTIMER = null;
+        location.reload();
+        return;
+      }
+      // 9:25 定格：页面已经显示当天（快照或实时还原）就不再刷，直接等 9:31
+      if (aucToday() || pageToday()){ toT2(); return; }
+      var rk = "kpl_arr_" + today, tries = 0;
+      try { tries = +(sessionStorage.getItem(rk) || 0); } catch(e) {}
+      if (tries >= 1){ toT2(); return; }   // 最多再确认 1 次，绝不 15 秒循环
+      try { sessionStorage.setItem(rk, String(tries + 1)); } catch(e) {}
+      phase = "retry"; target = s2 + 45; why = "9:25 定格文件（45 秒后再确认一次）";
+      tick();
       return;
     }
     var tdy = ymdDash(ymd(new Date()));
