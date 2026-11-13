@@ -111,6 +111,9 @@
   #ldrTbl tr.ldrgrp td{background:#2b3a55;color:#fff;font-weight:700;font-size:12px;letter-spacing:.4px;padding:4px 9px}
   #ldrTbl tr.ldrgrp td b{color:#ffd9c2}
   #ldrTbl td.nm2{white-space:nowrap}
+#ldrLv .yzb,#ldrLv .tzb,#thTbl .yzb,#thTbl .tzb{font-style:normal;border-radius:6px;padding:0 3px;margin-left:2px;font-size:10.5px;line-height:15px;vertical-align:1px}
+#ldrLv .yzb,#thTbl .yzb{background:#7b3ff2;color:#fff}
+#ldrLv .tzb,#thTbl .tzb{background:#e8801a;color:#fff}
 
   /* ---- 节点票（手动标记）---- */
   #ldrLv .lvS.lv1{cursor:pointer}
@@ -696,6 +699,7 @@
 if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
 </script>
 <script src="lhbdata.js?v=20261030b"></script>
+<script src="yztdata.js?v=20261113c"></script>
 <script src="nvdata.js?v=20261105"></script>
 <script src="auction925.js?v=20261113"></script>
 <script src="smashdata.js"></script>
@@ -2666,7 +2670,7 @@ function openThLadder(name, bkKey, dstr){
     return '<tr class="' + (i===0?"top ":"") + (bd>=3?"hot":"") + '">'
       + '<td>' + (i+1) + '</td>'
       + '<td><span class="bpos b' + Math.min(5, Math.max(1, bd)) + '">' + (bd>=5?"≥5板":(bd===1?"首板":bd+"板")) + '</span>' + (hsx ? '<span class="tth2">' + esc(hsx) + '</span>' : '') + '</td>'
-      + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + a[0] + '/" target="_blank" rel="noopener">' + esc(nm) + '</a><a class="kbtn" data-kc="' + a[0] + '" data-kn="' + esc(nm) + '">K线</a><span class="tag">' + a[0] + '</span></td>'
+      + '<td class="name"><a class="stk" href="https://stockpage.10jqka.com.cn/' + a[0] + '/" target="_blank" rel="noopener">' + esc(nm) + yztBadge(a[0], dstr) + '</a><a class="kbtn" data-kc="' + a[0] + '" data-kn="' + esc(nm) + '">K线</a><span class="tag">' + a[0] + '</span></td>'
       + '<td>' + esc(a[5] || "—") + '</td>'
       + '<td>' + (ztHHMM(a[6]) || "—") + '</td>'
       + '<td class="left">' + esc(thTagsOf(a).join(" · ")) + '</td></tr>';
@@ -2674,7 +2678,7 @@ function openThLadder(name, bkKey, dstr){
   $("thTbl").innerHTML = h + '</tbody>';
   var tp = members[0];
   var famExtra = (tgt && tgt.kind === "fam") ? thFamRecent(tgt.n, dstr, members) : "";
-  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「题材」条＝当天涨停股按开盘啦的题材精确归堆（同一题材一只不落，如「机器人概念」「军工」「存储」）＋「XX字辈」，点一下就换一个题材看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；「板型」列＝开盘啦的板型（如「5天3板」「6连板」）；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。" + famExtra;
+  $("thNote").textContent = "口径：" + src + "（" + dd + "）。共 " + members.length + " 只涨停，最高 " + (tp[4]||1) + " 板（" + (tp[1]||"") + "）。上面「题材」条＝当天涨停股按开盘啦的题材精确归堆（同一题材一只不落，如「机器人概念」「军工」「存储」）＋「XX字辈」，点一下就换一个题材看。「板位」＝东财口径的连板数（和上面 5 只榜单一致）；「板型」列＝开盘啦的板型（如「5天3板」「6连板」）；「首封」＝当天第一次封板时间。同一只票可能同时挂在几个方向里，属正常。名字后面的「一字」「T字」＝当日板型：一字＝开盘即涨停、全天没开板；T字＝开盘涨停、盘中开板后回封。" + famExtra;
 }
 // 连板梯队改成右下角浮动面板（可拖动标题栏移动），不再把页面滚到下面
 function thDragBind(card){
@@ -7217,6 +7221,7 @@ function ldrAgg(ds){
       ffmc: fromKpl ? (+a[8] || 0) : 0,
       reason: fromKpl ? String(a[9] || '') : '',
       tagSrc: live ? String(a.tagSrc || '') : '',
+      zbc: (+a.zbc || 0),
       tags: (function(){ var seen = {}, out = []; rawTags.forEach(function(t){ var k = ldrThNorm(t); if (!k || seen[k]) return; seen[k] = 1; out.push({ t: k, n: cnt[k] || 1, raw: String(t) }); }); return out.sort(function(x, y){ var ex = LDREVENT[x.t] ? 1 : 0, ey = LDREVENT[y.t] ? 1 : 0; return ex - ey || y.n - x.n || (x.t < y.t ? -1 : 1); }); })()
     });
   });
@@ -7262,6 +7267,8 @@ function renderLDR(){
   ldrPaintNav();
   if (typeof paintNodeBtn === "function") paintNodeBtn();
   var topB = A.cntB[A.maxB] || 0;
+  var yzc = 0, tzc = 0;
+  (A.rows || []).forEach(function(r){ var _t = ztBoardType(ds, r); if (_t === 'Y') yzc++; else if (_t === 'T') tzc++; });
   var k = document.getElementById('ldrKpi');
   var chipKpi = '';
   if (LDRCHIP){
@@ -7272,6 +7279,8 @@ function renderLDR(){
     + '<span class="chip">最高 <b>' + A.maxB + '</b> 板' + (topB > 1 ? '（' + topB + ' 只）' : '') + '</span>'
     + '<span class="chip">连板 <b>' + A.lian + '</b> 只</span>'
     + '<span class="chip">首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>'
+    + '<span class="chip" style="background:#efe6ff;color:#5b21b6" title="开盘即涨停、全天没开板；主板口径，2023 年起有标记，当天盘中用东财开板次数推断">一字 <b>' + yzc + '</b> 只</span>'
+    + '<span class="chip" style="background:#fff0e0;color:#a94e00" title="开盘涨停、盘中有开板后回封">T字 <b>' + tzc + '</b> 只</span>'
     + (nodeIsDay(ds) ? '<span class="chip" id="ldrNdKpi" style="background:#c02c2c">节点日 · 首板 <b>' + (A.cntB[1] || 0) + '</b> 只</span>' : '')
     + '<span class="chip">题材组 <b>' + TV.length + '</b> 个（≥2只 <b>' + TV.filter(function(x){ return x.n >= 2; }).length + '</b>）</span>'
     + (LDRTH ? '<span class="chip">只看：<b>' + esc(LDRTH) + '</b>（' + (CV[LDRTH] || 0) + ' 只）</span>' : '')
@@ -7300,10 +7309,11 @@ function renderLDR(){
   if (LDRLINE && !LDRLSEEN[ds]) ldrLineScan(ds, function(){ if (ldrCur() === ds) renderLDR(); });
   if (typeof renderLdrTop5 === "function") renderLdrTop5(ds);
   var note = document.getElementById('ldrNote');
+  var YZTNOTE = '名字后面的小标签：一字＝开盘即涨停、全天没开板；T字＝开盘涨停、盘中开板后回封。';
   if (note) note.textContent = live
-    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。')
+    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。' + YZTNOTE)
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。');
+    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。' + YZTNOTE);
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
@@ -7728,6 +7738,24 @@ function ldrLineScan(ds, done){
     if (done) done();
   });
 }
+var YZTMAPC = {};
+function ztYzMap(ds){
+  if (YZTMAPC[ds]) return YZTMAPC[ds];
+  var m = {};
+  try { if (typeof YZT !== "undefined" && YZT && YZT.d && YZT.d[ds]) YZT.d[ds].split(",").forEach(function(x){ if (x && x.length >= 7) m[x.slice(0,6)] = x.slice(6); }); } catch(e){}
+  YZTMAPC[ds] = m; return m;
+}
+function ztBoardType(ds, r){
+  if (!r) return "";
+  var m = ztYzMap(ds); if (m[r.c]) return m[r.c];
+  if (r.live && r.ts && r.zbc != null){
+    var t = new Date(r.ts * 1000), h = t.getUTCHours() + 8, mi = t.getUTCMinutes();
+    if (h > 23) h -= 24;
+    if (h * 60 + mi <= 9 * 60 + 26) return (+r.zbc > 0 ? "T" : "Y");
+  }
+  return "";
+}
+function yztBadge(c, ds){ var t = ztBoardType(ds, { c: c }); return t ? '<em class="' + (t === 'Y' ? 'yzb' : 'tzb') + '">' + (t === 'Y' ? '一字' : 'T字') + '</em>' : ''; }
 function ldrPaint(){
   var tb = document.getElementById('ldrLv'); if (!tb) return;
   var ds = ldrCur(); if (!ds){ tb.innerHTML = ''; return; }
@@ -7780,15 +7808,16 @@ function ldrPaint(){
       var ln = ldrLineHit(ds, r.c);
       var fts = famTagsOf(r);
       var ci = LDRCHIP ? ldrChipInfo(r.c, ds, b) : null;
+      var zt = ztBoardType(ds, r);
       var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b === 1 ? '首板' : b + '连板') ? '（' + (r.live ? '实时' : (kthDay(ds) ? '开盘啦' : '同花顺')) + '原标 ' + r.ty + (r.bt ? ' / ' + r.bt : '') + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
         + ' · 题材：' + (fts.map(function(x){ return x.t + x.n; }).join(' / ') || '—')
         + (ln ? ' · 分时直线：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟 +' + ln.g + '%，最大回撤 ' + ln.dd + '%' : '')
         + (r.live ? ' · 盘中实时（题材' + (r.tagSrc === '行业' ? '用东财行业兜底' : '沿用昨日开盘啦') + '）' : '')
-        + '（点开看K线）';
+        + '（点开看K线）' + (zt ? ' · ' + (zt === 'Y' ? '一字板（开盘即涨停、全天没开板）' : 'T字板（开盘涨停、盘中开板后回封）') : '');
       var ndm = !nodeIsDay(ds) && !!nodeSet()[r.c];   // 节点日当天不重复打标（当天首板本来就全是节点）
       if (ndm) ttl += ' · ◆节点票（节点日首板，今天 ' + b + ' 板）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + (b === 1 ? ' lv1' : '') + (ndm ? ' nd' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" data-lb="' + b + '" title="' + esc(ttl) + '">'
-        + '<b>' + esc(r.n) + '</b>' + (ndm ? '<em class="ndb">◆节点</em>' : '') + (LDRCHIP ? ldrChipBadge(ci) : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
+        + '<b>' + esc(r.n) + '</b>' + (zt ? '<em class="' + (zt === 'Y' ? 'yzb' : 'tzb') + '">' + (zt === 'Y' ? '一字' : 'T字') + '</em>' : '') + (ndm ? '<em class="ndb">◆节点</em>' : '') + (LDRCHIP ? ldrChipBadge(ci) : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
         + (LDRTS ? '<em>' + esc(fts.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (fts.length > 2 ? ' +' + (fts.length - 2) : '')) + '</em>' : '')
         + (ln ? '<em style="color:#c02c2c;font-style:normal;background:#fff1f0;border-radius:6px;padding:0 3px;margin-left:2px" title="' + esc('分时直线拉板：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟拉 ' + ln.g + '% 到涨停，最大回撤 ' + ln.dd + '%') + '">直线' + ldrHM(ln.s) + '</em>' : '')
         + '</a>';
