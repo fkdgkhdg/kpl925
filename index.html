@@ -700,7 +700,7 @@ if (navigator.serviceWorker) { navigator.serviceWorker.register("sw.js").catch(f
 </script>
 <script src="lhbdata.js?v=20261030b"></script>
 <script src="yztdata.js?v=20261113c"></script>
-<script src="nvdata.js?v=20261105"></script>
+<script src="nvdata.js?v=20261116"></script>
 <script src="auction925.js?v=20261116"></script>
 <script src="smashdata.js"></script>
 <script src="teamdata.js"></script>
@@ -6502,6 +6502,15 @@ function nvScan(gated){
     });
   });
 }
+function nvArchReload(cb){                    // 页面在 9:25 前就打开了：内存里的 NVDATA 没有今天 → 现拉一次存档再渲染
+  if (nvArchReload.busy || nvArchReload.done){ cb(); return; }
+  nvArchReload.busy = 1;
+  var s = document.createElement("script");
+  s.src = "nvdata.js?ts=" + Date.now();
+  s.onload = function(){ nvArchReload.busy = 0; nvArchReload.done = 1; cb(); };
+  s.onerror = function(){ nvArchReload.busy = 0; nvArchReload.done = 1; cb(); };
+  document.head.appendChild(s);
+}
 function renderNewTop5(){
   var card = $("nvCard"), tb = $("nvTbl");
   if (!card || !tb || !STATE || !STATE.day) return;
@@ -6578,6 +6587,12 @@ function renderNewTop5(){
   }
   if (!NV.rows){
     if (!inWin && nvArchDay(STATE.day)){ return renderNewTop5Archive(STATE.day); }   // 非竞价时点：退回当天 9:25 存档（nvdata.js）
+    if (!inWin && !nvArchDay(STATE.day) && !nvArchReload.done){
+      if (dt) dt.textContent = STATE.day + "（载入今日 9:25 存档）";
+      if (tb) tb.innerHTML = "<tbody><tr><td class=\"empty\">正在载入今天的 9:25 竞价存档…</td></tr></tbody>";
+      nvArchReload(function(){ renderNewTop5(); });
+      return;
+    }
     var tips = "";
     var _hm = nvHM();
     if (inWin) tips = "扫描失败：" + (NV.err || "取不到行情") + "。点右上「重新扫描」重试。";
