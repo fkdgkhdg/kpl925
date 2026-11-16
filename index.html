@@ -7161,6 +7161,41 @@ function boardLbl(r, day, exact){
   if (m) return m[1] ? (m[1] + m[2]) : m[2];
   return b === 1 ? "首板" : (b + "板");
 }
+var LDRKW = [                                   // 同花顺「涨停原因」是长句 / 东财行业是短标签，按关键词归到大类
+  [/机器人|具身智能|灵巧手|丝杠|减速器|伺服|机械臂/, "机器人概念"],
+  [/商业航天|航天|卫星|火箭/, "商业航天"],
+  [/冰雪|滑雪/, "冰雪产业"],
+  [/煤炭|焦煤|动力煤/, "煤炭"],
+  [/芯片|GPU|半导体|光刻|存储|晶圆/, "芯片"],
+  [/PCB|覆铜板|印制电路/, "PCB概念"],
+  [/光伏|硅片|组件|逆变器|钙钛矿/, "光伏"],
+  [/算力|数据中心|IDC|服务器|光模块|CPO|液冷/, "算力"],
+  [/软件|信创|IT服务|信息系统|数据要素|政务|国产操作系统/, "软件信创"],
+  [/医药|制药|创新药|中药|原料药|CRO|生物医药|疫苗/, "医药"],
+  [/零售|百货|超市|免税|商贸/, "零售"],
+  [/高速公路|运河|公路|铁路|机场|港口|航运|物流|基建|工程建设|建筑工程|水利|水务|管廊|水泥|建材/, "基础建设"],
+  [/生猪|养殖|饲料|种业|农机|化肥|猪肉|农业/, "农业"],
+  [/游戏|手游|影视|院线|传媒|广告|短剧|广电|电视广播|出版|IP/, "传媒"],
+  [/厨电|家电|白电|乳品|乳制品|乳业|食品|饮料|白酒|啤酒/, "消费"],
+  [/家居|家具|定制家|厨柜|卫浴/, "家居"],
+  [/电池|储能|锂|氢能|能源站|风电|核电/, "新能源"],   // 放在有色前面：锌锰电池、锂电池别被「锌／锂」抢走
+  [/电网|输变电|特高压|变压器|电线电缆|铜排|母排/, "电网设备"],
+  [/有色|铜|铝|锌|稀土|金属/, "有色金属"],
+  [/化工|化纤|化学原料|炼化|氟化工|磷化工|钛白粉/, "化工"],
+  [/石油|石化/, "石油石化"],
+  [/工程机械|机床|通用设备|专用设备|机械/, "机械设备"],
+  [/环保/, "环保"],
+  [/纺织|服装|面料|鞋帽/, "纺织服装"],
+  [/消费电子|电子元件|元器件/, "消费电子"],
+  [/国资|国企|央企/, "国资"],
+  [/汽车|整车|零部件|汽车零部/, "汽车"]
+];
+function ldrKwFam(t){
+  var s = String(t || "").replace(/[“”"']/g, "");
+  if (!s) return "";
+  for (var i = 0; i < LDRKW.length; i++){ if (LDRKW[i][0].test(s)) return LDRKW[i][1]; }
+  return "";
+}
 function ldrFam(t){
   var raw = String(t || "").trim();
   if (typeof thFamName === "function"){ var fm = thFamName(raw); if (fm) return fm; }
@@ -7183,10 +7218,20 @@ function ldrGroupOf(a, powerDay){
   // 都没有才退回主涨停原因（之后不足 2 只的组会并入「其他」）。
   var raw = String((a && a[10]) || "");
   var tags = (typeof thTagsOf === "function") ? thTagsOf(a) : [];
+  var live = !!(a && a.tagSrc);              // 盘中兜底题材（同花顺原因 / 东财行业）是长句，需要关键词归类
   if (!raw){
     for (var i = tags.length - 1; i >= 0; i--){
       var f = ldrFam(ldrThNorm(tags[i]));
       if (LDRARTCAT[f]) return f;
+    }
+    if (live){
+      for (var j = 0; j < tags.length; j++){   // 同花顺原因按出现顺序，第一个能归类的关键词算主因
+        var g = ldrKwFam(ldrThNorm(tags[j]));
+        if (g) return g;
+      }
+      var hb = String(a.hybk || "");           // 关键词都归不了，再用东财行业（行业名是「汽车零部」这种缩写，先过一遍关键词）
+      var fb = ldrKwFam(hb) || ldrFam(hb);
+      if (fb && fb !== "其他") return fb;
     }
   }
   var x = ldrThNorm(raw || tags[0] || "");
@@ -7272,9 +7317,16 @@ function ldrAgg(ds){
     });
   });
   rows.sort(function(x, y){ return y.b - x.b || (x.ts || 86400) - (y.ts || 86400) || (x.c < y.c ? -1 : 1); });
-  var catCnt = {};                                    // 文章口径：只保留 ≥2 只的题材组，其余并入「其他」
+  var catCnt = {};                                    // 认得的题材/行业即使只有 1 只也单独成组，只有业绩、治理这类零散标签才并入「其他」
+  var themeOk = {};
+  LDRKW.forEach(function(x){ themeOk[x[1]] = 1; });
+  Object.keys(LDRARTCAT).forEach(function(k){ themeOk[k] = 1; });
   rows.forEach(function(r){ r.cat = r.prim; catCnt[r.cat] = (catCnt[r.cat] || 0) + 1; });
-  rows.forEach(function(r){ if ((catCnt[r.cat] || 0) < 2) r.cat = "其他"; });
+  rows.forEach(function(r){
+    if ((catCnt[r.cat] || 0) >= 2) return;
+    if (r.cat === "其他" || themeOk[r.cat]) return;
+    r.cat = "其他";
+  });
   rows.forEach(function(r){ r.fam = ldrRowFam(r.n); });
   var cntB = {}, maxB = 0, lian = 0;
   rows.forEach(function(r){ cntB[r.b] = (cntB[r.b] || 0) + 1; if (r.b > maxB) maxB = r.b; if (r.b >= 2) lian++; });
@@ -7335,7 +7387,7 @@ function renderLDR(){
   if (te){
     var multi = TV.filter(function(x){ return x.n >= 2; });
     var singles = TV.filter(function(x){ return x.n < 2; });
-    var showMore = LDRTHX || !!LDRTH;
+    var showMore = LDRTHX || !!LDRTH || singles.length <= 14;   // 单只题材不多时直接铺开，别藏在「单只题材 N 个」里
     var list = showMore ? TV.slice() : multi.slice();
     if (LDRTH && !list.some(function(x){ return x.t === LDRTH; })){
       for (var q = 0; q < TV.length; q++) if (TV[q].t === LDRTH){ list.push(TV[q]); break; }
@@ -7345,9 +7397,9 @@ function renderLDR(){
           var cls = x.n >= 2 ? '' : ' fam';
           return '<span class="dchip' + cls + (LDRTH === x.t ? ' on' : '') + '" data-ldf="' + esc(x.t) + '" title="' + esc(x.t + '：' + (AF ? '当前筛选 ' + x.n + ' 只' : '当天涨停 ' + x.n + ' 只') + '，点一下只看这个题材') + '">' + esc(x.t) + '<b>' + x.n + '</b></span>';
         }).join('');
-    if (singles.length){
+    if (singles.length && !(singles.length <= 14 && !LDRTHX && !LDRTH)){   // 已经自动铺开时，不再显示「单只题材 N 个」开关
       hch += '<span class="dchip' + (LDRTHX ? ' on' : '') + '" data-ldfx="1" title="' + (LDRTHX ? '收起这些只有 1 只涨停的题材' : '展开 ' + singles.length + ' 个只有 1 只涨停的题材') + '">'
-        + (LDRTHX ? '收起单只题材' : '其他 ' + singles.length + ' 个（各1只）') + '</span>';
+        + (LDRTHX ? '收起单只题材' : '单只题材 ' + singles.length + ' 个') + '</span>';
     }
     te.innerHTML = hch;
   }
@@ -7357,7 +7409,7 @@ function renderLDR(){
   var note = document.getElementById('ldrNote');
   var YZTNOTE = '名字后面的小标签：一字＝开盘即涨停、全天没开板；T字＝开盘涨停、盘中开板后回封。';
   if (note) note.textContent = live
-    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用同花顺涨停原因兜底（同花顺取不到才退回东财行业）。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。' + YZTNOTE)
+    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用同花顺涨停原因兜底（同花顺取不到才退回东财行业；同花顺原因长句、东财行业缩写都会按关键词归到机器人、芯片、零售等 20+ 个大类，只有 1 只的题材也单列不并入「其他」）。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。' + YZTNOTE)
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
     + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。' + YZTNOTE);
 }
