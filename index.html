@@ -205,6 +205,7 @@
   #klCard.klfloat{position:fixed;right:14px;bottom:14px;width:min(720px,94vw);max-height:80vh;overflow:auto;z-index:130;margin:0;box-shadow:0 10px 30px rgba(0,0,0,.30)}
   #klCard.klfloat.big{width:min(1180px,97vw);max-height:93vh}
   #klCard.klfloat h2{cursor:move;user-select:none}
+  #klCard h2:after{content:"";display:block;clear:both}   /* 手机上关闭/放大等浮动按钮会挤扁下面一排标签，这里收一下 */
   .tpflex{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 2px}
   .tpblk{flex:1 1 280px;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:rgba(128,128,128,.05)}
   .tpblk .lb{font-size:11px;color:var(--muted);margin-bottom:3px;letter-spacing:.3px}
@@ -4322,9 +4323,12 @@ function klMinPaint(date, bars, prec){
   var code = KLST.code || "";
   var lim = /^(30|68|92)/.test(code) ? 0.2 : 0.1;
   var lu = Math.round(prev * (1 + lim) * 100) / 100, ld = Math.round(prev * (1 - lim) * 100) / 100;
-  var hi = lu, lo = ld;
-  if (rhi > hi + 0.004 || rlo < lo - 0.004){ hi = Math.max(rhi, prev) * 1.002; lo = Math.min(rlo, prev) * 0.998; }
-  var w = 980, hp = 224, hv = 62, gp = 12, padL = 52, padR = 64, padT = 12, padB = 18;
+  var op = 0;                                   // open = daily K open of that date; fallback: first minute price
+  if (KLST.bars){ for (i = 0; i < KLST.bars.length; i++){ if (klKey(KLST.bars[i].d) === klKey(date) && KLST.bars[i].o > 0){ op = KLST.bars[i].o; break; } } }
+  if (!(op > 0)) op = bars[0].p;
+  var hi = Math.max(lu, rhi, op), lo = Math.min(ld, rlo, op);
+  if (!(hi > lo)){ hi = Math.max(prev, op) * 1.002; lo = Math.min(prev, op) * 0.998; }
+  var w = ((window.innerWidth || 980) <= 700) ? 620 : 980, hp = 224, hv = 62, gp = 12, padL = 52, padR = 64, padT = 12, padB = 18;   // 手机用 620 宽度画，等比放大后分时图不会太扁
   var H = padT + hp + gp + hv + padB;
   var yP = function(v){ return padT + (hi - v) / (hi - lo) * hp; };
   var iw = w - padL - padR, bw = iw / n;
@@ -4349,6 +4353,9 @@ function klMinPaint(date, bars, prec){
     if (t[1] === "涨停") plab += '<text x="' + (padL + 5) + '" y="' + (+y + 12).toFixed(1) + '" font-size="10" fill="#c02c2c" opacity="0.85">涨停</text>';
     if (t[1] === "跌停") plab += '<text x="' + (padL + 5) + '" y="' + (+y - 5).toFixed(1) + '" font-size="10" fill="#1f7a3d" opacity="0.85">跌停</text>';
   });
+  var oy = yP(op).toFixed(1);
+  var opLine = '<line x1="' + padL + '" y1="' + oy + '" x2="' + (w - padR) + '" y2="' + oy + '" stroke="#d08a1f" stroke-width="1.2" stroke-dasharray="6 3"></line>';
+  var opLab = '<text x="' + (padL + 4) + '" y="' + Math.max(padT + 9, +oy - 3).toFixed(1) + '" font-size="10" fill="#b97812">今开</text>';
   var tl = "";
   [[930, "09:30"], [1030, "10:30"], [1130, "11:30/13:00"], [1400, "14:00"], [1500, "15:00"]].forEach(function(m){
     var k = -1;
@@ -4358,12 +4365,12 @@ function klMinPaint(date, bars, prec){
     tl += '<line x1="' + xx + '" y1="' + padT + '" x2="' + xx + '" y2="' + (vy0 + hv) + '" stroke="#eff2f7"></line>';
     if (m[1]) tl += '<text x="' + xx + '" y="' + (H - 4) + '" text-anchor="middle" font-size="10" fill="#8a94a6">' + m[1] + '</text>';
   });
-  var last = bars[n - 1], op = bars[0].p, pct = (last.p / prev - 1) * 100;
+  var last = bars[n - 1], pct = (last.p / prev - 1) * 100;
   var amp = (rhi - rlo) / prev * 100;
   var col = pct >= 0 ? "#c02c2c" : "#1f7a3d";
   var cnt = function(v){ return (v > 0 ? "+" : "") + v.toFixed(2) + "%"; };
   var stat = '<div class="chips"><span class="chip">日期 <b>' + date + '</b></span>' +
-    '<span class="chip">开 <b>' + op.toFixed(2) + '</b></span>' +
+    '<span class="chip">今开 <b style="color:#b97812">' + op.toFixed(2) + '</b></span>' +
     '<span class="chip">高 <b>' + rhi.toFixed(2) + '</b></span>' +
     '<span class="chip">低 <b>' + rlo.toFixed(2) + '</b></span>' +
     '<span class="chip">收 <b>' + last.p.toFixed(2) + '</b></span>' +
@@ -4377,20 +4384,21 @@ function klMinPaint(date, bars, prec){
     grid + tl + vol.join("") +
     '<polyline points="' + px.join(" ") + '" fill="none" stroke="' + col + '" stroke-width="1.5"></polyline>' +
     '<polyline points="' + av.join(" ") + '" fill="none" stroke="#e0a13a" stroke-width="1.1" opacity="0.95"></polyline>' +
-    plab +
+    plab + opLine + opLab +
     '<line id="klMinHover" x1="0" y1="' + padT + '" x2="0" y2="' + (vy0 + hv) + '" stroke="#1f3864" stroke-width="1" stroke-dasharray="2 2" visibility="hidden"></line></svg>';
   $("klSub").textContent = (KLST.minY ? "昨日分时 " : "分时 ") + date + (KLST.day2 ? "（买 " + KLST.day + " → 卖 " + KLST.day2 + "）" : "");
-  $("klTip").textContent = "分时：红绿＝股价，橙＝当日均价，下方柱＝每分钟成交量，灰虚线＝昨收；纵轴上边是涨停价、下边是跌停价。鼠标划过看每一分钟。";
+  $("klTip").textContent = "分时：红绿＝股价，橙＝当日均价，下方柱＝每分钟成交量，灰虚线＝昨收，金色虚线＝今开；纵轴上边是涨停价、下边是跌停价。鼠标划过看每一分钟。";
   $("klNote").textContent = "分时是 " + date + " 09:30–15:00 的 1 分钟走势（腾讯／新浪），不复权；均价＝累计成交额÷累计成交量；纵轴按涨跌停（±" + Math.round(lim * 100) + "%）标准刻度。";
   klMinHoverBind(bars, prev, xOf);
   klIdxMinDraw(date);
 }
 function klMinHoverBind(bars, prev, xOf){
   var svg = $("klMinSvg"); if (!svg) return;
-  svg.addEventListener("mousemove", function(e){
+  var show = function(e){
+    e = (e.touches && e.touches[0]) || e;
     var n = bars.length, rc = svg.getBoundingClientRect();
-    var x = (e.clientX - rc.left) / rc.width * 980;
-    var k = Math.round((x - 52) / ((980 - 52 - 62) / n) - 0.5);
+    var vw = parseFloat((svg.getAttribute("viewBox") || "").split(/s+/)[2]) || 980, x = (e.clientX - rc.left) / rc.width * vw;
+    var k = Math.round((x - 52) / ((vw - 52 - 64) / n) - 0.5);
     if (k < 0) k = 0;
     if (k > n - 1) k = n - 1;
     var b = bars[k], mk = $("klMinHover");
@@ -4402,7 +4410,11 @@ function klMinHoverBind(bars, prev, xOf){
     $("klTip").textContent = (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm +
       "　价 " + b.p.toFixed(2) + "　均 " + avg.toFixed(2) + "　" + (pcs > 0 ? "+" : "") + pcs.toFixed(2) + "%" +
       "　这一分钟 " + Math.round(b.v / 100) + " 手";
-  });
+  };
+  svg.style.touchAction = "pan-y";
+  svg.addEventListener("mousemove", show);
+  svg.addEventListener("touchstart", show, { passive: true });
+  svg.addEventListener("touchmove", show, { passive: true });
   svg.addEventListener("mouseleave", function(){ var mk = $("klMinHover"); if (mk) mk.setAttribute("visibility", "hidden"); });
 }
 
