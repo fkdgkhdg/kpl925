@@ -6918,12 +6918,21 @@ function ldrFbtTs(day, fbt){
   if (!(hh >= 0 && hh < 24)) return 0;
   return Math.floor(Date.UTC(+day.slice(0,4), +day.slice(4,6)-1, +day.slice(6,8), hh - 8, mm, ss) / 1000) || 0;
 }
-function ldrLiveNormalize(pool, day){
+function ldrLiveNormalize(pool, day, thsMap){
   var prevDs = ldrLivePrevDay(day);
+  thsMap = thsMap || {};
   return liveMainOnly(pool).map(function(x){
     var code = String(x.c || "");
     var tags = ldrLiveTagsOf(code, prevDs), src = "昨题材";
-    if (!tags){ src = "行业"; tags = ldrThNorm(String(x.hybk || "").replace(/[ⅠⅡⅢ]+$/g, "")); }
+    if (!tags){
+      var tr = String(thsMap[code] || "");                     // 同花顺涨停原因优先兜底
+      if (tr){
+        src = "同花顺";
+        tags = tr.split("+").map(function(t){ return ldrThNorm(String(t).trim()); }).filter(function(t){ return t; }).join("+");
+      } else {
+        src = "行业"; tags = ldrThNorm(String(x.hybk || "").replace(/[ⅠⅡⅢ]+$/g, ""));
+      }
+    }
     var row = [code, x.n || code, tags, "", (+x.lbc || 1), "", ldrFbtTs(day, x.fbt)];
     row.live = 1; row.tagSrc = src; row.zbc = +x.zbc || 0; row.amt = +x.amount || 0; row.hybk = String(x.hybk || "");
     return row;
@@ -6945,6 +6954,27 @@ function ldrFetchPoolQ(dateStr){
     return { q: q, pool: (d && d.data && d.data.pool) ? d.data.pool : [] };
   });
 }
+function ldrFetchThsReasons(day){            // 同花顺涨停池：code -> 涨停原因（reason_type），盘中也能取到
+  var base = "https://data.10jqka.com.cn/dataapi/limit_up/limit_up_pool?limit=200"
+    + "&field=199112,10,9001,330323,330324,330325,9002,330329,133971,133970,1968584,3475914,9004"
+    + "&order_field=330324&order_type=0&date=" + day + "&_=" + Date.now();
+  function page(p){
+    return fetch(base + "&page=" + p, { credentials: "omit" }).then(function(r){ return r.json(); });
+  }
+  return page(1).then(function(d){
+    var info = (d && d.data && d.data.info) || [];
+    var total = (d && d.data && d.data.page && d.data.page.total) || info.length;
+    if (total > info.length) return page(2).then(function(d2){ return info.concat((d2 && d2.data && d2.data.info) || []); });
+    return info;
+  }).then(function(info){
+    var m = {};
+    for (var i = 0; i < info.length; i++){
+      var c = String(info[i].code || ""), rt = String(info[i].reason_type || "").trim();
+      if (c && rt) m[c] = rt;
+    }
+    return m;
+  });
+}
 function ldrClearLive(){
   if (!LDRLIVE.day && !LDRLIVE.rows.length && !LDRLIVE.err) return;
   var old = LDRLIVE.day;
@@ -6958,9 +6988,10 @@ function ldrLiveFetch(){
   if (kthDay(day)){ ldrClearLive(); return Promise.resolve(false); }
   if (!ldrLiveAllowed()){ LDRLIVE.err = ""; ldrLiveBadge(); return Promise.resolve(false); }
   LDRLIVE.busy = true;
-  return ldrFetchPoolQ(day).then(function(r){
+  return Promise.all([ldrFetchPoolQ(day), ldrFetchThsReasons(day).catch(function(){ return {}; })]).then(function(ar){
+    var r = ar[0], ths = ar[1] || {};
     if (String(r.q) !== day) throw new Error("接口日期 " + (r.q || "空"));
-    var rows = ldrLiveNormalize(r.pool, day);
+    var rows = ldrLiveNormalize(r.pool, day, ths);
     LDRLIVE.day = day; LDRLIVE.rows = rows; LDRLIVE.ts = Date.now(); LDRLIVE.err = "";
     LDRRUN = null; delete LDRC[day];
     try { if (typeof NODESET !== "undefined") NODESET = null; } catch(e){}
@@ -7326,7 +7357,7 @@ function renderLDR(){
   var note = document.getElementById('ldrNote');
   var YZTNOTE = '名字后面的小标签：一字＝开盘即涨停、全天没开板；T字＝开盘涨停、盘中开板后回封。';
   if (note) note.textContent = live
-    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用东财行业兜底。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。' + YZTNOTE)
+    ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用同花顺涨停原因兜底（同花顺取不到才退回东财行业）。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。' + YZTNOTE)
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
     + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。' + YZTNOTE);
 }
@@ -7827,7 +7858,7 @@ function ldrPaint(){
       var ttl = r.n + ' ' + r.c + ' · ' + (b === 1 ? '首板' : b + '连板') + (r.ty && r.ty !== '首板' && r.ty !== (b === 1 ? '首板' : b + '连板') ? '（' + (r.live ? '实时' : (kthDay(ds) ? '开盘啦' : '同花顺')) + '原标 ' + r.ty + (r.bt ? ' / ' + r.bt : '') + '）' : '') + ' · 首封' + (ztHHMM(r.ts) || '—')
         + ' · 题材：' + (fts.map(function(x){ return x.t + x.n; }).join(' / ') || '—')
         + (ln ? ' · 分时直线：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟 +' + ln.g + '%，最大回撤 ' + ln.dd + '%' : '')
-        + (r.live ? ' · 盘中实时（题材' + (r.tagSrc === '行业' ? '用东财行业兜底' : '沿用昨日开盘啦') + '）' : '')
+        + (r.live ? ' · 盘中实时（题材' + (r.tagSrc === '同花顺' ? '用同花顺涨停原因兜底' : (r.tagSrc === '行业' ? '用东财行业兜底' : '沿用昨日开盘啦')) + '）' : '')
         + '（点开看K线）' + (zt ? ' · ' + (zt === 'Y' ? '一字板（开盘即涨停、全天没开板）' : 'T字板（开盘涨停、盘中开板后回封）') : '');
       var ndm = !nodeIsDay(ds) && !!nodeSet()[r.c];   // 节点日当天不重复打标（当天首板本来就全是节点）
       if (ndm) ttl += ' · ◆节点票（节点日首板，今天 ' + b + ' 板）';
