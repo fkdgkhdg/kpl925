@@ -287,7 +287,7 @@
   button.active{background:var(--head);color:#fff;border-color:var(--head)}
   button:disabled{opacity:.55;cursor:default}
   .opts{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;align-items:center}
-  .optgrp{display:flex;gap:6px;align-items:center}
+  .optgrp{display:flex;gap:6px;align-items:center;min-width:0}
   .optgrp span{font-size:12.5px;color:var(--muted)}
   .tablewrap{overflow-x:auto}
   table{border-collapse:collapse;width:100%;font-size:13.5px}
@@ -464,7 +464,7 @@
     <div class="kpirow"><div class="kpi" id="kpi"></div><div id="ndTix"></div></div>
     <div class="tablewrap"><table id="tbl"><tbody><tr><td class="empty">加载中…</td></tr></tbody></table></div>
     <div id="fixProg" style="margin:10px 0 6px"></div>
-    <div id="advBox"></div>
+    <div id="advBox" hidden></div>
     <div id="bmBox"></div>
     <p class="note fineprint" id="note"></p>
     </div><!-- /mbMain -->
@@ -595,7 +595,7 @@
       <span class="optgrp"><span>本金</span><input type="text" id="simCap" class="dtin" style="width:90px" value="100000"></span>
     </div>
     <div class="opts">
-      <span class="optgrp"><input type="text" id="simCodes" class="dtin" style="width:430px" placeholder="代码或名称，逗号/空格分隔，如 603936, 600519, 博敏电子"></span>
+      <span class="optgrp"><input type="text" id="simCodes" class="dtin" style="width:100%;max-width:430px;min-width:0;flex:1 1 200px" placeholder="代码或名称，逗号/空格分隔，如 603936, 600519, 博敏电子"></span>
       <button id="simRun">开始模拟</button>
       <button id="simFromWatch">从关注池导入</button>
       <button id="simClear">清空</button>
@@ -5142,18 +5142,62 @@ function load(){
     STATE.force = false;
   }).catch(function(e){
     if (seq !== loadSeq) return;
-    setBase("抓取失败（" + (e && e.message ? e.message : e) + "）：本机可能无法联网或浏览器拦截了本地文件的取数请求。"
+    var _msg = "抓取失败（" + (e && e.message ? e.message : e) + "）";
+    var _T2 = (STATE.picked && STATE.sel) ? new Date(STATE.sel + "T12:00:00") : guessDay();
+    var _ov2 = auc925Pool(ymdDash(ymd(_T2))) || poolGetCache(ymdDash(ymd(_T2)));
+    if (_ov2){                                 // 源超时：先用静态名单 + 9:25 快照把当天页面撑起来，绝不清空
+      setStatus("实时取数超时，正在用内置 9:25 名单还原…", true);
+      attempt(_T2, 1, seq, _ov2).then(function(ok){
+        if (seq !== loadSeq) return;
+        if (!ok){ setBase(_msg + "：本机可能无法联网或浏览器拦截了本地文件的取数请求。历史回看不受影响——用上面的日期选择器选任意交易日即可（数据已内置）。", true); }
+        else setBase("实时取数超时（" + (e && e.message ? e.message : e) + "），已用内置名单 + 9:25 静态快照还原（点「刷新最新」可重试实时源）", true);
+        $("btnRefresh").disabled = false;
+      }).catch(function(){
+        if (seq !== loadSeq) return;
+        setBase(_msg + "：本机可能无法联网或浏览器拦截了本地文件的取数请求。历史回看不受影响——用上面的日期选择器选任意交易日即可（数据已内置）。", true);
+        $("btnRefresh").disabled = false;
+      });
+      return;
+    }
+    setBase(_msg + "：本机可能无法联网或浏览器拦截了本地文件的取数请求。"
       + "历史回看不受影响——用上面的日期选择器选任意交易日即可（数据已内置）。", true);
     $("btnRefresh").disabled = false;
   });
 }
 function ptime(n, p){ var t = performance.now(); return p.then(function(v){ if (window.__pf) window.__pf[n] = Math.round(performance.now() - t); return v; }, function(e){ if (window.__pf) window.__pf[n] = -1; throw e; }); }
-function attempt(T, round, seq){
-  return findPool(T).then(function(res){
+function auc925Pool(d){                     // 发布包里的当天名单（代码/名称/板数/行业）：实时源超时也照样能还原 9:25 名单
+  var a = window.AUC925;
+  if (!a || a.day !== d || !a.pool || !a.pool.length) return null;
+  var pool = [];
+  a.pool.forEach(function(p){
+    if (!p || !p[0]) return;
+    pool.push({ c:String(p[0]), n:String(p[1] || ((typeof NAMEMAP !== "undefined" && NAMEMAP[p[0]]) ? NAMEMAP[p[0]] : "")), lbc:+p[2] || 1, hybk:String(p[3] || "") });
+  });
+  return pool.length ? { pool: pool, date: d.replace(/-/g, ""), day: new Date(d + "T12:00:00") } : null;
+}
+function poolCacheKey(d){ return "kpl_pool_" + d; }
+function poolPut(d, res){                   // 记住当天抓到的涨停池：9:31 自动刷新遇到源超时也能直接还原
+  try { if (!d || !res || !res.pool || !res.pool.length) return;
+    localStorage.setItem(poolCacheKey(d), JSON.stringify({ d: d, date: res.date, pool: res.pool })); } catch(e) {}
+}
+function poolGetCache(d){
+  try {
+    var s = localStorage.getItem(poolCacheKey(d)); if (!s) return null;
+    var o = JSON.parse(s);
+    if (!o || !o.pool || !o.pool.length) return null;
+    return { pool: o.pool, date: o.date || d.replace(/-/g, ""), day: new Date(d + "T12:00:00") };
+  } catch(e) { return null; }
+}
+function attempt(T, round, seq, ov){        // ov = 直接用给定名单（离线兜底：不再请求涨停池接口）
+  var _p0 = ov ? Promise.resolve(ov) : findPool(T).catch(function(){
+    return auc925Pool(ymdDash(ymd(T))) || poolGetCache(ymdDash(ymd(T))) || { pool: [], date: "" };   // 源超时 → 静态名单兜底，别把当天页面清空
+  });
+  return _p0.then(function(res){
     if (!res.pool.length) return false;
+    poolPut(ymdDash(ymd(T)), res);
     var codes = res.pool.map(function(x){ return x.c; });
     var done = 0;
-    var snap0 = STATE.force ? null : (auc925Snap(ymdDash(ymd(T)), codes) || snapGet(ymdDash(ymd(T))));
+    var snap0 = (STATE.force && !ov) ? null : (auc925Snap(ymdDash(ymd(T)), codes) || snapGet(ymdDash(ymd(T))));
     if (!snapGood(snap0)) snap0 = null;     // 质量不合格的定格（比如退化成全天换手率）丢掉重取
     setStatus(snap0 ? "正在读取 " + ymdDash(ymd(T)) + " 的 9:25 定格数据…"
                     : "正在还原 " + ymdDash(ymd(T)) + " 的 9:25 快照…（0/" + codes.length + "）");
@@ -5161,9 +5205,9 @@ function attempt(T, round, seq){
     // 直接用行情里的「今开 + 成交额」还原竞价额，等 9:31 自动刷新再用分时校正。手机少发上百个请求。
     var skipMin = inAuction() && ymd(T) === ymd(new Date());
     return Promise.all([
-      ptime("q", fetchQuotes(codes)),
+      ptime("q", ov ? fetchQuotes(codes).catch(function(){ return { m: {}, src: "" }; }) : fetchQuotes(codes)),
       ptime("prev", prevPool(res.day).catch(function(){ return []; })),
-      (snap0 || skipMin) ? Promise.resolve([]) : mapLimit(codes, 8, function(c){
+      (snap0 || skipMin || ov) ? Promise.resolve([]) : mapLimit(codes, 8, function(c){
         // 并发 8、只错开 12ms：腾讯分时单只是小请求，63 只从 ~6s 压到 ~1.5s
         return new Promise(function(res){ setTimeout(res, 12); }).then(function(){
           return fetchMinute(c);
@@ -6077,16 +6121,17 @@ function fixProg(){
   ];
   // 节流 2 项：板块节点 / 新题材 本身稀疏（无历史快照源，只能等本机脚本），落后不算故障
   var slow = [
-    ["板块节点",    fixProgLast(typeof BN !== "undefined" ? BN : null)],
-    ["新题材",      fixProgLast(typeof NEWT !== "undefined" ? NEWT : null)]
+    ["板块节点（最近触发）", fixProgLast(typeof BN !== "undefined" ? BN : null), "info"],   // 稀疏项：显示最近触发日，不是落后
+    ["新题材（最近出现）",   fixProgLast(typeof NEWT !== "undefined" ? NEWT : null), "info"]
   ];
   function chipsOf(items){
     return items.map(function(it){
-      var good = !!(it[1] && it[1] >= D0);
-      return '<span class="chip" style="margin:2px 0;' + (good
+      var info = it[2] === "info";
+      var good = !!(!info && it[1] && it[1] >= D0);
+      return '<span class="chip" style="margin:2px 0;' + (info ? 'background:#eef1f5;color:#4a5260;border-color:#d7dce3' : good
         ? 'background:#e8f6ec;color:#1f7a3d;border-color:#bfe3c8'
         : 'background:#fff5e6;color:#b26a00;border-color:#f0d9b0') + '">'
-        + (good ? '✅ ' : '⏳ ') + it[0] + ' ' + (it[1] || '无数据') + '</span>';
+        + (info ? '· ' : (good ? '✅ ' : '⏳ ')) + it[0] + ' ' + (it[1] || '无数据') + '</span>';
     }).join("");
   }
   var okN = 0;
@@ -6824,7 +6869,7 @@ function cvWarm(){
 }
 function renderTail(){                        // 每张卡之间让出一帧，长任务就不会叠成一个大冻结
   RTAILAGAIN = false;
-  var q = [vfAdvice, renderBoomSet, renderYizi, renderNewTop5, fixProg], i = 0;
+  var q = [renderBoomSet, renderYizi, renderNewTop5, fixProg], i = 0;   // 今日竞价建议卡片已删，不再渲染
   (function next(){
     if (i >= q.length){
       if (RTAILAGAIN){ RENDERTAIL = soon(renderTail, 80); return; }   // 尾巴跑的过程中又渲染了一次 → 再跑一轮
