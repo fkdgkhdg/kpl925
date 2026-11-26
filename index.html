@@ -127,10 +127,9 @@
   #ldrNode.active{background:#c02c2c;color:#fff;border-color:#c02c2c}
   #ldrChip.active{background:#1f3864;color:#fff;border-color:#1f3864}
   #ldrLv .lvS .cht{font-style:normal;font-size:10px;font-weight:700;border-radius:6px;padding:0 4px;line-height:1.55;margin-left:1px;white-space:nowrap}
-  #ldrLv .lvS .cht0{background:#e5e7eb;color:#6b7280}
-  #ldrLv .lvS .cht1{background:#3b6fd4;color:#fff}
-  #ldrLv .lvS .cht2{background:#e07a1f;color:#fff}
-  #ldrLv .lvS .cht3{background:#c02c2c;color:#fff}
+  #ldrLv .lvS .chtG{background:#12805c;color:#fff}
+  #ldrLv .lvS .chtM{background:#e8ecf2;color:#4b5563}
+  #ldrLv .lvS .chtR{background:#c02c2c;color:#fff}
   #ldrLv .lvS .chtq{background:transparent;color:#9aa3b2;border:1px dashed #cbd5e1}
   .kpirow{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
   .kpirow>.kpi{flex:1 1 320px;min-width:0}
@@ -678,7 +677,7 @@
         </span>
         <span id="ldrPos" style="font-size:11.5px;color:var(--muted);white-space:nowrap"></span><span id="ldrLive" style="display:none;font-size:11.5px;font-weight:700;color:#c02c2c;white-space:nowrap"></span>
         <span class="fineprint" style="flex:1;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">按板位从高到低分组 · 同板位按首封时间 · 题材带当天涨停家数，点题材筛选 · 点个股看 K线</span>
-        <button id="ldrChip" title="显示首板筹码标签：首板收盘站上主峰、主峰占比＜5%、上方无明显近峰；只加标签，不筛选也不改梯队">首板筹码</button><button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
+        <button id="ldrChip" title="按首板收盘筹码标出好不好接力：良＝获利盘＜70% 且 上方最近峰在 5~15%；险＝上方最近峰≥15%，或获利盘≥80% 且上方无峰；中＝其余；没数据的显示「筹?」。只加标签，不筛选也不改梯队">接力筹码</button><button id="ldrLine" title="只显示「分时从低处一笔直线拉到涨停」的股票：2~9 分钟拉到板（宽松档 12 分钟）、拉升≥3%、几乎不回撤">分时拉板</button><button id="ldrTOn" title="在每只股票后面显示它当天的题材（题材后面的数字＝该题材当天涨停家数）">显示题材</button><button id="ldrNode" title="点一下进入「标节点票」：切到任意交易日，点那天的涨停股（不限首板）就记成节点票，显示它当天是第几板；再点同一只＝取消">节点</button><button id="ldrBig" title="放大 / 还原">放大</button><button id="ldrClose">关闭</button>
       </div>
       <div id="ldrBody" style="flex:1;overflow:auto;padding:10px 12px">
         <div class="chips" id="ldrKpi"></div>
@@ -7438,7 +7437,7 @@ function renderLDR(){
   var chipKpi = '';
   if (LDRCHIP){
     var chc = ldrChipCounts(AF ? AF.rows : A.rows, ds);
-    chipKpi = '<span class="chip" style="background:#fff1f0;color:#c02c2c" title="3分＝三条件全满足；2分／1分依次递减；0分 ' + chc.c[0] + ' 只；待生成 ' + chc.miss + ' 只">首板筹码 <b>3分' + chc.c[3] + '</b> · 2分' + chc.c[2] + ' · 1分' + chc.c[1] + '</span>';
+    chipKpi = '<span class="chip" style="background:#eef7f2;color:#12805c" title="按首板收盘筹码判断好不好接力。良＝获利盘＜70% 且 上方最近峰在 5~15%（连板样本：封板 38%、T1 开盘 +0.6%、大面 11%）；险＝上方最近峰≥15% 或 获利盘≥80% 且上方无峰（封板 35%、T1 开盘 −0.4%、大面 18%）；中＝其余（T1 开盘 −0.3%、大面 15%）。鼠标悬停任意标签看这只票的获利盘和峰位">接力筹码 <b>良' + chc.g + '</b> · 中' + chc.m + ' · <span style="color:#c02c2c">险' + chc.r + '</span>' + (chc.miss ? ' · 待生成 ' + chc.miss : '') + '</span>';
   }
   if (k) k.innerHTML = (live ? '<span class="chip" style="background:#3b6fd4">● 盘中实时 <b>' + ldrClockOf(LDRLIVE.ts) + '</b></span>' : '') + '<span class="chip big" style="background:#c02c2c">涨停 ' + A.n + ' 家</span>'
     + '<span class="chip">最高 <b>' + A.maxB + '</b> 板' + (topB > 1 ? '（' + topB + ' 只）' : '') + '</span>'
@@ -7478,7 +7477,7 @@ function renderLDR(){
   if (note) note.textContent = live
     ? ('口径：盘中实时（东方财富涨停池，每 60 秒自动刷新，最后 ' + ldrClockOf(LDRLIVE.ts) + '，共 ' + A.n + ' 家）。题材按开盘啦「涨停原因」的主动因归族，与开盘啦文章一致：机器人概念、商业航天、冰雪产业、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业、其他。板数＝按昨日梯队连续板数＋1，并用东财 lbc 校正；首封时间实时；题材优先沿用该股上一交易日的开盘啦题材，没有则用同花顺涨停原因兜底（同花顺取不到才退回东财行业；同花顺原因长句、东财行业缩写都会按关键词归到机器人、芯片、零售等 20+ 个大类，只有 1 只的题材也单列不并入「其他」）。收盘 15:10 后自动换成当日完整题材。主板、剔 ST／退市。一个板位一行，点股票名看 K 线。' + YZTNOTE)
     : ('口径：' + (kthDay(ds) ? '开盘啦「涨停原因」题材' : '同花顺涨停原因（开盘啦这一天缺数据）')
-    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、首板筹码标签、分时拉板叠加；首板筹码只显示标签，不筛股。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。' + YZTNOTE);
+    + '，主板、剔 ST／退市。题材按开盘啦文章大类归族（与 11月09日复盘文章一致）：机器人概念、商业航天、冰雪产业(体育产业)、煤炭、芯片、零售、光伏、PCB概念、基础建设、农业分别成类，其余归其他；「东方字辈」另加一个紫色并列标签（点一下只看名字带「东方」的票），不覆盖上面的文章分类。板数＝按涨停池连续出现的天数重算（中间断过板就从 1 重新数，不沿用开盘啦「N天M板」的累计口径，原标见悬停提示）。一个板位一行，横排该板位所有股票，名字后面的小字＝当天首封时间（越早越硬，同板位按首封从早到晚排）；鼠标悬停看板型、代码和题材（题材后面的数字＝该题材组当天涨停家数）。点上面的题材条只列该题材组的票，再点「全部」回来；点股票名看这只票的日 K／分时。可与题材、接力筹码标签、分时拉板叠加；接力筹码只加标签、不筛股——按这一波首板那天的获利盘和上方最近峰位，给个 良／中／险（悬停看读数）。板位标签下面的 ▲▼ ＝ 比上一个交易日同板位的增减（▲红＝变多、▼绿＝变少，悬停看昨天几只）。上方 ◀ ▶ 或日期框可以翻看以前的交易日（' + (ldrDays().length ? ldrIso(ldrDays()[0]).slice(0,4) + ' 年以来' : '') + '）。' + YZTNOTE);
 }
 var LDRT5NEXT = true;                     // 梯队列下面默认显示「第二天」的 9:25 榜单
 function ldrNextTradeIso(iso){
@@ -7664,29 +7663,42 @@ function ldrChipInfo(code, ds, board){
   }
   return v ? { v:v, d0:d0 } : null;
 }
-function ldrChipBadge(info){
-  if (!info) return '<em class="cht chtq" title="首板筹码待生成：若今天是首板，需收盘后更新">筹?</em>';
-  var v = info.v, sc = Math.max(0, Math.min(3, +v[6] || 0));
-  var od = +v[3] < 0 ? '无' : '+' + (+v[3]).toFixed(1) + '%';
+function ldrChipTier(v){
+  if (!v) return '';
+  var ben = +v[4], od = +v[3];
+  if (ben < 70 && od >= 5 && od < 15) return 'G';           // 获利盘不高 + 头顶 5~15% 有峰：最容易过峰接力
+  if (od >= 15 || (ben >= 80 && od < 0)) return 'R';          // 峰太远没参照，或高获利盘且头顶无峰：最容易冲高被砸
+  return 'M';
+}
+var LDRCHIPT = { G:{t:'良',cls:'chtG',d:'获利盘＜70% 且 上方最近峰 5~15%'}, M:{t:'中',cls:'chtM',d:'两边都不极端'}, R:{t:'险',cls:'chtR',d:'上方峰≥15%，或获利盘≥80% 且上方无峰'} };
+function ldrChipBadge(info, board){
+  if (!info) return '<em class="cht chtq" title="接力筹码待生成：首板那天收盘后才算（当天盘中或数据还没更新）">筹?</em>';
+  var v = info.v, tier = ldrChipTier(v), st = LDRCHIPT[tier] || LDRCHIPT.M;
+  var ben = +v[4] || 0, od = +v[3];
   var nl = String.fromCharCode(10);
-  var tt = '首板 ' + ldrIso(info.d0) + ' 收盘筹码（东财三角分布模型）' + nl
-    + '首板收盘较主峰：' + (v[0] >= 0 ? '+' : '') + v[0] + '%' + nl
-    + '主峰筹码占比：' + v[1] + '%（<5% 达标）' + nl
-    + '90%筹码带宽：' + v[2] + '%' + nl
-    + '上方最近峰：' + od + '（无峰达标）' + nl
-    + '获利盘：' + v[4] + '%' + nl
+  var lian = (board || 2) >= 2;
+  var hist = (lian
+    ? { G:'封板 38% · T1 开盘 +0.60% · T1 胜 52% · 大面 11%', M:'封板 36% · T1 开盘 −0.31% · T1 胜 48% · 大面 15%', R:'封板 35% · T1 开盘 −0.42% · T1 胜 48% · 大面 18%' }
+    : { G:'封板 17% · T1 开盘 −0.13% · T1 胜 45% · 大面 10%', M:'封板 15% · T1 开盘 −0.34% · T1 胜 43% · 大面 9%', R:'封板 19% · T1 开盘 −0.45% · T1 胜 43% · 大面 11%' });
+  var tt = '接力筹码：' + st.t + '（' + st.d + '）' + nl
+    + '首板 ' + ldrIso(info.d0) + ' 收盘快照' + (lian ? '（取这一波第 1 板那天，不是今天）' : '（当天收盘）') + nl
+    + '获利盘：' + ben.toFixed(1) + '%' + nl
+    + '上方最近峰：' + (od < 0 ? '无峰（创新高区，头上没有压力位参照）' : '+' + od.toFixed(1) + '%') + nl
+    + '收盘较主峰：' + (v[0] >= 0 ? '+' : '') + v[0] + '% · 主峰占比 ' + v[1] + '% · 90%带宽 ' + v[2] + '%' + nl
     + '首板换手：' + v[5] + '%' + nl
-    + '三条件：' + sc + '/3';
-  return '<em class="cht cht' + sc + '" title="' + esc(tt) + '">筹' + sc + '</em>';
+    + '同档历史（' + (lian ? '连板' : '首板') + ' 样本）：' + hist[tier] + nl
+    + '口径：东财三角分布模型。获利盘低 ＋ 头顶 5~15% 有峰最好接力；头顶没峰或峰太远、获利盘又高，最容易冲高被砸。';
+  return '<em class="cht ' + st.cls + '" title="' + esc(tt) + '">' + st.t + '</em>';
 }
 function ldrChipCounts(rows, ds){
-  var c = [0,0,0,0], miss = 0;
-  (rows || []).forEach(function(r){
-    var info = ldrChipInfo(r.c, ds, r.b);
-    if (info) c[Math.max(0, Math.min(3, +info.v[6] || 0))]++;
-    else miss++;
+  var g = 0, m = 0, r = 0, miss = 0;
+  (rows || []).forEach(function(row){
+    var info = ldrChipInfo(row.c, ds, row.b);
+    if (!info){ miss++; return; }
+    var t = ldrChipTier(info.v);
+    if (t === 'G') g++; else if (t === 'R') r++; else m++;
   });
-  return { c:c, miss:miss };
+  return { g:g, m:m, r:r, miss:miss };
 }
 function ldrLineCache(){
   if (LDRLN) return LDRLN;
@@ -7982,7 +7994,7 @@ function ldrPaint(){
       var ndm = !nodeIsDay(ds) && !!nodeSet()[r.c];   // 节点日当天不重复打标（当天首板本来就全是节点）
       if (ndm) ttl += ' · ◆节点票（节点日首板，今天 ' + b + ' 板）';
       h += '<a class="kbtn lvS' + (b >= 3 ? ' hot' : '') + (b === 1 ? ' lv1' : '') + (ndm ? ' nd' : '') + '" data-kc="' + r.c + '" data-kn="' + esc(r.n) + '" data-kd="' + ds + '" data-lb="' + b + '" title="' + esc(ttl) + '">'
-        + '<b>' + esc(r.n) + '</b>' + (zt ? '<em class="' + (zt === 'Y' ? 'yzb' : 'tzb') + '">' + (zt === 'Y' ? '一字' : 'T字') + '</em>' : '') + (ndm ? '<em class="ndb">◆节点</em>' : '') + (LDRCHIP ? ldrChipBadge(ci) : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
+        + '<b>' + esc(r.n) + '</b>' + (zt ? '<em class="' + (zt === 'Y' ? 'yzb' : 'tzb') + '">' + (zt === 'Y' ? '一字' : 'T字') + '</em>' : '') + (ndm ? '<em class="ndb">◆节点</em>' : '') + (LDRCHIP ? ldrChipBadge(ci, b) : '') + '<i>' + (ztHHMM(r.ts) || '') + '</i>'
         + (LDRTS ? '<em>' + esc(fts.slice(0, 2).map(function(x){ return x.t + x.n; }).join('·') + (fts.length > 2 ? ' +' + (fts.length - 2) : '')) + '</em>' : '')
         + (ln ? '<em style="color:#c02c2c;font-style:normal;background:#fff1f0;border-radius:6px;padding:0 3px;margin-left:2px" title="' + esc('分时直线拉板：' + ldrHM(ln.s) + ' 起拉，' + ln.d + ' 分钟拉 ' + ln.g + '% 到涨停，最大回撤 ' + ln.dd + '%') + '">直线' + ldrHM(ln.s) + '</em>' : '')
         + '</a>';
@@ -10714,7 +10726,7 @@ vfInit();
       if (LDRCHIP){
         LDRCHIP = false;
         t.classList.remove("active");
-        t.textContent = "首板筹码";
+        t.textContent = "接力筹码";
         if (typeof renderLDR === "function") renderLDR();
       } else {
         t.disabled = true;
@@ -10722,7 +10734,7 @@ vfInit();
         if (typeof ldrChipEnsure === "function") ldrChipEnsure(function(ok){
           var b = document.getElementById("ldrChip"); if (!b) return;
           b.disabled = false;
-          if (!ok){ b.textContent = "首板筹码"; b.title = "筹码数据加载失败，请刷新页面重试"; return; }
+          if (!ok){ b.textContent = "接力筹码"; b.title = "筹码数据加载失败，请刷新页面重试"; return; }
           LDRCHIP = true;
           b.classList.add("active");
           b.textContent = "隐藏筹码";
