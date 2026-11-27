@@ -387,6 +387,34 @@
   #advToggle:hover{border-color:var(--head)}
   @media (max-width: 640px){ #advToggle{padding:11px 14px} }
   
+  /* 接力进场面板 */
+  #entryTbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  #entryTbl th{position:sticky;top:0;z-index:2;background:var(--panel);text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;padding:6px 7px}
+  #entryTbl td{border-bottom:1px solid rgba(0,0,0,.06);vertical-align:middle;padding:6px 7px;white-space:nowrap}
+  #entryTbl tr:hover td{background:rgba(31,56,100,.045)}
+  .entName{font-weight:700;color:var(--fg);cursor:pointer;text-decoration:none}
+  .entName:hover{color:#c02c2c;text-decoration:underline}
+  .entSub{display:block;font-size:10.5px;color:#9aa3b2;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400}
+  .entB{font-weight:700;color:#1f3864}
+  .entSt{display:inline-block;font-style:normal;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;line-height:1.5;white-space:nowrap}
+  .entSt.ready{background:#12805c;color:#fff}
+  .entSt.dip{background:#1f6fb2;color:#fff}
+  .entSt.wait{background:#eef2f7;color:#3d4a5c;border:1px solid #cbd5e1}
+  .entSt.watch{background:#e8ecf2;color:#4b5563}
+  .entSt.risk{background:#c02c2c;color:#fff}
+  .entSt.miss{background:#fff;color:#9aa3b2;border:1px dashed #cbd5e1;font-weight:600}
+  .entSc{font-weight:700;font-variant-numeric:tabular-nums;color:#1f3864}
+  .klbtn{font:11.5px inherit;padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:var(--chip);color:var(--fg);cursor:pointer}
+  .klbtn:hover{border-color:#c02c2c;color:#c02c2c}
+  @media (max-width:760px){
+    #entryWrap{align-items:stretch;justify-content:stretch}
+    #entryBox{width:100vw!important;max-width:100vw;height:100vh!important;height:100dvh!important;max-height:100dvh;border:0;border-radius:0}
+    #entryBar{flex-wrap:wrap;gap:6px;padding:6px 8px 8px}
+    #entryBar>b{flex:0 0 auto;font-size:12.5px}
+    #entryBar button{flex:0 0 auto;min-height:32px;padding:6px 9px;font-size:12.5px}
+    #entryMeta{flex:1 1 100%;order:9;white-space:normal;font-size:11.5px}
+    #entryBody{padding:8px}
+  }
   /* 题材榜（开盘啦口径） */
   #tbTbl td{padding-top:7px;padding-bottom:7px}
   .tbRank{display:inline-block;min-width:20px;text-align:center;border-radius:5px;color:#fff;font-weight:700;font-size:11.5px;padding:1px 4px;background:#8a8f98}
@@ -407,7 +435,7 @@
     <div class="bar">
       <button id="btnRefresh" class="active">刷新最新</button>
       <button id="recalcBtn" title="清掉当天缓存，把名单 / 行情 / 板块 / 情绪序列全部重新抓一遍">重算</button>
-      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位 / F 龙虎榜板块活跃）">龙虎榜席位 ▸</button><button id="ldrBtn" title="当晚复盘连板梯队：按板位分组，题材带当天涨停家数，点题材筛选，点个股看K线">连板梯队 ▸</button>
+      <button id="rvBtn">复盘本</button><button id="plBtn" title="输入代码或股票名，看断板次日怎么办 + 压力/支撑位">持仓纪律</button><button id="seatxBtn" title="龙虎榜席位结构对照（A 榜单日席位结构 / B 席位特征×次日表现 / C 买一占比条件拆解 / D 最新一档龙虎榜明细 / E 最近高连板股活跃席位 / F 龙虎榜板块活跃）">龙虎榜席位 ▸</button><button id="ldrBtn" title="当晚复盘连板梯队：按板位分组，题材带当天涨停家数，点题材筛选，点个股看K线">连板梯队 ▸</button><button id="entryBtn" title="从最近完整交易日的连板股里，按筹码峰（首板收盘）、出货嫌疑和今日竞价，筛出现在还能不能接力进场；点开可实时刷新">接力进场 ▸</button>
       <span id="status">正在加载…</span>
     <span id="verNote" style="color:#667;font-size:12px;margin-left:8px"></span>
     </div>
@@ -690,7 +718,26 @@
     </div>
   </div>
 
-  <p class="note fineprint">
+    <div id="entryWrap" style="position:fixed;inset:0;z-index:119;background:rgba(0,0,0,.42);display:none;align-items:center;justify-content:center">
+    <div id="entryBox" style="width:min(1080px,96vw);height:82vh;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.32);display:flex;flex-direction:column;overflow:hidden">
+      <div id="entryBar" style="padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;background:var(--chip)">
+        <b style="font-size:13px">接力进场 · 连板股</b>
+        <span id="entryMeta" style="font-size:12px;color:var(--muted);white-space:nowrap"></span>
+        <span style="flex:1"></span>
+        <button id="entryF_ready" class="active" title="连板≥2 + 筹码良 + 无出货嫌疑 + 竞价 0~7%（或还没到 9:25，先按筹码列候选）">可进场</button>
+        <button id="entryF_dip" title="筹码过关、无出货嫌疑，但竞价 −2~0%：低吸观察，不算可进场">低吸</button>
+        <button id="entryF_watch" title="筹码一般 / 竞价偏高 / 筹码还没生成">观察</button>
+        <button id="entryF_risk" title="筹码险 或 出货嫌疑 或 竞价低于 −2%">风险</button>
+        <button id="entryF_all" title="全部连板候选">全部</button>
+        <button id="entryReload" title="立刻重取行情（面板打开时每 60 秒自动刷一次）">刷新</button>
+        <button id="entryBig" title="放大 / 还原">放大</button>
+        <button id="entryClose">关闭</button>
+      </div>
+      <div id="entryBody" style="flex:1;overflow:auto;padding:8px 10px"><div class="empty" style="padding:12px">点「接力进场 ▸」加载…</div></div>
+    </div>
+  </div>
+
+<p class="note fineprint">
     口径：竞价涨幅＝9:25 竞价成交价 ÷ 前收盘；竞价成交额＝9:25 集合竞价成交额；实际换手＝竞价成交额 ÷ 实际流通市值（取最近一次统计值，未收录个股用普通换手率顶替并标「≈」）。开盘档位＝竞价高低按<b>绝对涨幅</b>分 6 档：低开 / 平开 0~2% / 高开 2~5% / 5~7% / 7~9.5% / ≥9.5%（以前用的是「竞价涨幅 ÷ 涨停幅度」的相对档，现已换成绝对涨幅，因为绝对涨幅档对断板卖出的收益区分度最高）。★优选档＝A 口径（9:25 竞价买、封板持有、第一次断板卖出）里不亏的两档（平开 0~2% = +0.25%、高开 5~7% = +0.02%；低开最差 -2.09%、7~9.5% -1.75%）；⚠ 高位高开＝<b>≥4 板且高开 >7%</b>，该组合 A 均值 -2.77%、中位 -4.19%、胜率 36.7%（30 笔），其中 4 板高开 7~9.5% 最差：均值 -4.09% / 中位 -9.56%（15 笔）；同是 ≥4 板，平开 0~5% 反而是均值 +3.52% / 中位 +0.75%（68 笔）。回测口径：856 笔 / 246 个交易日（2025-09-10 ~ 2026-09-18）。
     历史收益＝同「板数 × 开盘档位」组合的样本均值，<b>口径为 A</b>（9:25 竞价买入 → 封板继续持有 → 第一次断板时卖出；买入日就没封住的最早只能按次日开盘价卖，受 T+1 限制），样本少于 8 只波动很大。情绪周期＝六阶段循环（冰点→修复→主升发酵→高潮→分歧衰退→退潮主跌），用四个指标的近十年分位自适应判定（只统计主板）：晋级率、大面率（昨日涨停股当日跌≤-5% 比例）、最高连板、涨停家数；优先级为 退潮 → 冰点 → 高潮 → 分歧衰退 → 主升 → 修复。本页只是历史统计工具，不构成投资建议。
   </p>
@@ -10808,6 +10855,278 @@ vfInit();
 (function(){ if(!/[?&]perf=1/.test(location.search)) return;
   var t0=performance.now(), iv=setInterval(function(){ var tb=document.getElementById("tbl"); var n=tb?tb.querySelectorAll("tr").length:0;
     if(n>3){ clearInterval(iv); var f=window.__pf||{}; var msg="⏱"+((performance.now()/1000).toFixed(2))+"s q"+((f.q||0)/1000).toFixed(1)+" p"+((f.prev||0)/1000).toFixed(1)+" t"+((f.tq||0)/1000).toFixed(1)+" · "+document.title.replace(/^⏱[^·]*· /,""); document.title=msg; } },100); })();
+</script>
+<script>
+/* ===== 接力进场：从连板股里筛「现在还能不能接力」 =====
+   口径：候选＝最近完整交易日的连板股（≥2 板，只看主板、去 ST）。
+   筹码＝这一波「首板那天收盘」的峰（ldrChipInfo 内部按 board 回退，不是用今天）；
+   出货嫌疑＝当天筹码变化像高位派发（CHIPOUT 出货分 ≥ 2.5038）。
+   历史（主板 ARCDATA + CHIPTAG，2016 以来）：
+     连板≥2 全部 4323 例：T1 开盘 −0.24% / 胜率 48.5% / 大面 16.1%
+     ＋筹码良 602 例：T1 开盘 +0.62% / 51.7% / 10.8%
+     ＋竞价 0~7% 344 例：T1 开盘 +0.90% / 53.7% / 4.9%（当日均涨 +3.18%）
+     良＋竞价 <−2% 72 例：晋级仅 6.9%、大面 34.7%；良＋竞价 >7% 117 例：T1 收盘 −0.12%
+   所以「可进场」＝连板≥2 ＋ 筹码良 ＋ 无出货嫌疑 ＋ 今日竞价 0~7%；−2~0% 单列「低吸」。 */
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function pad2(n){ return (n < 10 ? "0" : "") + n; }
+  function bj(){
+    if (typeof ldrBjNow === "function") return ldrBjNow();
+    var d = new Date(Date.now() + 8 * 3600 * 1000);
+    return { y:d.getUTCFullYear(), mo:d.getUTCMonth() + 1, d:d.getUTCDate(), h:d.getUTCHours(), mi:d.getUTCMinutes(), s:d.getUTCSeconds(), wd:d.getUTCDay() };
+  }
+  function todayKey(){ var n = bj(); return "" + n.y + pad2(n.mo) + pad2(n.d); }
+  function hhmmss(){ var n = bj(); return pad2(n.h) + ":" + pad2(n.mi) + ":" + pad2(n.s); }
+  function num(v){ v = +v; return (v === v && isFinite(v)) ? v : null; }
+  function qNum(q, a, b){ if (!q) return null; var v = num(q[a]); if (v === null && b) v = num(q[b]); return v; }
+  function qPrice(q){ return qNum(q, "f2", "price"); }
+  function qChg(q){ return qNum(q, "f3", "chg"); }
+  function qPre(q){ return qNum(q, "f18", "pre"); }
+  function qOpen(q){ return qNum(q, "f17", "open"); }
+  function aucOf(q){
+    var p = qPre(q), o = qOpen(q);
+    if (!(p > 0) || !(o > 0)) return null;
+    var r = (o / p - 1) * 100;
+    return isFinite(r) ? r : null;
+  }
+  var ST = {
+    ready:{ t:"可进场", c:"ready" },
+    dip:{ t:"低吸", c:"dip" },
+    wait:{ t:"待竞价", c:"wait" },
+    watch:{ t:"观察", c:"watch" },
+    chase:{ t:"追高", c:"watch" },
+    risk:{ t:"风险", c:"risk" },
+    miss:{ t:"待生成", c:"miss" }
+  };
+  var BIG = false, FILTER = "ready", ROWS = [], DAY = "", SRC = "", TS = 0, TIMER = 0, LOADING = false;
+
+  function aucOn(){
+    var n = bj();
+    if (n.wd === 0 || n.wd === 6) return false;
+    if (todayKey() === DAY) return false;                  // 候选就是今天 → 明早再比竞价
+    return (n.h * 100 + n.mi) >= 925;
+  }
+  function classify(r, on){
+    if (r.miss) return "miss";
+    if (r.tier === "R") return "risk";
+    if (r.hot) return "risk";
+    if (r.tier !== "G") return "watch";
+    if (!on || r.auc === null) return "wait";
+    if (r.auc < -2) return "risk";
+    if (r.auc < 0) return "dip";
+    if (r.auc <= 7) return "ready";
+    return "chase";
+  }
+  function scoreOf(r){
+    var s = 0, ben = r.ben, od = r.od;
+    if (r.tier === "G") s += 14; else if (r.tier === "R") s -= 14; else s += 2;
+    if (r.miss) s -= 4;
+    s += r.hot ? -10 : 6;
+    if (ben !== null){ if (ben <= 30) s += 8; else if (ben <= 50) s += 5; else if (ben <= 70) s += 1; else s -= 6; }
+    if (od !== null){ if (od < 0) s += 7; else if (od < 5) s -= 4; else if (od < 15) s += 4; else s -= 5; }
+    if (r.auc !== null){
+      var a = r.auc;
+      if (a >= 0 && a <= 7) s += 9;
+      else if (a >= -2 && a < 0) s += 4;
+      else if (a > 7 && a < 9.5) s -= 3;
+      else if (a >= 9.5) s -= 6;
+      else s -= 12;
+    }
+    return Math.round(s);
+  }
+  function buildRows(){
+    var day = (typeof ldrDay === "function") ? ldrDay() : "";
+    var A = (day && typeof ldrAgg === "function") ? ldrAgg(day) : null;
+    var src = (A && A.rows) ? A.rows : [], out = [];
+    src.forEach(function(x){
+      var code = String(x.c || "");
+      if (!/^(60|00)/.test(code)) return;
+      var name = String(x.n || "");
+      if (/ST|退/.test(name)) return;
+      var board = Math.max(1, +x.b || 1);
+      if (board < 2) return;
+      var ci = (typeof ldrChipInfo === "function") ? ldrChipInfo(code, day, board) : null;
+      var oi = (typeof ldrOutInfo === "function") ? ldrOutInfo(code, day) : null;
+      var osc = oi ? num(oi.v[3]) : null;
+      out.push({
+        code: code, name: name, board: board, day: day,
+        tags: (x.tags || []).map(function(t){ return t.t; }).slice(0, 2).join(" · "),
+        tier: ci ? (typeof ldrChipTier === "function" ? ldrChipTier(ci.v) : "") : "",
+        miss: !ci,
+        ben: ci ? num(ci.v[4]) : null,
+        od: ci ? num(ci.v[3]) : null,
+        osc: osc, hot: (osc !== null && osc >= 2.5038),
+        outDay: oi ? oi.d : "",
+        auc: null, chg: null, price: null
+      });
+    });
+    out.sort(function(a, b){ return b.board - a.board || (a.code < b.code ? -1 : 1); });
+    return { day: day, rows: out };
+  }
+  function applyQuotes(rows, q){
+    if (!q) return;
+    rows.forEach(function(r){
+      var x = q[r.code]; if (!x) return;
+      r.price = qPrice(x); r.chg = qChg(x); r.auc = aucOf(x);
+    });
+  }
+  function pct(v){ return (v > 0 ? "+" : "") + v.toFixed(2) + "%"; }
+  function col(v){
+    var c = v > 0 ? "#c02c2c" : (v < 0 ? "#12805c" : "#667");
+    return '<b style="color:' + c + '">' + pct(v) + '</b>';
+  }
+  function chipHtml(r){
+    if (r.miss) return '<em class="entSt miss">待生成</em>';
+    if (r.tier === "G") return '<em class="entSt ready" title="上方零套牢盘或头顶 5~15% 才有峰，且获利盘＜70%">良</em>';
+    if (r.tier === "R") return '<em class="entSt risk" title="获利盘≥70%，头顶 5% 内就压着峰、或峰远在 15% 外">险</em>';
+    return '<em class="entSt watch" title="不极端">中</em>';
+  }
+  function render(){
+    var body = $("entryBody"); if (!body) return;
+    if (!ROWS.length){ body.innerHTML = '<div class="empty" style="padding:12px">没有连板候选</div>'; return; }
+    var on = aucOn();
+    var cnt = { ready:0, dip:0, wait:0, watch:0, chase:0, risk:0, miss:0 };
+    ROWS.forEach(function(r){ r.st = classify(r, on); r.sc = scoreOf(r); cnt[r.st] = (cnt[r.st] || 0) + 1; });
+    var meta = $("entryMeta");
+    if (meta){
+      var live = (typeof ldrLiveSession === "function") && ldrLiveSession() && on;
+      meta.innerHTML = (live ? '<b style="color:#c02c2c">● 实时 ' + hhmmss() + '</b>' : '<b style="color:#667">○ ' + (on ? "盘中快照" : "收盘快照") + ' ' + hhmmss() + '</b>')
+        + ' · 候选日 ' + esc(ldrIso(DAY)) + ' · 连板 ' + ROWS.length + ' 只'
+        + ' · <b style="color:#12805c">可进场 ' + cnt.ready + '</b>' + (cnt.wait ? ' · 待竞价 ' + cnt.wait : '') + ' · 低吸 ' + cnt.dip + ' · 风险 ' + cnt.risk
+        + (SRC ? ' · ' + esc(SRC) : '');
+    }
+    var list = ROWS.filter(function(r){
+      if (FILTER === "all") return true;
+      if (FILTER === "ready") return r.st === "ready" || r.st === "wait";
+      if (FILTER === "dip") return r.st === "dip";
+      if (FILTER === "watch") return r.st === "watch" || r.st === "chase" || r.st === "miss";
+      if (FILTER === "risk") return r.st === "risk";
+      return true;
+    });
+    list.sort(function(a, b){ return b.sc - a.sc || b.board - a.board; });
+    var h = '<div class="tablewrap"><table id="entryTbl"><thead><tr>'
+      + '<th>状态</th><th>股票</th><th>板</th>'
+      + '<th title="筹码档：良＝上方零套牢盘或头顶 5~15% 才有峰，且获利盘＜70%">筹码</th>'
+      + '<th title="首板那天收盘的获利盘占比">获利盘</th>'
+      + '<th title="首板收盘时上方最近一个筹码峰距现价多远；负＝头上没有峰（全部筹码在下方）">上方峰</th>'
+      + '<th title="当天筹码变化像不像高位派发（分≥2.50）。只是降预期，不等于确认出货">出货</th>'
+      + '<th title="今开 ÷ 昨收 − 1；9:25 之后才有值">竞价</th>'
+      + '<th>现涨幅</th><th title="筹码＋出货＋获利盘＋上方峰＋竞价合成，越高越靠前">评分</th><th></th></tr></thead><tbody>';
+    if (!list.length){
+      var tips = { ready:"这段时间没有「筹码过关 + 竞价合适」的连板股", dip:"没有低开到 −2~0% 的良股", watch:"没有观察档", risk:"没有风险档" };
+      h += '<tr><td colspan="11" class="empty" style="padding:14px">' + (tips[FILTER] || "没有候选") + '，点上面「全部」看完整名单。</td></tr>';
+    }
+    list.forEach(function(r){
+      var st = ST[r.st] || ST.watch;
+      h += '<tr>'
+        + '<td><em class="entSt ' + st.c + '">' + st.t + '</em></td>'
+        + '<td><a class="entName" data-kl="' + r.code + '" data-kn="' + esc(r.name) + '" title="点开看 K线">' + esc(r.name) + '</a><span class="entSub">' + esc(r.tags || "") + '</span></td>'
+        + '<td class="entB">' + r.board + '</td>'
+        + '<td>' + chipHtml(r) + '</td>'
+        + '<td>' + (r.ben === null ? "—" : r.ben.toFixed(1) + "%") + '</td>'
+        + '<td>' + (r.od === null ? "—" : (r.od < 0 ? "无峰" : "+" + r.od.toFixed(1) + "%")) + '</td>'
+        + '<td>' + (r.osc === null ? "—" : (r.hot ? '<em class="entSt risk">' + r.osc.toFixed(2) + '</em>' : r.osc.toFixed(2))) + '</td>'
+        + '<td>' + ((on && r.auc !== null) ? col(r.auc) : "—") + '</td>'
+        + '<td>' + (r.chg === null ? "—" : col(r.chg)) + '</td>'
+        + '<td class="entSc">' + r.sc + '</td>'
+        + '<td><button class="klbtn" data-kl="' + r.code + '" data-kn="' + esc(r.name) + '">K线</button></td>'
+        + '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<p class="note fineprint" style="margin:8px 0 0;font-size:11.5px;color:#8a929e">'
+      + '候选＝' + esc(ldrIso(DAY)) + ' 收盘的连板股（≥2 板，主板、去 ST）。筹码取这一波<b>首板收盘</b>的峰；出货嫌疑＝当天筹码变化像高位派发（分≥2.50），只是降预期。'
+      + '<br>历史：连板≥2 全部 4323 例 T1 开盘 −0.24%、大面 16.1%；＋筹码良 602 例 +0.62%／大面 10.8%；＋竞价 0~7% 344 例 <b>+0.90%、T1 胜率 53.7%、大面 4.9%</b>。良＋竞价 &lt;−2% 72 例：晋级仅 6.9%、大面 34.7%，所以低开直接踢出可进场；良＋竞价 &gt;7% 追高，T1 收盘 −0.12%。'
+      + (on ? '' : '<br>现在不是竞价时段：状态只按筹码给，竞价列留空；9:25 后自动按当天竞价重排。')
+      + '</p>';
+    body.innerHTML = h;
+  }
+  function refresh(){
+    if (LOADING) return;
+    var body = $("entryBody"); if (!body) return;
+    LOADING = true;
+    var meta = $("entryMeta");
+    if (meta && !ROWS.length) meta.textContent = "加载筹码数据…";
+    var go = function(){
+      var built = buildRows(), day = built.day, rows = built.rows;
+      if (!day){
+        body.innerHTML = '<div class="empty" style="padding:12px">还没有涨停池数据（KPLTH / ZTRS 未加载）</div>';
+        LOADING = false; return;
+      }
+      if (!rows.length){
+        body.innerHTML = '<div class="empty" style="padding:12px">' + esc(ldrIso(day)) + ' 这天没有连板股</div>';
+        LOADING = false; return;
+      }
+      var fin = function(res){
+        applyQuotes(rows, (res && res.m) ? res.m : null);
+        ROWS = rows; DAY = day; SRC = (res && res.src) ? res.src : ""; TS = Date.now();
+        LOADING = false; render();
+      };
+      var codes = rows.map(function(r){ return r.code; });
+      if (typeof fetchQuotes === "function") fetchQuotes(codes, true).then(fin).catch(function(){ fin(null); });
+      else fin(null);
+    };
+    if (typeof ldrChipEnsure === "function") ldrChipEnsure(function(){ go(); });
+    else go();
+  }
+  function stopTimer(){ if (TIMER){ clearInterval(TIMER); TIMER = 0; } }
+  function startTimer(){
+    stopTimer();
+    TIMER = setInterval(function(){
+      var w = $("entryWrap");
+      if (!w || w.style.display === "none"){ stopTimer(); return; }
+      if (document.hidden) return;
+      var n = bj(); if (n.wd === 0 || n.wd === 6) return;
+      var hm = n.h * 100 + n.mi;
+      if (hm < 915 || hm > 1505) return;
+      refresh();
+    }, 60000);
+  }
+  function open(){
+    var w = $("entryWrap"); if (!w) return;
+    w.style.display = "flex";
+    refresh();
+    startTimer();
+  }
+  function close(){ var w = $("entryWrap"); if (w) w.style.display = "none"; stopTimer(); }
+  function setFilter(f){
+    FILTER = f;
+    ["ready","dip","watch","risk","all"].forEach(function(k){
+      var b = $("entryF_" + k); if (b) b.classList.toggle("active", k === f);
+    });
+    render();
+  }
+  var bodyEl = $("entryBody");
+  if (bodyEl) bodyEl.addEventListener("click", function(e){
+    var t = e.target;
+    if (!t) return;
+    var code = t.getAttribute ? (t.getAttribute("data-kl") || "") : "";
+    if (code){
+      var nm = t.getAttribute("data-kn") || "";
+      if (typeof klOpen === "function") klOpen(code, nm, DAY);
+      e.preventDefault();
+      return;
+    }
+  });
+  document.addEventListener("click", function(e){
+    var t = e.target; if (!t || !t.id) return;
+    if (t.id === "entryBtn"){ open(); e.preventDefault(); return; }
+    if (t.id === "entryClose"){ close(); e.preventDefault(); return; }
+    if (t.id === "entryReload"){ refresh(); e.preventDefault(); return; }
+    if (t.id === "entryBig"){
+      var b = $("entryBox"); if (b){ BIG = !BIG; b.style.width = BIG ? "99vw" : "min(1080px,96vw)"; b.style.height = BIG ? "98vh" : "82vh"; }
+      e.preventDefault(); return;
+    }
+    if (t.id === "entryF_ready"){ setFilter("ready"); e.preventDefault(); return; }
+    if (t.id === "entryF_dip"){ setFilter("dip"); e.preventDefault(); return; }
+    if (t.id === "entryF_watch"){ setFilter("watch"); e.preventDefault(); return; }
+    if (t.id === "entryF_risk"){ setFilter("risk"); e.preventDefault(); return; }
+    if (t.id === "entryF_all"){ setFilter("all"); e.preventDefault(); return; }
+    if (t.id === "entryWrap"){ close(); }
+  });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") close(); });
+  window.__entryOpen = open;
+  window.__entryRefresh = refresh;
+})();
 </script>
 <script src="relay-table.js"></script>
 </body>
